@@ -19,6 +19,7 @@ import {
   ReceiptStatus,
   calculateGradeAndRemark,
 } from '@/types';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   SCHOOL_INFO,
   INITIAL_CLASSES,
@@ -258,7 +259,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (savedStudents) {
         const parsed = JSON.parse(savedStudents);
-        if (Array.isArray(parsed) && parsed.length >= 4) {
+        if (Array.isArray(parsed)) {
           const hydrated = parsed.map((s: StudentProfile) => {
             const isFeePaid = s.fee_paid !== undefined ? s.fee_paid : s.tuition_status === 'paid';
             const payStatus = s.payment_status || (isFeePaid ? 'paid' : 'unpaid');
@@ -273,9 +274,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           });
           setStudents(hydrated);
         } else {
-          setStudents(INITIAL_STUDENTS);
-          localStorage.setItem('apex_students', JSON.stringify(INITIAL_STUDENTS));
+          setStudents([]);
         }
+      }
+
+      // Fetch live data from Supabase if configured
+      if (isSupabaseConfigured()) {
+        const fetchLiveData = async () => {
+          try {
+            const [stdRes, staffRes, resRes, classRes, feeRes, recRes] = await Promise.all([
+              supabase.from('students').select('*'),
+              supabase.from('staff').select('*'),
+              supabase.from('term_results').select('*'),
+              supabase.from('classes').select('*'),
+              supabase.from('fee_structures').select('*'),
+              supabase.from('receipts').select('*'),
+            ]);
+
+            if (stdRes.data && Array.isArray(stdRes.data)) {
+              setStudents(stdRes.data as StudentProfile[]);
+              try { localStorage.setItem('apex_students', JSON.stringify(stdRes.data)); } catch {}
+            }
+            if (staffRes.data && Array.isArray(staffRes.data)) {
+              setTeachers(staffRes.data as TeacherProfile[]);
+              try { localStorage.setItem('apex_teachers', JSON.stringify(staffRes.data)); } catch {}
+            }
+            if (resRes.data && Array.isArray(resRes.data)) {
+              setResults(resRes.data as StudentResult[]);
+              try { localStorage.setItem('apex_results', JSON.stringify(resRes.data)); } catch {}
+            }
+            if (classRes.data && Array.isArray(classRes.data) && classRes.data.length > 0) {
+              setClasses(classRes.data as AcademicClass[]);
+            }
+            if (feeRes.data && Array.isArray(feeRes.data)) {
+              setFeeStructures(feeRes.data as FeeStructure[]);
+            }
+            if (recRes.data && Array.isArray(recRes.data)) {
+              setReceipts(recRes.data as PaymentReceipt[]);
+            }
+          } catch (err) {
+            console.error('Error fetching data from Supabase:', err);
+          }
+        };
+        fetchLiveData();
       }
 
       if (savedResults) setResults(JSON.parse(savedResults));
@@ -421,7 +462,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const authUser: AuthUser = {
         id: 'usr-admin-1',
         username: 'admin',
-        full_name: 'Dr. Arthur Vance (Principal)',
+        full_name: 'School Administrator',
         role: 'admin',
       };
       setCurrentUser(authUser);
@@ -462,23 +503,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (cleanUser === 'teacher' && (cleanPass === 'teacher123' || cleanPass === 'teacher')) {
-      const defaultT = teachers.find((t) => t.id === 't-keller') || teachers[0];
-      const authUser: AuthUser = {
-        id: defaultT.id,
-        username: 'teacher',
-        full_name: defaultT.full_name,
-        role: 'teacher',
-        teacher_id: defaultT.id,
-        form_class_id: defaultT.form_class_id,
-        form_class_name: defaultT.form_class_name,
-        assigned_subject_ids: defaultT.assigned_subject_ids,
-        session_token: defaultT.session_token,
-      };
-      setCurrentUser(authUser);
-      try {
-        localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
-      } catch {}
-      return { success: true };
+      const defaultT = teachers[0];
+      if (defaultT) {
+        const authUser: AuthUser = {
+          id: defaultT.id,
+          username: defaultT.username || 'teacher',
+          full_name: defaultT.full_name,
+          role: 'teacher',
+          teacher_id: defaultT.id,
+          form_class_id: defaultT.form_class_id,
+          form_class_name: defaultT.form_class_name,
+          assigned_subject_ids: defaultT.assigned_subject_ids,
+          session_token: defaultT.session_token,
+        };
+        setCurrentUser(authUser);
+        try {
+          localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
+        } catch {}
+        return { success: true };
+      }
     }
 
     return { success: false, message: 'Invalid Staff credentials. Use admin/admin123 or registered Teacher ID / Password.' };
@@ -626,7 +669,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addAnnouncement({
       title: `End-of-Session Class Promotion: ${fromClass.name} ➔ ${toClass.name}`,
       content: `${studentsToPromote.length} students have been promoted to ${toClass.name} for the ${toClass.session} session.`,
-      author_name: 'Dr. Arthur Vance (Principal)',
+      author_name: 'School Administrator',
       priority: 'high',
     });
 

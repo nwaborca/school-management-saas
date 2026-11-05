@@ -185,7 +185,7 @@ export default function AdminHubPage() {
     addAnnouncement({
       title: annTitle,
       content: annContent,
-      author_name: 'Dr. Arthur Vance (Principal)',
+      author_name: 'School Administrator',
       priority: annPriority,
     });
     setAnnTitle('');
@@ -323,7 +323,7 @@ export default function AdminHubPage() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search student by name or Reg No (e.g. Adeleke or STU-2026-089)..."
+              placeholder="Search student by name or Reg No..."
               value={masterSearchQuery}
               onChange={(e) => setMasterSearchQuery(e.target.value)}
               className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400"
@@ -916,7 +916,7 @@ export default function AdminHubPage() {
           <div className="max-w-2xl mx-auto">
             <EnrollStudentForm
               defaultEnrolledByRole="Principal"
-              defaultEnrolledByName="Dr. Arthur Vance (Principal)"
+              defaultEnrolledByName="School Administrator"
               title="Principal / Admin Student Enrollment"
               description="Directly register new pupils into any of the 33 classes (Creche to SS3 Arm F) with automatic audit tracking provenance."
             />
@@ -1614,7 +1614,7 @@ export default function AdminHubPage() {
                     Enrolled By: <span className="text-rose-700 dark:text-rose-300">{selectedStudentForDossier.enrolled_by_role || 'System'}</span>
                   </div>
                   <div className="text-[11px] text-gray-600 dark:text-gray-400">
-                    Staff: {selectedStudentForDossier.enrolled_by_name || 'Dr. Arthur Vance'}
+                    Staff: {selectedStudentForDossier.enrolled_by_name || 'School Administrator'}
                   </div>
                   <div className="text-[10px] text-gray-500 font-mono">
                     Timestamp: {selectedStudentForDossier.enrollment_date || selectedStudentForDossier.created_at || 'Pre-seeded'}

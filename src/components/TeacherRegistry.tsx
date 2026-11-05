@@ -257,7 +257,7 @@ export default function TeacherRegistry() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Dr. Ngozi Adeleke"
+                  placeholder="e.g. Dr. Ngozi Okafor"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"

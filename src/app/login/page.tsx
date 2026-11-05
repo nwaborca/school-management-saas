@@ -61,20 +61,6 @@ export default function LoginPage() {
     }, 400);
   };
 
-  const fillDemoStudent = (reg: string, p: string) => {
-    setActiveTab('student');
-    setRegNumber(reg);
-    setPin(p);
-    setError(null);
-  };
-
-  const fillDemoStaff = (u: string, p: string) => {
-    setActiveTab('staff');
-    setUsername(u);
-    setPassword(p);
-    setError(null);
-  };
-
   return (
     <div className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat overflow-hidden" style={{ backgroundImage: "url('/hero-bg.jpg')" }}>
       {/* Readability Overlay over Background Image */}
@@ -198,7 +184,7 @@ export default function LoginPage() {
                 <input
                   type="text"
                   required
-                  placeholder="admin or teacher"
+                  placeholder="Enter staff username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3.5 py-3 text-xs font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
@@ -232,50 +218,6 @@ export default function LoginPage() {
               </button>
             </form>
           )}
-
-          {/* Preset Demo Logins */}
-          <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700 text-xs">
-            <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block mb-2.5">
-              Instant Demo Presets:
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => fillDemoStudent('STU-2026-089', '2026')}
-                className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-750 border border-gray-200 dark:border-gray-700 text-left text-[11px] text-gray-700 dark:text-gray-300 transition cursor-pointer"
-              >
-                <span className="font-bold text-gray-900 dark:text-gray-100 block">Lucas Adeleke</span>
-                <span className="text-gray-500 dark:text-gray-400">Paid • STU-2026-089</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemoStudent('STU-2026-104', '8832')}
-                className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-750 border border-gray-200 dark:border-gray-700 text-left text-[11px] text-gray-700 dark:text-gray-300 transition cursor-pointer"
-              >
-                <span className="font-bold text-gray-900 dark:text-gray-100 block">Emeka Okafor</span>
-                <span className="text-gray-500 dark:text-gray-400">Pending • STU-2026-104</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemoStaff('teacher', 'teacher123')}
-                className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-750 border border-gray-200 dark:border-gray-700 text-left text-[11px] text-gray-700 dark:text-gray-300 transition cursor-pointer"
-              >
-                <span className="font-bold text-rose-700 dark:text-rose-300 block">Faculty Teacher</span>
-                <span className="text-gray-500 dark:text-gray-400">teacher / teacher123</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemoStaff('admin', 'admin123')}
-                className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-750 border border-gray-200 dark:border-gray-700 text-left text-[11px] text-gray-700 dark:text-gray-300 transition cursor-pointer"
-              >
-                <span className="font-bold text-amber-600 dark:text-amber-300 block">Principal / Admin</span>
-                <span className="text-gray-500 dark:text-gray-400">admin / admin123</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

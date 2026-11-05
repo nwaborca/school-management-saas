@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { formatNaira, calculateGradeAndRemark } from '@/types';
 import { filterSubjectsForClassAndStream, getSeniorStreamForClass } from '@/lib/streamSpecialization';
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 
 export default function AcademicHubPage() {
+  const router = useRouter();
   const {
     schoolInfo,
     classes = [],
@@ -35,11 +37,19 @@ export default function AcademicHubPage() {
     currentUser,
   } = useApp();
 
-  const loggedTeacher =
-    teachers.find((t) => t.id === currentUser?.teacher_id || t.username === currentUser?.username) ||
-    (currentUser?.role === 'teacher' ? teachers[0] : null);
+  // Route Guard: Require authentication and staff role
+  useEffect(() => {
+    if (!currentUser) {
+      router.push('/login');
+    } else if (currentUser.role === 'student') {
+      router.push('/student-hub');
+    }
+  }, [currentUser, router]);
 
-  const teacherName = currentUser?.full_name || loggedTeacher?.full_name || 'Prof. Margaret Keller';
+  const loggedTeacher =
+    teachers.find((t) => t.id === currentUser?.teacher_id || t.username === currentUser?.username) || null;
+
+  const teacherName = currentUser?.full_name || loggedTeacher?.full_name || 'Faculty Educator';
 
   const [activeTab, setActiveTab] = useState<'entry' | 'form_roster' | 'enroll_student'>('entry');
 

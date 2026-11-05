@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { FeeLineItem, formatNaira } from '@/types';
@@ -102,10 +102,18 @@ export default function AdminFeesPage() {
   const [ledgerTermFilter, setLedgerTermFilter] = useState('all');
 
   // Guard: admin only
-  if (currentRole !== 'admin') {
+  useEffect(() => {
+    if (!currentUser) {
+      router.push('/login');
+    } else if (currentRole !== 'admin') {
+      router.push('/login');
+    }
+  }, [currentUser, currentRole, router]);
+
+  if (!currentUser || currentRole !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-400">Access denied. Admins only.</p>
+        <p className="text-gray-400 text-xs">Authenticating administrator privileges...</p>
       </div>
     );
   }

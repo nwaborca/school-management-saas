@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { StudentProfile, formatNaira } from '@/types';
 import TeacherRegistry from '@/components/TeacherRegistry';
@@ -37,6 +38,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminHubPage() {
+  const router = useRouter();
   const {
     schoolInfo,
     classes = [],
@@ -57,7 +59,19 @@ export default function AdminHubPage() {
     toggleResultsPublished,
     results = [],
     updateAdminPassword,
+    currentUser,
   } = useApp();
+
+  // Route Guard: Require admin / bursar authentication
+  useEffect(() => {
+    if (!currentUser) {
+      router.push('/login');
+    } else if (currentUser.role === 'student') {
+      router.push('/student-hub');
+    } else if (currentUser.role === 'teacher') {
+      router.push('/academic-hub');
+    }
+  }, [currentUser, router]);
 
   const [activeTab, setActiveTab] = useState<'roster' | 'receipts' | 'ledger' | 'teachers' | 'enroll' | 'notices' | 'admin-security'>('roster');
   const [copiedId, setCopiedId] = useState<string | null>(null);

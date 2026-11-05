@@ -73,14 +73,17 @@ export default function StudentDashboardPage() {
 
   // Guard & Active student: Strict RBAC Isolation to currentUser.student_id only
   const activeStudent =
-    (currentUser?.role === 'student' &&
-      (students.find((s) => s.id === currentUser?.student_id) ||
-        students.find((s) => s.reg_number === currentUser?.reg_number))) ||
-    students[0];
+    currentUser?.role === 'student'
+      ? students.find((s) => s.id === currentUser?.student_id) ||
+        students.find((s) => s.reg_number === currentUser?.reg_number) ||
+        null
+      : null;
 
-  // RBAC Guard: If user is logged in as staff (teacher/admin) or not a student, redirect to appropriate console
+  // RBAC Guard: If user is not authenticated, redirect to login
   useEffect(() => {
-    if (currentUser && currentUser.role !== 'student') {
+    if (!currentUser) {
+      router.push('/login');
+    } else if (currentUser.role !== 'student') {
       if (currentUser.role === 'teacher') {
         router.push('/academic-hub');
       } else if (currentUser.role === 'admin') {
@@ -88,6 +91,14 @@ export default function StudentDashboardPage() {
       }
     }
   }, [currentUser, router]);
+
+  if (!currentUser || !activeStudent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
+        <span>Authenticating session...</span>
+      </div>
+    );
+  }
 
   const studentClass = classes.find((c) => c.id === activeStudent.class_id) ||
     classes.find((c) => c.name === activeStudent.class_grade);

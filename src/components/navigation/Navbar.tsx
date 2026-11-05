@@ -41,7 +41,6 @@ export function Navbar() {
     if (!isAuthenticated || !role) {
       return [
         { href: '/', label: 'Home' },
-        { href: '/student-hub', label: 'Student Portal' },
         { href: '/login', label: 'Login' },
       ];
     }

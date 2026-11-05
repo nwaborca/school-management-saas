@@ -241,19 +241,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (savedUser) {
         setCurrentUser(JSON.parse(savedUser));
       } else {
-        // Default session is Lucas Adeleke (student)
-        const defaultStudent = INITIAL_STUDENTS[0];
-        const defaultUser: AuthUser = {
-          id: defaultStudent.id,
-          reg_number: defaultStudent.reg_number,
-          full_name: defaultStudent.full_name,
-          role: 'student',
-          student_id: defaultStudent.id,
-          class_id: defaultStudent.class_id,
-          class_grade: defaultStudent.class_grade,
-          parent_phone: defaultStudent.parent_phone,
-        };
-        setCurrentUser(defaultUser);
+        // App starts logged out by default
+        setCurrentUser(null);
       }
 
       if (savedClasses) {

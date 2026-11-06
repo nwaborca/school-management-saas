@@ -1,3 +1,4 @@
+import { AnimatedContent } from '@/components/AnimatedContent';
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -232,6 +233,7 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="min-h-screen text-gray-100 pb-16">
+      <AnimatedContent distance={100} direction="vertical" duration={0.8} ease="power3.out" blur={0} stagger={0.08} threshold={0.1}>
       {/* Top Student Header */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 py-6 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1114,6 +1116,7 @@ export default function StudentDashboardPage() {
           </div>
         )}
       </div>
+          </AnimatedContent>
     </div>
   );
 }

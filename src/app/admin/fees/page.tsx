@@ -1,3 +1,4 @@
+import { AnimatedContent } from '@/components/AnimatedContent';
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -178,6 +179,7 @@ export default function AdminFeesPage() {
 
   return (
     <div className="min-h-screen text-gray-100 pb-16">
+      <AnimatedContent distance={100} direction="vertical" duration={0.8} ease="power3.out" blur={0} stagger={0.08} threshold={0.1}>
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 py-5 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
@@ -999,6 +1001,7 @@ export default function AdminFeesPage() {
           </div>
         </div>
       )}
+          </AnimatedContent>
     </div>
   );
 }

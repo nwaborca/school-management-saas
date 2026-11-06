@@ -1,5 +1,7 @@
 'use client';
 
+import { AnimatedContent } from '@/components/AnimatedContent';
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -196,6 +198,7 @@ export default function AdminHubPage() {
 
   return (
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
+      <AnimatedContent distance={100} direction="vertical" duration={0.8} ease="power3.out" blur={0} stagger={0.08} threshold={0.1}>
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-800">
@@ -1838,6 +1841,7 @@ export default function AdminHubPage() {
           </div>
         )}
       </div>
+          </AnimatedContent>
     </div>
   );
 }

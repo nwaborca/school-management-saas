@@ -1,5 +1,7 @@
 'use client';
 
+import { AnimatedContent } from '@/components/AnimatedContent';
+
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
@@ -63,6 +65,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat overflow-hidden" style={{ backgroundImage: "url('/hero-bg.jpg')" }}>
+      <AnimatedContent distance={100} direction="vertical" duration={0.8} ease="power3.out" blur={0} stagger={0.08} threshold={0.1}>
       {/* Readability Overlay over Background Image */}
       <div className="absolute inset-0 bg-slate-50/85 dark:bg-gray-950/80 backdrop-blur-[1px] pointer-events-none transition-colors duration-200" aria-hidden="true" />
 
@@ -220,6 +223,7 @@ export default function LoginPage() {
           )}
         </div>
       </div>
+          </AnimatedContent>
     </div>
   );
 }

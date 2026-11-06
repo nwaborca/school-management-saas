@@ -154,6 +154,31 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Helper to set cross-browser, mobile-resilient session cookie
+function setSessionCookie(user: AuthUser | null) {
+  if (typeof document === 'undefined') return;
+  try {
+    if (!user) {
+      document.cookie = 'apex_auth_user=; path=/; max-age=0; SameSite=Lax';
+    } else {
+      const encoded = encodeURIComponent(JSON.stringify(user));
+      // 7 days expiration
+      document.cookie = `apex_auth_user=${encoded}; path=/; max-age=604800; SameSite=Lax`;
+    }
+  } catch {}
+}
+
+function getSessionCookie(): AuthUser | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)apex_auth_user=([^;]+)/);
+    if (match && match[1]) {
+      return JSON.parse(decodeURIComponent(match[1]));
+    }
+  } catch {}
+  return null;
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [classes, setClasses] = useState<AcademicClass[]>(INITIAL_CLASSES);
@@ -234,16 +259,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Restore session with schema validation to prevent stale cache bugs
   useEffect(() => {
     try {
+      // Prioritize cookie for mobile Safari / Chrome storage isolation, fallback to localStorage
+      const cookieUser = getSessionCookie();
       const savedUser = localStorage.getItem('apex_auth_user');
       const savedStudents = localStorage.getItem('apex_students');
       const savedClasses = localStorage.getItem('apex_classes');
       const savedResults = localStorage.getItem('apex_results');
 
-      if (savedUser) {
-        setCurrentUser(JSON.parse(savedUser));
+      if (cookieUser) {
+        setCurrentUser(cookieUser);
+        try { localStorage.setItem('apex_auth_user', JSON.stringify(cookieUser)); } catch {}
+      } else if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        setCurrentUser(parsed);
+        setSessionCookie(parsed);
       } else {
         // App starts logged out by default
         setCurrentUser(null);
+        setSessionCookie(null);
       }
 
       if (savedClasses) {
@@ -448,6 +481,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(authUser);
     try {
       localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
+      setSessionCookie(authUser);
     } catch {}
 
     return { success: true };
@@ -468,6 +502,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(authUser);
       try {
         localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
+        setSessionCookie(authUser);
       } catch {}
       return { success: true };
     }
@@ -498,6 +533,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(authUser);
       try {
         localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
+        setSessionCookie(authUser);
       } catch {}
       return { success: true };
     }
@@ -519,6 +555,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentUser(authUser);
         try {
           localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
+          setSessionCookie(authUser);
         } catch {}
         return { success: true };
       }
@@ -531,6 +568,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(null);
     try {
       localStorage.removeItem('apex_auth_user');
+      setSessionCookie(null);
     } catch {}
   };
 

@@ -102,9 +102,10 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Right Crystalized Ball Centerpiece */}
+              {/* Right Hero Visual: Interactive WebGL on Desktop, High-Performance Emblem on Mobile */}
               <div className="lg:col-span-6 flex items-center justify-center">
-                <div className="w-full rounded-3xl bg-gradient-to-b from-gray-900/90 to-gray-950/90 border border-gray-800/80 p-2 shadow-2xl backdrop-blur-md relative overflow-hidden group">
+                {/* Desktop/Tablet: CrystalizedBall */}
+                <div className="hidden md:block w-full rounded-3xl bg-gradient-to-b from-gray-900/90 to-gray-950/90 border border-gray-800/80 p-2 shadow-2xl backdrop-blur-md relative overflow-hidden group">
                   <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-black/60 border border-amber-500/30 text-amber-400 text-xs font-mono">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span>APEX QUANTUM CORE</span>
@@ -127,6 +128,45 @@ export default function HomePage() {
                     <span className="font-serif italic text-amber-300">{schoolInfo.motto}</span>
                     <span className="text-[11px] text-gray-500">Interactive WebGL Plasma Engine</span>
                   </div>
+                </div>
+
+                {/* Mobile Fallback: Lightweight, Battery-Efficient Academic Shield Hero */}
+                <div className="block md:hidden w-full rounded-3xl bg-gradient-to-br from-rose-950 via-gray-900 to-gray-950 border border-amber-500/30 p-8 text-center space-y-6 shadow-xl relative overflow-hidden">
+                  <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+                  <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-amber-500 to-rose-700 p-0.5 shadow-lg">
+                    <div className="w-full h-full bg-gray-950 rounded-[22px] flex items-center justify-center text-amber-400">
+                      <GraduationCap className="w-10 h-10" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono font-semibold">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>APEX DIGITAL PORTAL</span>
+                    </div>
+                    <h3 className="text-xl font-black text-white">{schoolInfo.name}</h3>
+                    <p className="text-xs text-amber-300/90 font-serif italic">{schoolInfo.motto}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2 text-left">
+                    <div className="p-3 rounded-xl bg-gray-900/80 border border-gray-800">
+                      <span className="text-[10px] text-gray-400 block font-mono">ACADEMIC ARM</span>
+                      <strong className="text-xs text-gray-200 font-bold">Creche – SS3 F</strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-gray-900/80 border border-gray-800">
+                      <span className="text-[10px] text-gray-400 block font-mono">STANDARDS</span>
+                      <strong className="text-xs text-amber-400 font-bold">WAEC / NECO</strong>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/login"
+                    className="w-full py-3.5 rounded-xl bg-rose-900 hover:bg-rose-800 text-white font-bold text-xs flex items-center justify-center gap-2 border border-rose-700 shadow-md transition"
+                  >
+                    <KeyRound className="w-4 h-4 text-amber-400" />
+                    <span>Portal Sign In</span>
+                    <ArrowRight className="w-4 h-4 text-amber-400" />
+                  </Link>
                 </div>
               </div>
             </div>

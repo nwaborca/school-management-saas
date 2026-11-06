@@ -970,6 +970,15 @@ const CrystalizedBall = ({
     const container = containerRef.current;
     if (!container) return undefined;
 
+    // Detect low-power or mobile devices (e.g. Samsung Galaxy A04s) to prevent WebGL lockups
+    const isMobileDevice =
+      typeof window !== 'undefined' &&
+      (window.innerWidth < 768 || window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0);
+
+    if (isMobileDevice) {
+      return undefined;
+    }
+
     const renderer = new Renderer({ alpha: true, premultipliedAlpha: true, antialias: false, depth: false });
     const gl = renderer.gl;
     const gl2 = gl as unknown as WebGL2RenderingContext;

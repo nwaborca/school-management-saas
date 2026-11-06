@@ -96,9 +96,17 @@ const AnimatedContent = ({
     if (typeof scroller === 'string') scroller = document.querySelector(scroller);
 
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    // Detect mobile touch devices (e.g. Samsung Galaxy A04s) to bypass GPU-heavy filter/stagger overhead
+    const isMobileTouch =
+      typeof window !== 'undefined' &&
+      (window.innerWidth < 768 || window.matchMedia?.('(pointer: coarse)').matches || navigator.maxTouchPoints > 0);
+
+    const effectiveBlur = isMobileTouch ? 0 : blur;
+    const effectiveStagger = isMobileTouch ? 0 : stagger;
+    const effectiveTilt = isMobileTouch ? 0 : tilt;
 
     const ctx = gsap.context(() => {
-      const targets: Element[] = stagger > 0 && el.children.length ? Array.from(el.children) : [el];
+      const targets: Element[] = effectiveStagger > 0 && el.children.length ? Array.from(el.children) : [el];
       const horizontal = direction === 'horizontal';
       const axis = horizontal ? 'x' : 'y';
       const sign = reverse ? -1 : 1;
@@ -120,21 +128,21 @@ const AnimatedContent = ({
         [axis]: 0,
         scale: 1,
         opacity: 1,
-        duration,
+        duration: isMobileTouch ? Math.min(duration, 0.4) : duration,
         ease
       };
 
-      if (blur > 0) {
-        from.filter = `blur(${blur}px)`;
+      if (effectiveBlur > 0) {
+        from.filter = `blur(${effectiveBlur}px)`;
         to.filter = 'blur(0px)';
       }
       if (rotate) {
         from.rotation = rotate * sign;
         to.rotation = 0;
       }
-      if (tilt) {
+      if (effectiveTilt) {
         const tiltAxis = horizontal ? 'rotationY' : 'rotationX';
-        from[tiltAxis] = horizontal ? -tilt * sign : tilt * sign;
+        from[tiltAxis] = horizontal ? -effectiveTilt * sign : effectiveTilt * sign;
         to[tiltAxis] = 0;
         from.transformPerspective = 900;
         to.transformPerspective = 900;
@@ -144,7 +152,7 @@ const AnimatedContent = ({
         from['--ac-wipe'] = 0;
         to['--ac-wipe'] = 1;
       }
-      if (stagger > 0) to.stagger = { each: stagger, from: staggerFrom };
+      if (effectiveStagger > 0) to.stagger = { each: effectiveStagger, from: staggerFrom };
 
       const settle = () => {
         if (scrub) return;

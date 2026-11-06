@@ -32,15 +32,14 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    setTimeout(() => {
-      const res = loginStudent(regNumber, pin);
-      setLoading(false);
-      if (res.success) {
-        router.push('/student-hub');
-      } else {
-        setError(res.message || 'Invalid Student Registration Number or PIN');
-      }
-    }, 400);
+    const res = loginStudent(regNumber, pin);
+    setLoading(false);
+    if (res.success) {
+      // Force navigation and flush router state to prevent mobile stale-cache redirects
+      router.replace('/student-hub');
+    } else {
+      setError(res.message || 'Invalid Student Registration Number or PIN');
+    }
   };
 
   const handleStaffLogin = (e: React.FormEvent) => {
@@ -48,19 +47,16 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    setTimeout(() => {
-      const res = loginStaff(username, password);
-      setLoading(false);
-      if (res.success) {
-        if (username.toLowerCase().includes('admin')) {
-          router.push('/admin-hub');
-        } else {
-          router.push('/academic-hub');
-        }
-      } else {
-        setError(res.message || 'Invalid Staff Credentials');
-      }
-    }, 400);
+    const res = loginStaff(username, password);
+    setLoading(false);
+    if (res.success) {
+      const cleanUser = username.trim().toLowerCase();
+      const targetRoute = cleanUser.includes('admin') ? '/admin-hub' : '/academic-hub';
+      // Force navigation and flush router state to prevent mobile stale-cache redirects
+      router.replace(targetRoute);
+    } else {
+      setError(res.message || 'Invalid Staff Credentials');
+    }
   };
 
   return (

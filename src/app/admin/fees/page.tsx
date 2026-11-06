@@ -1,5 +1,6 @@
-import { AnimatedContent } from '@/components/AnimatedContent';
 'use client';
+
+import { AnimatedContent } from '@/components/AnimatedContent';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';

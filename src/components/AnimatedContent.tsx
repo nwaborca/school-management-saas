@@ -197,6 +197,14 @@ const AnimatedContent = ({
         return;
       }
 
+      // If the element is already within the viewport on mount, start immediately without scroll delay
+      const rect = el.getBoundingClientRect();
+      const inView = rect.top < window.innerHeight * (1 - threshold);
+      if (inView) {
+        tl.play();
+        return;
+      }
+
       ScrollTrigger.create({
         trigger: el,
         scroller,

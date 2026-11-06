@@ -615,7 +615,7 @@ export default function AdminHubPage() {
                             <div className="text-[10px] text-gray-500 font-mono">
                               {std.enrollment_date
                                 ? new Date(std.enrollment_date).toLocaleDateString('en-GB')
-                                : 'Pre-seeded'}
+                                : 'Registered'}
                             </div>
                           </div>
                         </td>
@@ -1620,7 +1620,7 @@ export default function AdminHubPage() {
                     Staff: {selectedStudentForDossier.enrolled_by_name || 'School Administrator'}
                   </div>
                   <div className="text-[10px] text-gray-500 font-mono">
-                    Timestamp: {selectedStudentForDossier.enrollment_date || selectedStudentForDossier.created_at || 'Pre-seeded'}
+                    Timestamp: {selectedStudentForDossier.enrollment_date || selectedStudentForDossier.created_at || 'Registered'}
                   </div>
                   <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold pt-1">
                     {selectedStudentForDossier.ndpa_consent_granted ? '✓ NDPA 2023 Consented' : 'Standard Shield'}

@@ -290,10 +290,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Ensure zero resurrected dummy records from stale mobile/desktop local caches
+      const DUMMY_NAMES = ['lucas adeleke', 'zainab abubakar', 'chimera exe', 'chioma nwosu', 'emeka okafor', 'fatima bello'];
+      const isDummyRecord = (name?: string, reg?: string) => {
+        const cleanName = (name || '').toLowerCase();
+        const cleanReg = (reg || '').toLowerCase();
+        return DUMMY_NAMES.some((d) => cleanName.includes(d)) || cleanReg.startsWith('stu-2026-089') || cleanReg.startsWith('stu-2026-092') || cleanReg.startsWith('stu-2026-118');
+      };
+
       if (savedStudents) {
         const parsed = JSON.parse(savedStudents);
         if (Array.isArray(parsed)) {
-          const hydrated = parsed.map((s: StudentProfile) => {
+          const sanitized = parsed.filter((s: StudentProfile) => !isDummyRecord(s.full_name, s.reg_number));
+          const hydrated = sanitized.map((s: StudentProfile) => {
             const isFeePaid = s.fee_paid !== undefined ? s.fee_paid : s.tuition_status === 'paid';
             const payStatus = s.payment_status || (isFeePaid ? 'paid' : 'unpaid');
             return {
@@ -306,6 +315,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           });
           setStudents(hydrated);
+          // If dummies were purged, synchronize local cache immediately
+          if (hydrated.length !== parsed.length) {
+            try { localStorage.setItem('apex_students', JSON.stringify(hydrated)); } catch {}
+          }
         } else {
           setStudents([]);
         }
@@ -352,7 +365,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchLiveData();
       }
 
-      if (savedResults) setResults(JSON.parse(savedResults));
+      if (savedResults) {
+        const parsedRes = JSON.parse(savedResults);
+        if (Array.isArray(parsedRes)) {
+          setResults(parsedRes.filter((r: StudentResult) => !isDummyRecord(r.student_name)));
+        }
+      }
 
       const savedTeachers = localStorage.getItem('apex_teachers');
       if (savedTeachers) {
@@ -366,7 +384,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (savedTransactions) {
         const parsedTx = JSON.parse(savedTransactions);
         if (Array.isArray(parsedTx) && parsedTx.length > 0) {
-          setTransactions(parsedTx);
+          setTransactions(parsedTx.filter((tx: PaymentTransaction) => !isDummyRecord(tx.student_name)));
         }
       }
 
@@ -374,7 +392,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (savedReceipts) {
         const parsedR = JSON.parse(savedReceipts);
         if (Array.isArray(parsedR) && parsedR.length > 0) {
-          setReceipts(parsedR);
+          setReceipts(parsedR.filter((rc: PaymentReceipt) => !isDummyRecord(rc.student_name)));
         }
       }
     } catch {}

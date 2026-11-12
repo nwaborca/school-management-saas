@@ -47,22 +47,22 @@ export default function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               {/* Left Content */}
               <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 dark:bg-gray-900/90 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold shadow-sm">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-gray-700 dark:text-gray-200">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111827] border border-amber-500/40 text-amber-400 text-xs font-semibold shadow-sm">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-gray-200">
                     Premier Nigerian Academic Institution • Session {schoolInfo.academic_year}
                   </span>
                 </div>
 
-                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-gray-900 dark:text-gray-50 tracking-tight leading-tight">
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight">
                   Academic Excellence & <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600">
+                  <span className="text-[#D97706] drop-shadow-sm font-extrabold">
                     Institutional Governance
                   </span>
                 </h1>
 
-                <p className="text-gray-700 dark:text-gray-300 text-sm sm:text-base max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
-                  Standardized school management platform engineered specifically for the 33-tier Nigerian educational hierarchy from <strong className="text-gray-900 dark:text-gray-50 font-semibold">Creche through Senior Secondary 3 (Arms A–F)</strong>. Secure PIN-based credential access, continuous assessment grading (CA1, CA2, Term Exam), digital WAEC/NECO transcripts, and automated bursary verification in <strong className="text-gray-900 dark:text-gray-50 font-semibold">Naira (₦)</strong>.
+                <p className="text-gray-300 text-sm sm:text-base max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
+                  Standardized school management platform engineered specifically for the 33-tier Nigerian educational hierarchy from <strong className="text-white font-semibold">Creche through Senior Secondary 3 (Arms A–F)</strong>. Secure PIN-based credential access, continuous assessment grading (CA1, CA2, Term Exam), digital WAEC/NECO transcripts, and automated bursary verification in <strong className="text-amber-400 font-semibold">Naira (₦)</strong>.
                 </p>
 
                 {/* Call to Action */}
@@ -105,8 +105,8 @@ export default function HomePage() {
               {/* Right Hero Visual: Interactive WebGL on Desktop, High-Performance Emblem on Mobile */}
               <div className="lg:col-span-6 flex items-center justify-center">
                 {/* Desktop/Tablet: CrystalizedBall */}
-                <div className="hidden md:block w-full rounded-3xl bg-gradient-to-b from-gray-900/90 to-gray-950/90 border border-gray-800/80 p-2 shadow-2xl backdrop-blur-md relative overflow-hidden group">
-                  <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-black/60 border border-amber-500/30 text-amber-400 text-xs font-mono">
+                <div className="hidden md:block w-full rounded-3xl bg-[#111827] border border-gray-800 p-2 shadow-xl relative overflow-hidden group">
+                  <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-[#0B0F19] border border-amber-500/30 text-amber-400 text-xs font-mono">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span>APEX QUANTUM CORE</span>
                   </div>
@@ -124,7 +124,7 @@ export default function HomePage() {
                     />
                   </div>
 
-                  <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between px-4 py-2 rounded-xl bg-black/60 border border-gray-800/80 backdrop-blur-sm text-xs text-gray-400">
+                  <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between px-4 py-2.5 rounded-xl bg-[#0B0F19] border border-gray-800 text-xs text-gray-400">
                     <span className="font-serif italic text-amber-300">{schoolInfo.motto}</span>
                     <span className="text-[11px] text-gray-500">Interactive WebGL Plasma Engine</span>
                   </div>

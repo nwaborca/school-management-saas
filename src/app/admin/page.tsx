@@ -62,10 +62,12 @@ export default function AdminHubPage() {
     results = [],
     updateAdminPassword,
     currentUser,
+    isAuthReady,
   } = useApp();
 
   // Route Guard: Require admin / bursar authentication
   useEffect(() => {
+    if (!isAuthReady) return;
     if (!currentUser) {
       router.push('/login');
     } else if (currentUser.role === 'student') {
@@ -73,7 +75,7 @@ export default function AdminHubPage() {
     } else if (currentUser.role === 'teacher') {
       router.push('/academic-hub');
     }
-  }, [currentUser, router]);
+  }, [currentUser, isAuthReady, router]);
 
   const [activeTab, setActiveTab] = useState<'roster' | 'receipts' | 'ledger' | 'teachers' | 'enroll' | 'notices' | 'admin-security'>('roster');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -88,6 +90,17 @@ export default function AdminHubPage() {
   // Master Student Search & Dossier Modal State
   const [masterSearchQuery, setMasterSearchQuery] = useState('');
   const [selectedStudentForDossier, setSelectedStudentForDossier] = useState<StudentProfile | null>(null);
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-3 bg-[#111827] border border-gray-800 px-5 py-3 rounded-2xl shadow-xl">
+          <Clock className="w-5 h-5 text-amber-500 animate-spin" />
+          <span className="text-sm font-medium text-gray-300">Synchronizing Session...</span>
+        </div>
+      </div>
+    );
+  }
 
   // Administrative Gate Publish Results Confirmation Modal State
   const [isPublishConfirmModalOpen, setIsPublishConfirmModalOpen] = useState(false);
@@ -538,7 +551,8 @@ export default function AdminHubPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-gray-700 bg-gray-800">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto rounded-2xl border border-gray-700 bg-gray-800">
               <table className="w-full text-left text-xs text-gray-300">
                 <thead className="bg-gray-900 text-gray-400 uppercase tracking-wider text-[11px] border-b border-gray-700">
                   <tr>
@@ -662,6 +676,76 @@ export default function AdminHubPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Stacked Card View */}
+            <div className="block md:hidden space-y-3">
+              {filteredStudents.length === 0 ? (
+                <div className="p-6 text-center text-gray-400 italic bg-gray-800 rounded-2xl border border-gray-700 text-xs">
+                  No student records match the selected filter.
+                </div>
+              ) : (
+                filteredStudents.map((std) => {
+                  const ledger = getStudentTermLedger(std.id, '1st Term');
+                  return (
+                    <div
+                      key={std.id}
+                      className="p-4 bg-gray-800 rounded-2xl border border-gray-700 space-y-3 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-gray-100 text-sm">{std.full_name}</h4>
+                          <span className="text-[10px] text-gray-400">Class: {std.class_grade}</span>
+                        </div>
+                        <button
+                          onClick={() => toggleStudentFeeStatus(std.id)}
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition ${
+                            ledger.isUnlocked
+                              ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800'
+                              : ledger.paymentStatus === 'partially_paid'
+                              ? 'bg-amber-950/70 text-amber-300 border-amber-700'
+                              : 'bg-rose-950/60 text-rose-400 border-rose-800'
+                          }`}
+                        >
+                          {ledger.isUnlocked ? 'Paid in Full' : ledger.paymentStatus === 'partially_paid' ? 'Partially Paid' : 'Unpaid'}
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-gray-900/60 p-2.5 rounded-xl border border-gray-700/60 font-mono">
+                        <div>
+                          <div className="text-[10px] text-gray-400 font-sans">Reg Number</div>
+                          <div className="text-amber-400 font-bold flex items-center gap-1">
+                            <span>{std.reg_number}</span>
+                            <button
+                              onClick={() => copyToClipboard(std.reg_number, `reg-${std.id}`)}
+                              className="text-gray-400 hover:text-white"
+                            >
+                              {copiedId === `reg-${std.id}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-gray-400 font-sans">Portal PIN</div>
+                          <div className="text-gray-200">{std.access_pin}</div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-gray-300 flex items-center justify-between pt-1">
+                        <div>
+                          <div className="text-[10px] text-gray-400">Parent</div>
+                          <div>{std.parent_name} ({std.parent_phone})</div>
+                        </div>
+                        <button
+                          onClick={() => setSelectedStudentForLedger(std)}
+                          className="text-xs text-amber-400 underline font-semibold cursor-pointer"
+                        >
+                          Ledger →
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}
@@ -1072,7 +1156,7 @@ export default function AdminHubPage() {
                     required
                     value={adminCurrentPass}
                     onChange={(e) => setAdminCurrentPass(e.target.value)}
-                    placeholder="Enter current password (default: admin123)"
+                    placeholder="Enter current password"
                     className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400"
                   />
                 </div>

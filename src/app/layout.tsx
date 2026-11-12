@@ -1,8 +1,15 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AppProvider } from '@/context/AppContext';
 import { Navbar } from '@/components/navigation/Navbar';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1.0,
+  maximumScale: 1.0,
+  userScalable: false,
+};
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,19 +35,20 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased bg-slate-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-200`}
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased bg-[#0B0F19] text-gray-100`}
     >
-      <body className="min-h-full flex flex-col font-sans relative selection:bg-rose-900 selection:text-amber-100">
-        {/* Global Campus Background Image Wrapper */}
+      <body className="min-h-full flex flex-col font-sans relative selection:bg-[#881337] selection:text-amber-100 bg-[#0B0F19] text-gray-100">
+        {/* Permanent Matte Dark Background & Atmosphere */}
         <div
-          className="fixed inset-0 bg-cover bg-center bg-no-repeat bg-fixed w-full h-full pointer-events-none z-0"
-          style={{ backgroundImage: "url('/hero-bg.jpg')" }}
+          className="fixed inset-0 bg-[#0B0F19] pointer-events-none z-0"
           aria-hidden="true"
         />
-
-        {/* Global Readability Backdrop / Scrim */}
         <div
-          className="fixed inset-0 bg-slate-50/85 dark:bg-gray-950/85 backdrop-blur-[1px] pointer-events-none z-0 transition-colors duration-200"
+          className="fixed inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(136,19,55,0.18),rgba(11,15,25,0))] pointer-events-none z-0"
+          aria-hidden="true"
+        />
+        <div
+          className="fixed inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(217,119,6,0.06),transparent_40%)] pointer-events-none z-0"
           aria-hidden="true"
         />
 

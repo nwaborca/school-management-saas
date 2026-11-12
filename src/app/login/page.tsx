@@ -38,7 +38,7 @@ export default function LoginPage() {
       // Force navigation and flush router state to prevent mobile stale-cache redirects
       router.replace('/student-hub');
     } else {
-      setError(res.message || 'Invalid Student Registration Number or PIN');
+      setError(res.message || 'Invalid registration number or PIN.');
     }
   };
 
@@ -50,12 +50,11 @@ export default function LoginPage() {
     const res = loginStaff(username, password);
     setLoading(false);
     if (res.success) {
-      const cleanUser = username.trim().toLowerCase();
-      const targetRoute = cleanUser.includes('admin') ? '/admin-hub' : '/academic-hub';
+      const targetRoute = res.role === 'admin' ? '/admin-hub' : '/academic-hub';
       // Force navigation and flush router state to prevent mobile stale-cache redirects
       router.replace(targetRoute);
     } else {
-      setError(res.message || 'Invalid Staff Credentials');
+      setError(res.message || 'Invalid username or password.');
     }
   };
 
@@ -139,7 +138,7 @@ export default function LoginPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. STU-2026-089"
+                    placeholder="Enter Registration Number"
                     value={regNumber}
                     onChange={(e) => setRegNumber(e.target.value.toUpperCase())}
                     className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3.5 py-3 text-xs font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
@@ -156,7 +155,7 @@ export default function LoginPage() {
                     type="password"
                     required
                     maxLength={6}
-                    placeholder="e.g. 2026"
+                    placeholder="Enter 4-digit PIN"
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
                     className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3.5 py-3 text-xs font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"

@@ -20,8 +20,11 @@ export interface AuthUser {
   parent_phone?: string;
   teacher_id?: string;
   form_class_id?: string;
+  assigned_class_id?: string | null;
   form_class_name?: string;
   assigned_subject_ids?: string[];
+  assigned_subjects?: string[];
+  is_part_time?: boolean;
   session_token?: string;
 }
 
@@ -35,13 +38,20 @@ export interface TeacherProfile {
   username: string;
   password_hash: string;    // Auto-generated initial or reset password
   assigned_subject_ids: string[]; // IDs of assigned subjects
+  assigned_subjects?: string[];   // Assigned subject IDs / names
   form_class_id?: string;   // If assigned as Form / Class Teacher (e.g. "cls-ss1-a")
+  assigned_class_id?: string | null; // e.g. "cls-ss1-a" or null for part-time
   form_class_name?: string; // e.g. "SS1 Arm A"
+  is_part_time?: boolean;   // Part-time teacher (no fixed form class)
   status: 'active' | 'suspended' | 'revoked';
   session_token: string;    // Changes upon credential reset to invalidate old sessions
   created_at: string;
   last_credential_reset?: string;
 }
+
+// Staff alias matching the database table name
+export type Staff = TeacherProfile;
+export type StaffProfile = TeacherProfile;
 
 // 1. Classes: Creche to SS3 (Arms A - F)
 export interface AcademicClass {

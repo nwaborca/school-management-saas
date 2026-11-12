@@ -55,6 +55,7 @@ export default function StudentDashboardPage() {
     getStudentTermLedger,
     resultsPublished,
     logout,
+    isAuthReady,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'results' | 'fees' | 'awards'>('results');
@@ -83,6 +84,7 @@ export default function StudentDashboardPage() {
 
   // RBAC Guard: If user is not authenticated, redirect to login
   useEffect(() => {
+    if (!isAuthReady) return;
     if (!currentUser) {
       router.push('/login');
     } else if (currentUser.role !== 'student') {
@@ -92,7 +94,7 @@ export default function StudentDashboardPage() {
         router.push('/admin-hub');
       }
     }
-  }, [currentUser, router]);
+  }, [currentUser, isAuthReady, router]);
 
   if (!currentUser || !activeStudent) {
     return (

@@ -37,16 +37,31 @@ export default function AcademicHubPage() {
     results = [],
     updateStudentScore,
     currentUser,
+    isAuthReady,
   } = useApp();
 
-  // Route Guard: Require authentication and staff role
+  // Route Guard: Strictly require teacher role (Admins have Admin & Bursar Hubs)
   useEffect(() => {
+    if (!isAuthReady) return;
     if (!currentUser) {
       router.push('/login');
     } else if (currentUser.role === 'student') {
       router.push('/student-hub');
+    } else if (currentUser.role === 'admin') {
+      router.push('/admin-hub');
     }
-  }, [currentUser, router]);
+  }, [currentUser, isAuthReady, router]);
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-3 bg-[#111827] border border-gray-800 px-5 py-3 rounded-2xl shadow-xl">
+          <RefreshCw className="w-5 h-5 text-amber-500 animate-spin" />
+          <span className="text-sm font-medium text-gray-300">Synchronizing Session...</span>
+        </div>
+      </div>
+    );
+  }
 
   const loggedTeacher =
     teachers.find((t) => t.id === currentUser?.teacher_id || t.username === currentUser?.username) || null;
@@ -55,52 +70,50 @@ export default function AcademicHubPage() {
 
   const [activeTab, setActiveTab] = useState<'entry' | 'form_roster' | 'enroll_student'>('entry');
 
-  const assignedSubjectIds = loggedTeacher?.assigned_subject_ids || [];
-  const formClassId = loggedTeacher?.form_class_id;
+  const assignedSubjectIds = loggedTeacher?.assigned_subjects || loggedTeacher?.assigned_subject_ids || [];
+  const formClassId = loggedTeacher?.is_part_time ? undefined : (loggedTeacher?.assigned_class_id || loggedTeacher?.form_class_id);
   const formClass = classes.find((c) => c.id === formClassId);
 
-  // RBAC: Restrict selectable classes to assigned form class or classes where teacher teaches
-  const allowedClasses = useMemo(() => {
-    if (currentUser?.role === 'admin') return classes;
-    if (formClassId) {
-      const fc = classes.filter((c) => c.id === formClassId);
-      return fc.length > 0 ? fc : classes;
-    }
-    return classes;
-  }, [classes, formClassId, currentUser?.role]);
-
-  const [selectedClassId, setSelectedClassId] = useState<string>(
-    formClassId || classes.find((c) => c.name === 'SS1 Arm A')?.id || classes[0]?.id || ''
-  );
-
-  const currentClass = classes.find((c) => c.id === selectedClassId);
-
-  // RBAC: Strictly restrict available subjects to assignedSubjectIds for teacher role
-  const availableSubjectsForClass = useMemo(() => {
-    if (!currentClass) return subjects;
-    const streamFiltered = filterSubjectsForClassAndStream(subjects, currentClass);
-    if (currentUser?.role === 'admin') {
-      return streamFiltered;
-    }
+  // Teacher selectable subjects: strictly restricted to their assigned subjects if teacher
+  const teacherSubjects = useMemo(() => {
+    if (currentUser?.role === 'admin') return subjects;
     if (assignedSubjectIds.length > 0) {
-      const assigned = streamFiltered.filter((s) => assignedSubjectIds.includes(s.id));
-      return assigned.length > 0 ? assigned : streamFiltered.filter((s) => assignedSubjectIds.includes(s.id));
+      const filtered = subjects.filter((s) => assignedSubjectIds.includes(s.id));
+      return filtered.length > 0 ? filtered : subjects;
     }
-    return streamFiltered;
-  }, [currentClass, subjects, assignedSubjectIds, currentUser?.role]);
+    return subjects;
+  }, [subjects, assignedSubjectIds, currentUser?.role]);
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(
-    availableSubjectsForClass[0]?.id || subjects[0]?.id || ''
+    teacherSubjects[0]?.id || subjects[0]?.id || ''
   );
 
   React.useEffect(() => {
-    if (
-      availableSubjectsForClass.length > 0 &&
-      !availableSubjectsForClass.some((s) => s.id === selectedSubjectId)
-    ) {
-      setSelectedSubjectId(availableSubjectsForClass[0].id);
+    if (teacherSubjects.length > 0 && !teacherSubjects.some((s) => s.id === selectedSubjectId)) {
+      setSelectedSubjectId(teacherSubjects[0].id);
     }
-  }, [availableSubjectsForClass, selectedSubjectId]);
+  }, [teacherSubjects, selectedSubjectId]);
+
+  // Find classes offering the currently selected subject
+  const classesOfferingSubject = useMemo(() => {
+    if (!selectedSubjectId) return classes;
+    return classes.filter((cls) => {
+      const subs = filterSubjectsForClassAndStream(subjects, cls);
+      return subs.some((s) => s.id === selectedSubjectId);
+    });
+  }, [classes, subjects, selectedSubjectId]);
+
+  // Selected class filter: 'all' to show all students offering the subject, or a specific class
+  const [selectedClassId, setSelectedClassId] = useState<string>('all');
+
+  // Verify selectedClassId is valid whenever selectedSubjectId changes
+  React.useEffect(() => {
+    if (selectedClassId !== 'all' && !classesOfferingSubject.some((c) => c.id === selectedClassId)) {
+      setSelectedClassId('all');
+    }
+  }, [classesOfferingSubject, selectedClassId]);
+
+  const currentClass = selectedClassId === 'all' ? null : classes.find((c) => c.id === selectedClassId);
 
   const [selectedTerm, setSelectedTerm] = useState('1st Term');
   const [session] = useState('2025/2026');
@@ -198,10 +211,20 @@ export default function AcademicHubPage() {
   }, [isOnline, pendingQueue.length, flushSyncQueue]);
 
   const currentSubject = subjects.find((s) => s.id === selectedSubjectId);
-  const classStudents = students.filter((s) => s.class_id === selectedClassId);
+
+  // Pull all students offering this subject (spanning assigned form class & all other classes offering the subject)
+  const classStudents = useMemo(() => {
+    if (!selectedSubjectId) return [];
+    if (selectedClassId === 'all') {
+      const allowedClassIds = new Set(classesOfferingSubject.map((c) => c.id));
+      return students.filter((s) => allowedClassIds.has(s.class_id));
+    }
+    return students.filter((s) => s.class_id === selectedClassId);
+  }, [students, selectedClassId, selectedSubjectId, classesOfferingSubject]);
 
   const handleScoreInput = (
     studentId: string,
+    studentClassId: string,
     field: 'ca1' | 'ca2' | 'exam',
     value: number
   ) => {
@@ -209,7 +232,7 @@ export default function AcademicHubPage() {
       (r) =>
         r.student_id === studentId &&
         r.subject_id === selectedSubjectId &&
-        r.class_id === selectedClassId &&
+        r.class_id === studentClassId &&
         r.term === selectedTerm &&
         r.session === session
     );
@@ -225,12 +248,12 @@ export default function AcademicHubPage() {
     };
 
     // Scoped storage key: (class_id, subject_id, term, session) + student_id
-    const storageKey = `${OFFLINE_STORAGE_PREFIX}${selectedClassId}_${selectedSubjectId}_${selectedTerm}_${session}_${studentId}`;
+    const storageKey = `${OFFLINE_STORAGE_PREFIX}${studentClassId}_${selectedSubjectId}_${selectedTerm}_${session}_${studentId}`;
     const queuePayload = {
       key: storageKey,
       studentId,
       subjectId: selectedSubjectId,
-      classId: selectedClassId,
+      classId: studentClassId,
       term: selectedTerm,
       session,
       scores: newScores,
@@ -242,7 +265,7 @@ export default function AcademicHubPage() {
       updateStudentScore(
         studentId,
         selectedSubjectId,
-        selectedClassId,
+        studentClassId,
         selectedTerm,
         session,
         newScores
@@ -280,13 +303,14 @@ export default function AcademicHubPage() {
     }
   };
 
-  const currentClassResults = results.filter(
-    (r) =>
-      r.class_id === selectedClassId &&
-      r.subject_id === selectedSubjectId &&
-      r.term === selectedTerm &&
-      r.session === session
-  );
+  const currentClassResults = results.filter((r) => {
+    const isSubject = r.subject_id === selectedSubjectId && r.term === selectedTerm && r.session === session;
+    if (!isSubject) return false;
+    if (selectedClassId === 'all') {
+      return classesOfferingSubject.some((c) => c.id === r.class_id);
+    }
+    return r.class_id === selectedClassId;
+  });
 
   const totalScores = currentClassResults.map((r) => r.total_score);
   const classAverage =
@@ -491,29 +515,10 @@ export default function AcademicHubPage() {
             {/* Filter Controls Bar */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-gray-800 border border-gray-700">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">
-                  Target Class Arm:
-                </label>
-                <select
-                  value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                >
-                  {allowedClasses.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name} ({cls.session})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
                 <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
-                  <span>Grading Subject:</span>
-                  {currentClass?.stage === 'senior_secondary' && (
-                    <span className="text-[10px] text-amber-400 uppercase font-bold">
-                      Stream: {getSeniorStreamForClass(currentClass)}
-                    </span>
+                  <span>Grading Subject (NERDC):</span>
+                  {currentUser?.role === 'teacher' && (
+                    <span className="text-[10px] text-amber-400 font-mono">Assigned</span>
                   )}
                 </label>
                 <select
@@ -521,9 +526,34 @@ export default function AcademicHubPage() {
                   onChange={(e) => setSelectedSubjectId(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
                 >
-                  {availableSubjectsForClass.map((sub) => (
+                  {teacherSubjects.map((sub) => (
                     <option key={sub.id} value={sub.id}>
                       {sub.name} ({sub.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                  <span>Target Class / Scope:</span>
+                  {currentClass?.stage === 'senior_secondary' && (
+                    <span className="text-[10px] text-amber-400 uppercase font-bold">
+                      Stream: {getSeniorStreamForClass(currentClass)}
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={selectedClassId}
+                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                >
+                  <option value="all">
+                    ⭐ All Classes & Arms Offering {currentSubject?.name || 'Subject'} ({classesOfferingSubject.length} Arms)
+                  </option>
+                  {classesOfferingSubject.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name} ({cls.session})
                     </option>
                   ))}
                 </select>
@@ -548,11 +578,11 @@ export default function AcademicHubPage() {
             {/* Quick Metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-3 bg-gray-800 border border-gray-700 rounded-xl text-center">
-                <span className="text-[11px] text-gray-400 font-medium">Enrolled in Arm</span>
+                <span className="text-[11px] text-gray-400 font-medium">Enrolled in Subject</span>
                 <p className="text-xl font-black text-gray-100">{classStudents.length}</p>
               </div>
               <div className="p-3 bg-gray-800 border border-gray-700 rounded-xl text-center">
-                <span className="text-[11px] text-gray-400 font-medium">Class Average</span>
+                <span className="text-[11px] text-gray-400 font-medium">Subject Average</span>
                 <p className="text-xl font-black text-amber-400">{classAverage}%</p>
               </div>
               <div className="p-3 bg-gray-800 border border-gray-700 rounded-xl text-center">
@@ -572,7 +602,7 @@ export default function AcademicHubPage() {
               <div className="p-4 border-b border-gray-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-900/60">
                 <div>
                   <h3 className="font-bold text-gray-100 text-sm">
-                    {currentSubject?.name} — {currentClass?.name}
+                    {currentSubject?.name} — {selectedClassId === 'all' ? 'All Classes Offering Subject' : currentClass?.name}
                   </h3>
                   <p className="text-xs text-gray-400">
                     Enter scores: CA1 (Max 20) + CA2 (Max 20) + Terminal Exam (Max 60) = 100%
@@ -602,104 +632,207 @@ export default function AcademicHubPage() {
 
               {classStudents.length === 0 ? (
                 <div className="p-8 text-center text-gray-400 text-xs italic">
-                  No students currently enrolled in {currentClass?.name}.
+                  No students currently found offering {currentSubject?.name || 'this subject'}.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-900 text-gray-400 uppercase tracking-wider text-[11px] border-b border-gray-700">
-                      <tr>
-                        <th className="px-4 py-3">Student Name</th>
-                        <th className="px-4 py-3">Reg Number</th>
-                        <th className="px-4 py-3 text-center">CA 1 (20)</th>
-                        <th className="px-4 py-3 text-center">CA 2 (20)</th>
-                        <th className="px-4 py-3 text-center">Exam (60)</th>
-                        <th className="px-4 py-3 text-center font-bold text-gray-100">Total (100)</th>
-                        <th className="px-4 py-3 text-center">Grade</th>
-                        <th className="px-4 py-3">Remark</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700">
-                      {classStudents.map((std) => {
-                        const result = results.find(
-                          (r) =>
-                            r.student_id === std.id &&
-                            r.subject_id === selectedSubjectId &&
-                            r.class_id === selectedClassId &&
-                            r.term === selectedTerm &&
-                            r.session === session
-                        );
+                <>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-gray-900 text-gray-400 uppercase tracking-wider text-[11px] border-b border-gray-700">
+                        <tr>
+                          <th className="px-4 py-3">Student Name</th>
+                          <th className="px-4 py-3">Class / Arm</th>
+                          <th className="px-4 py-3">Reg Number</th>
+                          <th className="px-4 py-3 text-center">CA 1 (20)</th>
+                          <th className="px-4 py-3 text-center">CA 2 (20)</th>
+                          <th className="px-4 py-3 text-center">Exam (60)</th>
+                          <th className="px-4 py-3 text-center font-bold text-gray-100">Total (100)</th>
+                          <th className="px-4 py-3 text-center">Grade</th>
+                          <th className="px-4 py-3">Remark</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-700">
+                        {classStudents.map((std) => {
+                          const result = results.find(
+                            (r) =>
+                              r.student_id === std.id &&
+                              r.subject_id === selectedSubjectId &&
+                              r.class_id === std.class_id &&
+                              r.term === selectedTerm &&
+                              r.session === session
+                          );
 
-                        const ca1 = result?.ca1 ?? 0;
-                        const ca2 = result?.ca2 ?? 0;
-                        const exam = result?.exam ?? 0;
-                        const total = ca1 + ca2 + exam;
-                        const { grade, remarks: remark } = calculateGradeAndRemark(total);
+                          const ca1 = result?.ca1 ?? 0;
+                          const ca2 = result?.ca2 ?? 0;
+                          const exam = result?.exam ?? 0;
+                          const total = ca1 + ca2 + exam;
+                          const { grade, remarks: remark } = calculateGradeAndRemark(total);
 
-                        const gradeBadge =
-                          grade === 'A'
-                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
-                            : grade === 'B'
-                            ? 'bg-amber-950/60 text-amber-300 border border-amber-800'
-                            : grade === 'C'
-                            ? 'bg-gray-900 text-gray-200 border border-gray-700'
-                            : 'bg-rose-950/60 text-rose-400 border border-rose-800';
+                          const gradeBadge =
+                            grade === 'A'
+                              ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
+                              : grade === 'B'
+                              ? 'bg-amber-950/60 text-amber-300 border border-amber-800'
+                              : grade === 'C'
+                              ? 'bg-gray-900 text-gray-200 border border-gray-700'
+                              : 'bg-rose-950/60 text-rose-400 border border-rose-800';
 
-                        return (
-                          <tr key={std.id} className="hover:bg-gray-750 transition">
-                            <td className="px-4 py-3 font-semibold text-gray-100">{std.full_name}</td>
-                            <td className="px-4 py-3 font-mono text-gray-400">{std.reg_number}</td>
+                          const studentClass = classes.find((c) => c.id === std.class_id);
 
-                            <td className="px-4 py-3 text-center">
+                          return (
+                            <tr key={std.id} className="hover:bg-gray-750 transition">
+                              <td className="px-4 py-3 font-semibold text-gray-100">{std.full_name}</td>
+                              <td className="px-4 py-3">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-900 text-amber-300 border border-gray-700">
+                                  {studentClass?.name || std.class_grade || 'Class'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-mono text-gray-400">{std.reg_number}</td>
+
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="20"
+                                  value={ca1}
+                                  onChange={(e) => handleScoreInput(std.id, std.class_id, 'ca1', Number(e.target.value))}
+                                  className="w-16 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="20"
+                                  value={ca2}
+                                  onChange={(e) => handleScoreInput(std.id, std.class_id, 'ca2', Number(e.target.value))}
+                                  className="w-16 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="60"
+                                  value={exam}
+                                  onChange={(e) => handleScoreInput(std.id, std.class_id, 'exam', Number(e.target.value))}
+                                  className="w-20 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <span className="font-mono font-extrabold text-sm text-gray-100">{total}</span>
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-block px-2.5 py-0.5 rounded-md font-mono font-bold text-xs ${gradeBadge}`}>
+                                  {grade}
+                                </span>
+                              </td>
+
+                              <td className="px-4 py-3 text-gray-300 text-xs italic">{remark}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Stacked Score Card View */}
+                  <div className="block md:hidden divide-y divide-gray-700 p-3 space-y-4">
+                    {classStudents.map((std) => {
+                      const result = results.find(
+                        (r) =>
+                          r.student_id === std.id &&
+                          r.subject_id === selectedSubjectId &&
+                          r.class_id === std.class_id &&
+                          r.term === selectedTerm &&
+                          r.session === session
+                      );
+
+                      const ca1 = result?.ca1 ?? 0;
+                      const ca2 = result?.ca2 ?? 0;
+                      const exam = result?.exam ?? 0;
+                      const total = ca1 + ca2 + exam;
+                      const { grade, remarks: remark } = calculateGradeAndRemark(total);
+
+                      const gradeBadge =
+                        grade === 'A'
+                          ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
+                          : grade === 'B'
+                          ? 'bg-amber-950/60 text-amber-300 border border-amber-800'
+                          : grade === 'C'
+                          ? 'bg-gray-900 text-gray-200 border border-gray-700'
+                          : 'bg-rose-950/60 text-rose-400 border border-rose-800';
+
+                      const studentClass = classes.find((c) => c.id === std.class_id);
+
+                      return (
+                        <div key={std.id} className="pt-3 first:pt-0 space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-bold text-gray-100 text-sm">{std.full_name}</h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-gray-400 font-mono">{std.reg_number}</span>
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-900 text-amber-300 border border-gray-700">
+                                  {studentClass?.name || std.class_grade || 'Class'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-mono font-black text-base text-gray-100 mr-2">{total}%</span>
+                              <span className={`inline-block px-2 py-0.5 rounded font-mono font-bold text-[10px] ${gradeBadge}`}>
+                                {grade}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 bg-gray-900/60 p-2.5 rounded-xl border border-gray-700/70">
+                            <div>
+                              <label className="block text-[10px] text-gray-400 font-medium mb-1">CA 1 (20)</label>
                               <input
                                 type="number"
                                 min="0"
                                 max="20"
                                 value={ca1}
-                                onChange={(e) => handleScoreInput(std.id, 'ca1', Number(e.target.value))}
-                                className="w-16 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                onChange={(e) => handleScoreInput(std.id, std.class_id, 'ca1', Number(e.target.value))}
+                                className="w-full bg-gray-950 border border-gray-700 rounded-lg py-1 px-2 text-center font-mono font-bold text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
                               />
-                            </td>
-
-                            <td className="px-4 py-3 text-center">
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-gray-400 font-medium mb-1">CA 2 (20)</label>
                               <input
                                 type="number"
                                 min="0"
                                 max="20"
                                 value={ca2}
-                                onChange={(e) => handleScoreInput(std.id, 'ca2', Number(e.target.value))}
-                                className="w-16 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                onChange={(e) => handleScoreInput(std.id, std.class_id, 'ca2', Number(e.target.value))}
+                                className="w-full bg-gray-950 border border-gray-700 rounded-lg py-1 px-2 text-center font-mono font-bold text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
                               />
-                            </td>
-
-                            <td className="px-4 py-3 text-center">
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-gray-400 font-medium mb-1">Exam (60)</label>
                               <input
                                 type="number"
                                 min="0"
                                 max="60"
                                 value={exam}
-                                onChange={(e) => handleScoreInput(std.id, 'exam', Number(e.target.value))}
-                                className="w-20 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                onChange={(e) => handleScoreInput(std.id, std.class_id, 'exam', Number(e.target.value))}
+                                className="w-full bg-gray-950 border border-gray-700 rounded-lg py-1 px-2 text-center font-mono font-bold text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
                               />
-                            </td>
-
-                            <td className="px-4 py-3 text-center">
-                              <span className="font-mono font-extrabold text-sm text-gray-100">{total}</span>
-                            </td>
-
-                            <td className="px-4 py-3 text-center">
-                              <span className={`inline-block px-2.5 py-0.5 rounded-md font-mono font-bold text-xs ${gradeBadge}`}>
-                                {grade}
-                              </span>
-                            </td>
-
-                            <td className="px-4 py-3 text-gray-300 text-xs italic">{remark}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-gray-400 italic flex items-center justify-between px-1">
+                            <span>Remark: {remark}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
 

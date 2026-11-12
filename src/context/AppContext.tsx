@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   AuthUser,
   UserRole,
@@ -40,6 +40,7 @@ interface AppContextType {
   currentUser: AuthUser | null;
   currentRole: UserRole | null;
   isAuthenticated: boolean;
+  isAuthReady: boolean;
   classes: AcademicClass[];
   subjects: AcademicSubject[];
   allocations: TeacherSubjectAllocation[];
@@ -49,8 +50,8 @@ interface AppContextType {
   announcements: SchoolAnnouncement[];
 
   // Auth
-  loginStudent: (regNumber: string, pin: string) => { success: boolean; message?: string };
-  loginStaff: (username: string, pass: string) => { success: boolean; message?: string };
+  loginStudent: (regNumber: string, pin: string) => { success: boolean; message?: string; role?: UserRole };
+  loginStaff: (username: string, pass: string) => { success: boolean; message?: string; role?: UserRole };
   logout: () => void;
 
   // Teacher Score Entry Portal
@@ -126,7 +127,10 @@ interface AppContextType {
     phone: string;
     email: string;
     assignedSubjectIds: string[];
+    assignedSubjects?: string[];
     formClassId?: string;
+    assignedClassId?: string | null;
+    isPartTime?: boolean;
   }) => { teacher: TeacherProfile; initialPassword: string };
   updateTeacher: (
     teacherId: string,
@@ -135,7 +139,10 @@ interface AppContextType {
       phone?: string;
       email?: string;
       assignedSubjectIds?: string[];
+      assignedSubjects?: string[];
       formClassId?: string;
+      assignedClassId?: string | null;
+      isPartTime?: boolean;
       resetCredentials?: boolean;
     }
   ) => { success: boolean; newPassword?: string };
@@ -154,16 +161,20 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Helper to set cross-browser, mobile-resilient session cookie
+// Helper to set cross-browser, mobile-resilient session cookie and multi-store fallback
 function setSessionCookie(user: AuthUser | null) {
   if (typeof document === 'undefined') return;
   try {
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const secureFlag = isHttps ? '; Secure' : '';
     if (!user) {
-      document.cookie = 'apex_auth_user=; path=/; max-age=0; SameSite=Lax';
+      document.cookie = `apex_auth_user=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
+      try { sessionStorage.removeItem('apex_auth_user'); } catch {}
     } else {
       const encoded = encodeURIComponent(JSON.stringify(user));
-      // 7 days expiration
-      document.cookie = `apex_auth_user=${encoded}; path=/; max-age=604800; SameSite=Lax`;
+      // 7 days expiration with explicit Lax and HTTPS Secure guard
+      document.cookie = `apex_auth_user=${encoded}; path=/; max-age=604800; SameSite=Lax${secureFlag}`;
+      try { sessionStorage.setItem('apex_auth_user', JSON.stringify(user)); } catch {}
     }
   } catch {}
 }
@@ -176,11 +187,18 @@ function getSessionCookie(): AuthUser | null {
       return JSON.parse(decodeURIComponent(match[1]));
     }
   } catch {}
+  try {
+    const sessionData = sessionStorage.getItem('apex_auth_user');
+    if (sessionData) {
+      return JSON.parse(sessionData);
+    }
+  } catch {}
   return null;
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
   const [classes, setClasses] = useState<AcademicClass[]>(INITIAL_CLASSES);
   const [subjects] = useState<AcademicSubject[]>(INITIAL_SUBJECTS);
   const [allocations] = useState<TeacherSubjectAllocation[]>(INITIAL_ALLOCATIONS);
@@ -196,50 +214,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [resultsPublished, setResultsPublished] = useState<boolean>(false);
   const [adminPassword, setAdminPassword] = useState<string>('admin123');
 
-  // Load and apply theme and results publishing gate from localStorage
+  // Avoid unnecessary re-fetch loops
+  const isFetchingRef = useRef(false);
+
+  // Permanently locked to rich matte dark theme
   useEffect(() => {
     try {
-      const savedTheme = localStorage.getItem('apex_theme') as 'dark' | 'light' | null;
-      if (savedTheme === 'light' || savedTheme === 'dark') {
-        setTheme(savedTheme);
-        document.documentElement.classList.toggle('light', savedTheme === 'light');
-        document.documentElement.classList.toggle('dark', savedTheme === 'dark');
-      } else {
-        document.documentElement.classList.add('dark');
-      }
-
-      const savedPub = localStorage.getItem('apex_results_published');
-      if (savedPub !== null) {
-        setResultsPublished(savedPub === 'true');
-      }
-
-      const savedAdminPass = localStorage.getItem('apex_admin_password');
-      if (savedAdminPass) {
-        setAdminPassword(savedAdminPass);
-      }
+      setTheme('dark');
+      localStorage.setItem('apex_theme', 'dark');
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
     } catch {}
   }, []);
 
   const toggleTheme = () => {
-    setTheme((prevTheme) => {
-      const nextTheme = prevTheme === 'dark' ? 'light' : 'dark';
-      try {
-        localStorage.setItem('apex_theme', nextTheme);
-      } catch {}
-      document.documentElement.classList.toggle('light', nextTheme === 'light');
-      document.documentElement.classList.toggle('dark', nextTheme === 'dark');
-      return nextTheme;
-    });
+    // Theme is permanently locked to matte dark mode
+    setTheme('dark');
+    document.documentElement.classList.remove('light');
+    document.documentElement.classList.add('dark');
+    try {
+      localStorage.setItem('apex_theme', 'dark');
+    } catch {}
   };
 
   const toggleResultsPublished = () => {
-    setResultsPublished((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('apex_results_published', String(next));
-      } catch {}
-      return next;
-    });
+    setResultsPublished((prev) => !prev);
   };
 
   const updateAdminPassword = (currentPass: string, newPass: string) => {
@@ -250,225 +249,258 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: 'New password must be at least 6 characters.' };
     }
     setAdminPassword(newPass);
-    try {
-      localStorage.setItem('apex_admin_password', newPass);
-    } catch {}
     return { success: true };
   };
 
-  // Restore session with schema validation to prevent stale cache bugs
+  // Helper to normalize teacher record from Supabase or memory
+  const normalizeTeacher = (t: any): TeacherProfile => {
+    const assignedIds = t.assigned_subject_ids || t.assigned_subjects || [];
+    return {
+      id: t.id,
+      teacher_id_code: t.teacher_id_code || t.staff_id_code || `TCH/2026/${String(t.id).slice(-3)}`,
+      full_name: t.full_name || 'Teacher',
+      phone: t.phone || '+2348000000000',
+      email: t.email || `${t.username || t.id}@school.edu.ng`,
+      username: t.username || `tch_${t.id}`,
+      password_hash: t.password_hash || 'Tch2026!',
+      assigned_subject_ids: Array.isArray(assignedIds) ? assignedIds : [],
+      assigned_subjects: Array.isArray(assignedIds) ? assignedIds : [],
+      form_class_id: t.is_part_time ? undefined : (t.form_class_id || (t.assigned_class_id ?? undefined)),
+      assigned_class_id: t.is_part_time ? null : (t.assigned_class_id ?? t.form_class_id ?? null),
+      form_class_name: t.is_part_time ? undefined : t.form_class_name,
+      is_part_time: Boolean(t.is_part_time),
+      status: t.status || 'active',
+      session_token: t.session_token || `token-${Date.now()}`,
+      created_at: t.created_at || new Date().toISOString(),
+      last_credential_reset: t.last_credential_reset,
+    };
+  };
+
+  // Live Cloud Fetch from Supabase
+  const fetchLiveData = useCallback(async () => {
+    if (!isSupabaseConfigured() || isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    try {
+      const [stdRes, staffRes, resRes, classRes, feeRes, recRes] = await Promise.all([
+        supabase.from('students').select('*').order('created_at', { ascending: false }),
+        supabase.from('staff').select('*').order('created_at', { ascending: false }),
+        supabase.from('term_results').select('*').order('created_at', { ascending: false }),
+        supabase.from('classes').select('*'),
+        supabase.from('fee_structures').select('*'),
+        supabase.from('receipts').select('*').order('created_at', { ascending: false }),
+      ]);
+
+      if (stdRes.data && Array.isArray(stdRes.data) && stdRes.data.length > 0) {
+        setStudents(stdRes.data as StudentProfile[]);
+      }
+      if (staffRes.data && Array.isArray(staffRes.data) && staffRes.data.length > 0) {
+        const normalizedStaff = (staffRes.data as any[]).map(normalizeTeacher);
+        setTeachers(normalizedStaff);
+      }
+      if (resRes.data && Array.isArray(resRes.data) && resRes.data.length > 0) {
+        setResults(resRes.data as StudentResult[]);
+      }
+      if (classRes.data && Array.isArray(classRes.data) && classRes.data.length > 0) {
+        setClasses(classRes.data as AcademicClass[]);
+      }
+      if (feeRes.data && Array.isArray(feeRes.data) && feeRes.data.length > 0) {
+        setFeeStructures(feeRes.data as FeeStructure[]);
+      }
+      if (recRes.data && Array.isArray(recRes.data) && recRes.data.length > 0) {
+        setReceipts(recRes.data as PaymentReceipt[]);
+      }
+    } catch (err) {
+      console.error('Error fetching live data from Supabase:', err);
+    } finally {
+      isFetchingRef.current = false;
+    }
+  }, []);
+
+  // 1. Initial Mount: Authenticate session and trigger Cloud Sync
   useEffect(() => {
     try {
-      // Prioritize cookie for mobile Safari / Chrome storage isolation, fallback to localStorage
       const cookieUser = getSessionCookie();
-      const savedUser = localStorage.getItem('apex_auth_user');
-      const savedStudents = localStorage.getItem('apex_students');
-      const savedClasses = localStorage.getItem('apex_classes');
-      const savedResults = localStorage.getItem('apex_results');
-
       if (cookieUser) {
         setCurrentUser(cookieUser);
-        try { localStorage.setItem('apex_auth_user', JSON.stringify(cookieUser)); } catch {}
-      } else if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        setCurrentUser(parsed);
-        setSessionCookie(parsed);
       } else {
-        // App starts logged out by default
         setCurrentUser(null);
         setSessionCookie(null);
       }
+    } catch {} finally {
+      setIsAuthReady(true);
+    }
 
-      if (savedClasses) {
-        const parsed = JSON.parse(savedClasses);
-        // Ensure classes have the stage property to avoid zero mapped subjects
-        if (Array.isArray(parsed) && parsed.length >= 10 && parsed[0]?.stage) {
-          setClasses(parsed);
-        } else {
-          setClasses(INITIAL_CLASSES);
-          localStorage.setItem('apex_classes', JSON.stringify(INITIAL_CLASSES));
-        }
-      }
+    // Immediately fetch from Supabase cloud
+    if (isSupabaseConfigured()) {
+      fetchLiveData();
+    }
+  }, [fetchLiveData]);
 
-      // Ensure zero resurrected dummy records from stale mobile/desktop local caches
-      const DUMMY_NAMES = ['lucas adeleke', 'zainab abubakar', 'chimera exe', 'chioma nwosu', 'emeka okafor', 'fatima bello'];
-      const isDummyRecord = (name?: string, reg?: string) => {
-        const cleanName = (name || '').toLowerCase();
-        const cleanReg = (reg || '').toLowerCase();
-        return DUMMY_NAMES.some((d) => cleanName.includes(d)) || cleanReg.startsWith('stu-2026-089') || cleanReg.startsWith('stu-2026-092') || cleanReg.startsWith('stu-2026-118');
-      };
+  // 2. Real-Time Supabase Cloud Subscriptions (`supabase.channel`) across all clients
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
 
-      if (savedStudents) {
-        const parsed = JSON.parse(savedStudents);
-        if (Array.isArray(parsed)) {
-          const sanitized = parsed.filter((s: StudentProfile) => !isDummyRecord(s.full_name, s.reg_number));
-          const hydrated = sanitized.map((s: StudentProfile) => {
-            const isFeePaid = s.fee_paid !== undefined ? s.fee_paid : s.tuition_status === 'paid';
-            const payStatus = s.payment_status || (isFeePaid ? 'paid' : 'unpaid');
-            return {
-              ...s,
-              fee_paid: isFeePaid,
-              payment_status: payStatus,
-              enrolled_by_role: s.enrolled_by_role || 'Bursar',
-              enrolled_by_name: s.enrolled_by_name || 'Finance Desk',
-              enrollment_date: s.enrollment_date || s.created_at || new Date().toISOString(),
-            };
-          });
-          setStudents(hydrated);
-          // If dummies were purged, synchronize local cache immediately
-          if (hydrated.length !== parsed.length) {
-            try { localStorage.setItem('apex_students', JSON.stringify(hydrated)); } catch {}
+    // Realtime listener for 'staff' (Teachers, HODs, Faculty)
+    const staffChannel = supabase
+      .channel('public:staff_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const inserted = normalizeTeacher(payload.new);
+            setTeachers((prev) => {
+              if (prev.some((t) => t.id === inserted.id)) return prev;
+              return [inserted, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = normalizeTeacher(payload.new);
+            setTeachers((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              setTeachers((prev) => prev.filter((t) => t.id !== deletedId));
+            }
           }
-        } else {
-          setStudents([]);
         }
-      }
+      )
+      .subscribe();
 
-      // Fetch live data from Supabase if configured
-      if (isSupabaseConfigured()) {
-        const fetchLiveData = async () => {
-          try {
-            const [stdRes, staffRes, resRes, classRes, feeRes, recRes] = await Promise.all([
-              supabase.from('students').select('*'),
-              supabase.from('staff').select('*'),
-              supabase.from('term_results').select('*'),
-              supabase.from('classes').select('*'),
-              supabase.from('fee_structures').select('*'),
-              supabase.from('receipts').select('*'),
-            ]);
-
-            if (stdRes.data && Array.isArray(stdRes.data)) {
-              setStudents(stdRes.data as StudentProfile[]);
-              try { localStorage.setItem('apex_students', JSON.stringify(stdRes.data)); } catch {}
+    // Realtime listener for 'students'
+    const studentChannel = supabase
+      .channel('public:students_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'students' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const inserted = payload.new as StudentProfile;
+            setStudents((prev) => {
+              if (prev.some((s) => s.id === inserted.id)) return prev;
+              return [inserted, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as StudentProfile;
+            setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              setStudents((prev) => prev.filter((s) => s.id !== deletedId));
             }
-            if (staffRes.data && Array.isArray(staffRes.data)) {
-              setTeachers(staffRes.data as TeacherProfile[]);
-              try { localStorage.setItem('apex_teachers', JSON.stringify(staffRes.data)); } catch {}
-            }
-            if (resRes.data && Array.isArray(resRes.data)) {
-              setResults(resRes.data as StudentResult[]);
-              try { localStorage.setItem('apex_results', JSON.stringify(resRes.data)); } catch {}
-            }
-            if (classRes.data && Array.isArray(classRes.data) && classRes.data.length > 0) {
-              setClasses(classRes.data as AcademicClass[]);
-            }
-            if (feeRes.data && Array.isArray(feeRes.data)) {
-              setFeeStructures(feeRes.data as FeeStructure[]);
-            }
-            if (recRes.data && Array.isArray(recRes.data)) {
-              setReceipts(recRes.data as PaymentReceipt[]);
-            }
-          } catch (err) {
-            console.error('Error fetching data from Supabase:', err);
           }
-        };
-        fetchLiveData();
-      }
-
-      if (savedResults) {
-        const parsedRes = JSON.parse(savedResults);
-        if (Array.isArray(parsedRes)) {
-          setResults(parsedRes.filter((r: StudentResult) => !isDummyRecord(r.student_name)));
         }
-      }
+      )
+      .subscribe();
 
-      const savedTeachers = localStorage.getItem('apex_teachers');
-      if (savedTeachers) {
-        const parsedT = JSON.parse(savedTeachers);
-        if (Array.isArray(parsedT) && parsedT.length > 0) {
-          setTeachers(parsedT);
+    // Realtime listener for 'term_results' (Grading & Continuous Assessment)
+    const resultsChannel = supabase
+      .channel('public:term_results_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'term_results' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const inserted = payload.new as StudentResult;
+            setResults((prev) => {
+              if (prev.some((r) => r.id === inserted.id)) return prev;
+              return [inserted, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as StudentResult;
+            setResults((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              setResults((prev) => prev.filter((r) => r.id !== deletedId));
+            }
+          }
         }
-      }
+      )
+      .subscribe();
 
-      const savedTransactions = localStorage.getItem('apex_transactions');
-      if (savedTransactions) {
-        const parsedTx = JSON.parse(savedTransactions);
-        if (Array.isArray(parsedTx) && parsedTx.length > 0) {
-          setTransactions(parsedTx.filter((tx: PaymentTransaction) => !isDummyRecord(tx.student_name)));
+    // Realtime listener for 'receipts' (Fees & Bursar Verification)
+    const receiptsChannel = supabase
+      .channel('public:receipts_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'receipts' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const inserted = payload.new as PaymentReceipt;
+            setReceipts((prev) => {
+              if (prev.some((rc) => rc.id === inserted.id)) return prev;
+              return [inserted, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as PaymentReceipt;
+            setReceipts((prev) => prev.map((rc) => (rc.id === updated.id ? updated : rc)));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              setReceipts((prev) => prev.filter((rc) => rc.id !== deletedId));
+            }
+          }
         }
-      }
+      )
+      .subscribe();
 
-      const savedReceipts = localStorage.getItem('apex_receipts');
-      if (savedReceipts) {
-        const parsedR = JSON.parse(savedReceipts);
-        if (Array.isArray(parsedR) && parsedR.length > 0) {
-          setReceipts(parsedR.filter((rc: PaymentReceipt) => !isDummyRecord(rc.student_name)));
-        }
-      }
-    } catch {}
+    return () => {
+      supabase.removeChannel(staffChannel);
+      supabase.removeChannel(studentChannel);
+      supabase.removeChannel(resultsChannel);
+      supabase.removeChannel(receiptsChannel);
+    };
   }, []);
 
-  const saveStudents = (newStudents: StudentProfile[]) => {
-    setStudents(newStudents);
-    try {
-      localStorage.setItem('apex_students', JSON.stringify(newStudents));
-    } catch {}
-  };
-
-  const saveTransactions = (newTx: PaymentTransaction[]) => {
-    setTransactions(newTx);
-    try {
-      localStorage.setItem('apex_transactions', JSON.stringify(newTx));
-    } catch {}
-  };
-
-  const saveReceipts = (newReceipts: PaymentReceipt[]) => {
-    setReceipts(newReceipts);
-    try {
-      localStorage.setItem('apex_receipts', JSON.stringify(newReceipts));
-    } catch {}
-  };
-
-  const saveClasses = (newClasses: AcademicClass[]) => {
-    setClasses(newClasses);
-    try {
-      localStorage.setItem('apex_classes', JSON.stringify(newClasses));
-    } catch {}
-  };
-
-  const saveResults = (newResults: StudentResult[]) => {
-    setResults(newResults);
-    try {
-      localStorage.setItem('apex_results', JSON.stringify(newResults));
-    } catch {}
-  };
-
   // Student Fee Status Toggle (Admin can toggle "Mark School Fees as Paid" / "Pending")
-  const toggleStudentFeeStatus = (studentId: string, forceStatus?: boolean) => {
+  const toggleStudentFeeStatus = async (studentId: string, forceStatus?: boolean) => {
     let nextFeePaidState = false;
 
-    const updatedStudents = students.map((std) => {
-      if (std.id === studentId) {
-        nextFeePaidState = forceStatus !== undefined ? forceStatus : !std.fee_paid;
-        return {
-          ...std,
-          fee_paid: nextFeePaidState,
-          payment_status: nextFeePaidState ? ('paid' as const) : ('unpaid' as const),
-          tuition_status: nextFeePaidState ? ('paid' as const) : ('pending' as const),
-        };
-      }
-      return std;
-    });
+    const targetStudent = students.find((s) => s.id === studentId);
+    if (!targetStudent) return;
 
-    saveStudents(updatedStudents);
+    nextFeePaidState = forceStatus !== undefined ? forceStatus : !targetStudent.fee_paid;
+
+    const updated = {
+      ...targetStudent,
+      fee_paid: nextFeePaidState,
+      payment_status: nextFeePaidState ? ('paid' as const) : ('unpaid' as const),
+      tuition_status: nextFeePaidState ? ('paid' as const) : ('pending' as const),
+    };
+
+    // Update in React state
+    setStudents((prev) => prev.map((s) => (s.id === studentId ? updated : s)));
 
     // Synchronize corresponding invoices
-    const targetStudent = updatedStudents.find((s) => s.id === studentId);
-    if (targetStudent) {
-      setInvoices((prev) =>
-        prev.map((inv) => {
-          if (inv.student_id === studentId || inv.reg_number === targetStudent.reg_number) {
-            return {
-              ...inv,
-              fee_paid: targetStudent.fee_paid,
-              status: targetStudent.fee_paid ? 'paid' : 'pending',
-              paid_amount: targetStudent.fee_paid ? inv.total_amount : 0,
-              paid_at: targetStudent.fee_paid ? new Date().toISOString() : undefined,
-            };
-          }
-          return inv;
-        })
-      );
+    setInvoices((prev) =>
+      prev.map((inv) => {
+        if (inv.student_id === studentId || inv.reg_number === targetStudent.reg_number) {
+          return {
+            ...inv,
+            fee_paid: nextFeePaidState,
+            status: nextFeePaidState ? 'paid' : 'pending',
+            paid_amount: nextFeePaidState ? inv.total_amount : 0,
+            paid_at: nextFeePaidState ? new Date().toISOString() : undefined,
+          };
+        }
+        return inv;
+      })
+    );
+
+    // Centralize write to Supabase
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('students')
+          .update({
+            fee_paid: nextFeePaidState,
+            payment_status: nextFeePaidState ? 'paid' : 'unpaid',
+            tuition_status: nextFeePaidState ? 'paid' : 'pending',
+          })
+          .eq('id', studentId);
+      } catch (err) {
+        console.error('Error updating student fee status in Supabase:', err);
+      }
     }
   };
 
@@ -482,7 +514,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
 
     if (!student) {
-      return { success: false, message: 'Invalid Registration Number or Access PIN.' };
+      return { success: false, message: 'Invalid registration number or PIN.' };
     }
 
     const authUser: AuthUser = {
@@ -497,16 +529,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     setCurrentUser(authUser);
-    try {
-      localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
-      setSessionCookie(authUser);
-    } catch {}
+    setSessionCookie(authUser);
 
-    return { success: true };
+    return { success: true, role: 'student' as UserRole };
   };
 
   // Staff Login
-  const loginStaff = (username: string, pass: string) => {
+  const loginStaff = (username: string, pass: string): { success: boolean; message?: string; role?: UserRole } => {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = pass.trim();
 
@@ -518,23 +547,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         role: 'admin',
       };
       setCurrentUser(authUser);
-      try {
-        localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
-        setSessionCookie(authUser);
-      } catch {}
-      return { success: true };
+      setSessionCookie(authUser);
+      return { success: true, role: 'admin' as UserRole };
     }
 
-    // Dynamic match against registered teachers
-    const matchedTeacher = teachers.find(
-      (t) =>
-        (t.username.toLowerCase() === cleanUser || t.teacher_id_code.toLowerCase() === cleanUser) &&
-        t.password_hash === cleanPass
-    );
+    // Dynamic match against live Supabase-synchronized teacher records
+    const normalizedCleanUser = cleanUser.replace(/\s+/g, '');
+    const matchedTeacher = teachers.find((t) => {
+      const matchUsername = (t.username || '').toLowerCase().replace(/\s+/g, '');
+      const matchIdCode = (t.teacher_id_code || '').toLowerCase().replace(/\s+/g, '');
+      const matchUnderscored = matchIdCode.replace(/\//g, '_');
+      const matchSlashed = matchUsername.replace(/_/g, '/');
+
+      const matchesIdentifier =
+        matchUsername === normalizedCleanUser ||
+        matchIdCode === normalizedCleanUser ||
+        matchUnderscored === normalizedCleanUser ||
+        matchSlashed === normalizedCleanUser;
+
+      return matchesIdentifier && t.password_hash === cleanPass;
+    });
 
     if (matchedTeacher) {
       if (matchedTeacher.status === 'revoked') {
-        return { success: false, message: 'This teacher account credentials have been revoked by administration.' };
+        return { success: false, message: 'Invalid username or password.' };
       }
 
       const authUser: AuthUser = {
@@ -543,17 +579,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         full_name: matchedTeacher.full_name,
         role: 'teacher',
         teacher_id: matchedTeacher.id,
-        form_class_id: matchedTeacher.form_class_id,
-        form_class_name: matchedTeacher.form_class_name,
+        form_class_id: matchedTeacher.is_part_time ? undefined : matchedTeacher.form_class_id,
+        assigned_class_id: matchedTeacher.assigned_class_id ?? (matchedTeacher.is_part_time ? null : (matchedTeacher.form_class_id ?? null)),
+        form_class_name: matchedTeacher.is_part_time ? undefined : matchedTeacher.form_class_name,
         assigned_subject_ids: matchedTeacher.assigned_subject_ids,
+        assigned_subjects: matchedTeacher.assigned_subjects || matchedTeacher.assigned_subject_ids,
+        is_part_time: Boolean(matchedTeacher.is_part_time),
         session_token: matchedTeacher.session_token,
       };
       setCurrentUser(authUser);
-      try {
-        localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
-        setSessionCookie(authUser);
-      } catch {}
-      return { success: true };
+      setSessionCookie(authUser);
+      return { success: true, role: 'teacher' as UserRole };
     }
 
     if (cleanUser === 'teacher' && (cleanPass === 'teacher123' || cleanPass === 'teacher')) {
@@ -565,34 +601,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           full_name: defaultT.full_name,
           role: 'teacher',
           teacher_id: defaultT.id,
-          form_class_id: defaultT.form_class_id,
-          form_class_name: defaultT.form_class_name,
+          form_class_id: defaultT.is_part_time ? undefined : defaultT.form_class_id,
+          assigned_class_id: defaultT.assigned_class_id ?? (defaultT.is_part_time ? null : (defaultT.form_class_id ?? null)),
+          form_class_name: defaultT.is_part_time ? undefined : defaultT.form_class_name,
           assigned_subject_ids: defaultT.assigned_subject_ids,
+          assigned_subjects: defaultT.assigned_subjects || defaultT.assigned_subject_ids,
+          is_part_time: Boolean(defaultT.is_part_time),
           session_token: defaultT.session_token,
         };
         setCurrentUser(authUser);
-        try {
-          localStorage.setItem('apex_auth_user', JSON.stringify(authUser));
-          setSessionCookie(authUser);
-        } catch {}
-        return { success: true };
+        setSessionCookie(authUser);
+        return { success: true, role: 'teacher' as UserRole };
       }
     }
 
-    return { success: false, message: 'Invalid Staff credentials. Use admin/admin123 or registered Teacher ID / Password.' };
+    return { success: false, message: 'Invalid username or password.' };
   };
 
   const logout = () => {
     setCurrentUser(null);
-    try {
-      localStorage.removeItem('apex_auth_user');
-      setSessionCookie(null);
-    } catch {}
+    setSessionCookie(null);
   };
 
   // Teacher Score Entry Portal:
-  // Automatically calculate Total Score (CA1 + CA2 + Exam) and assign letter grades (A, B, C, D, F)
-  const updateStudentScore = (
+  // Automatically calculate Total Score (CA1 + CA2 + Exam) and assign letter grades
+  const updateStudentScore = async (
     studentId: string,
     subjectId: string,
     classId: string,
@@ -615,29 +648,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         r.session === session
     );
 
-    let updatedResults: StudentResult[];
+    let updatedResultRecord: StudentResult;
 
     if (existingIndex >= 0) {
-      updatedResults = results.map((r, i) =>
-        i === existingIndex
-          ? {
-              ...r,
-              ca1,
-              ca2,
-              exam,
-              total_score: total,
-              grade,
-              remarks,
-              graded_at: new Date().toISOString().split('T')[0],
-              audited_by: currentUser?.full_name || currentUser?.username || 'Authorized Staff',
-              audit_timestamp: new Date().toISOString(),
-            }
-          : r
-      );
+      updatedResultRecord = {
+        ...results[existingIndex],
+        ca1,
+        ca2,
+        exam,
+        total_score: total,
+        grade,
+        remarks,
+        graded_at: new Date().toISOString().split('T')[0],
+        audited_by: currentUser?.full_name || currentUser?.username || 'Authorized Staff',
+        audit_timestamp: new Date().toISOString(),
+      };
+      setResults((prev) => prev.map((r, i) => (i === existingIndex ? updatedResultRecord : r)));
     } else {
       const student = students.find((s) => s.id === studentId);
       const subject = subjects.find((sb) => sb.id === subjectId);
-      const newResult: StudentResult = {
+      updatedResultRecord = {
         id: `res-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         student_id: studentId,
         student_name: student?.full_name || 'Student',
@@ -657,13 +687,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         audited_by: currentUser?.full_name || currentUser?.username || 'Authorized Staff',
         audit_timestamp: new Date().toISOString(),
       };
-      updatedResults = [...results, newResult];
+      setResults((prev) => [...prev, updatedResultRecord]);
     }
 
-    saveResults(updatedResults);
+    // Direct Cloud Upsert to Supabase
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('term_results').upsert({
+          student_id: updatedResultRecord.student_id,
+          class_id: updatedResultRecord.class_id,
+          subject_id: updatedResultRecord.subject_id,
+          term: updatedResultRecord.term,
+          session: updatedResultRecord.session,
+          ca1: updatedResultRecord.ca1,
+          ca2: updatedResultRecord.ca2,
+          exam: updatedResultRecord.exam,
+          grade: updatedResultRecord.grade,
+          remarks: updatedResultRecord.remarks,
+          audited_by: updatedResultRecord.audited_by,
+          graded_at: updatedResultRecord.graded_at,
+          audit_timestamp: updatedResultRecord.audit_timestamp,
+        });
+      } catch (err) {
+        console.error('Error saving score to Supabase term_results:', err);
+      }
+    }
   };
 
-  // Admin Class Management: Promote Class (e.g. SS1 Science A -> SS2 Science A)
+  // Admin Class Management: Promote Class
   const promoteClass = (fromClassId: string, toClassId: string) => {
     const fromClass = classes.find((c) => c.id === fromClassId);
     const toClass = classes.find((c) => c.id === toClassId);
@@ -681,34 +732,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // Update students to target class
-    const updatedStudents = students.map((s) => {
-      if (s.class_id === fromClassId) {
-        return {
-          ...s,
-          class_id: toClass.id,
-          class_grade: toClass.name,
-          session: toClass.session,
-        };
-      }
-      return s;
-    });
+    // Update students in state
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.class_id === fromClassId) {
+          return {
+            ...s,
+            class_id: toClass.id,
+            class_grade: toClass.name,
+            session: toClass.session,
+          };
+        }
+        return s;
+      })
+    );
 
-    // Update student counts in class objects
-    const updatedClasses = classes.map((c) => {
-      if (c.id === fromClassId) {
-        return { ...c, student_count: Math.max(0, c.student_count - studentsToPromote.length) };
-      }
-      if (c.id === toClassId) {
-        return { ...c, student_count: c.student_count + studentsToPromote.length };
-      }
-      return c;
-    });
+    // Update classes in state
+    setClasses((prev) =>
+      prev.map((c) => {
+        if (c.id === fromClassId) {
+          return { ...c, student_count: Math.max(0, c.student_count - studentsToPromote.length) };
+        }
+        if (c.id === toClassId) {
+          return { ...c, student_count: c.student_count + studentsToPromote.length };
+        }
+        return c;
+      })
+    );
 
-    saveStudents(updatedStudents);
-    saveClasses(updatedClasses);
-
-    // If current logged-in student was in that class, update active session
+    // Update currentUser if active student was promoted
     if (currentUser?.class_id === fromClassId) {
       const updatedUser: AuthUser = {
         ...currentUser,
@@ -716,12 +768,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         class_grade: toClass.name,
       };
       setCurrentUser(updatedUser);
-      try {
-        localStorage.setItem('apex_auth_user', JSON.stringify(updatedUser));
-      } catch {}
+      setSessionCookie(updatedUser);
     }
 
-    // Add announcement log
+    // Centralize write to Supabase
+    if (isSupabaseConfigured()) {
+      const studentIds = studentsToPromote.map((s) => s.id);
+      Promise.resolve(
+        supabase
+          .from('students')
+          .update({
+            class_id: toClass.id,
+            class_grade: toClass.name,
+            session: toClass.session,
+          })
+          .in('id', studentIds)
+      )
+        .then((res: any) => {
+          if (res?.error) console.error('Error promoting students in Supabase:', res.error);
+        })
+        .catch((err: unknown) => console.error('Error promoting students in Supabase:', err));
+    }
+
     addAnnouncement({
       title: `End-of-Session Class Promotion: ${fromClass.name} ➔ ${toClass.name}`,
       content: `${studentsToPromote.length} students have been promoted to ${toClass.name} for the ${toClass.session} session.`,
@@ -780,16 +848,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       consent_timestamp: data.consentTimestamp || new Date().toISOString(),
     };
 
-    const updated = [newStudent, ...students];
-    saveStudents(updated);
+    setStudents((prev) => [newStudent, ...prev]);
 
-    // Update class student count
-    const updatedClasses = classes.map((c) =>
-      c.id === data.classId ? { ...c, student_count: c.student_count + 1 } : c
+    setClasses((prev) =>
+      prev.map((c) => (c.id === data.classId ? { ...c, student_count: c.student_count + 1 } : c))
     );
-    saveClasses(updatedClasses);
 
-    // Seed default invoice
     const newInvoice: TuitionInvoice = {
       id: `inv-${Date.now()}`,
       student_id: newStudent.id,
@@ -811,6 +875,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setInvoices((prev) => [newInvoice, ...prev]);
 
+    // Centralize write to Supabase cloud
+    if (isSupabaseConfigured()) {
+      Promise.resolve(
+        supabase.from('students').insert({
+          id: newStudent.id,
+          reg_number: newStudent.reg_number,
+          access_pin: newStudent.access_pin,
+          full_name: newStudent.full_name,
+          class_id: newStudent.class_id,
+          class_grade: newStudent.class_grade,
+          session: newStudent.session,
+          parent_name: newStudent.parent_name,
+          parent_phone: newStudent.parent_phone,
+          gpa: newStudent.gpa,
+          attendance_percentage: newStudent.attendance_percentage,
+          fee_paid: newStudent.fee_paid,
+          payment_status: newStudent.payment_status,
+          enrolled_by_role: newStudent.enrolled_by_role,
+          enrolled_by_name: newStudent.enrolled_by_name,
+          enrollment_date: newStudent.enrollment_date,
+          ndpa_consent_granted: newStudent.ndpa_consent_granted,
+          consent_timestamp: newStudent.consent_timestamp,
+          created_at: newStudent.created_at,
+        })
+      )
+        .then((res: any) => {
+          if (res?.error) console.error('Error inserting student to Supabase:', res.error);
+        })
+        .catch((e: unknown) => console.error('Supabase student insert failed:', e));
+    }
+
     return newStudent;
   };
 
@@ -824,10 +919,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     const matched = invoices.find((inv) => inv.id === invoiceId);
     if (matched) {
-      const updated = students.map((s) =>
-        s.id === matched.student_id ? { ...s, tuition_status: 'paid' as const } : s
+      setStudents((prev) =>
+        prev.map((s) => (s.id === matched.student_id ? { ...s, tuition_status: 'paid' as const } : s))
       );
-      saveStudents(updated);
     }
   };
 
@@ -840,7 +934,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAnnouncements((prev) => [newAnn, ...prev]);
   };
 
-  // ── Fee Structure Builder ──────────────────────────────────────────────────
+  // Fee Structure Builder
   const publishFeeStructure = (data: Omit<FeeStructure, 'id' | 'published' | 'published_at'>): FeeStructure => {
     const newStructure: FeeStructure = {
       ...data,
@@ -848,13 +942,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       published: true,
       published_at: new Date().toISOString().split('T')[0],
     };
+
     setFeeStructures((prev) => {
-      // Replace existing structure for same class+term, or prepend new
       const filtered = prev.filter(
         (f) => !(f.class_id === data.class_id && f.term === data.term && f.session === data.session)
       );
       return [newStructure, ...filtered];
     });
+
+    if (isSupabaseConfigured()) {
+      Promise.resolve(
+        supabase.from('fee_structures').upsert({
+          id: newStructure.id,
+          class_id: newStructure.class_id,
+          class_name: newStructure.class_name,
+          term: newStructure.term,
+          session: newStructure.session,
+          line_items: newStructure.line_items,
+          total_amount: newStructure.total_amount,
+          published: newStructure.published,
+          published_at: newStructure.published_at,
+        })
+      ).catch(() => {});
+    }
+
     return newStructure;
   };
 
@@ -866,12 +977,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteFeeStructure = (id: string) => {
     setFeeStructures((prev) => prev.filter((f) => f.id !== id));
+    if (isSupabaseConfigured()) {
+      Promise.resolve(supabase.from('fee_structures').delete().eq('id', id)).catch(() => {});
+    }
   };
 
-  // ── Receipt Upload & Verification & Debt Ledger ─────────────────────────────
+  // Receipt Upload & Verification & Debt Ledger
   const getStudentTermLedger = (studentId: string, term: string) => {
     const student = students.find((s) => s.id === studentId);
-    // Find published fee structure for student's class and term
     const feeStructure =
       feeStructures.find((fs) => fs.class_id === student?.class_id && fs.term === term && fs.published) ||
       feeStructures.find((fs) => fs.class_id === student?.class_id && fs.published);
@@ -882,15 +995,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const totalTermFee = feeStructure ? feeStructure.total_amount : termInvoice?.total_amount || 235000;
 
-    // Filter confirmed transactions for this student and term
     const studentTx = transactions.filter(
       (tx) => tx.student_id === studentId && tx.term === term
     );
 
-    // Sum total credited payments
     let totalPaid = studentTx.reduce((sum, tx) => sum + tx.amount_credited, 0);
 
-    // If student has an approved full receipt or paid invoice or legacy fee_paid status on 1st Term
     const studentReceipts = receipts.filter(
       (r) => (r.student_id === studentId || r.reg_number === student?.reg_number) && (r.term === term || !r.term)
     );
@@ -969,21 +1079,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: 'pending_verification',
     };
 
-    const updatedReceipts = [newReceipt, ...receipts];
-    saveReceipts(updatedReceipts);
+    setReceipts((prev) => [newReceipt, ...prev]);
 
     // Mark student status as pending_verification
-    const updatedStudents = students.map((s) =>
-      s.id === studentId
-        ? {
-            ...s,
-            payment_status: 'pending_verification' as const,
-            fee_paid: false,
-            tuition_status: 'pending' as const,
-          }
-        : s
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.id === studentId
+          ? {
+              ...s,
+              payment_status: 'pending_verification' as const,
+              fee_paid: false,
+              tuition_status: 'pending' as const,
+            }
+          : s
+      )
     );
-    saveStudents(updatedStudents);
 
     // Update corresponding invoice to pending
     setInvoices((prev) =>
@@ -993,42 +1103,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : inv
       )
     );
+
+    // Persist receipt to Supabase
+    if (isSupabaseConfigured()) {
+      Promise.resolve(
+        supabase.from('receipts').insert({
+          id: newReceipt.id,
+          student_id: newReceipt.student_id,
+          class_id: newReceipt.class_id,
+          term: newReceipt.term,
+          session: newReceipt.session,
+          amount_claimed: newReceipt.amount_claimed,
+          payment_mode: newReceipt.payment_mode,
+          file_name: newReceipt.file_name,
+          file_data_url: newReceipt.file_data_url,
+          storage_path: newReceipt.storage_path,
+          file_type: newReceipt.file_type,
+          status: newReceipt.status,
+          uploaded_at: newReceipt.uploaded_at,
+        })
+      )
+        .then((res: any) => {
+          if (res?.error) console.error('Error saving receipt to Supabase:', res.error);
+        })
+        .catch((e: unknown) => console.error('Supabase receipt insert failed:', e));
+    }
   };
 
-  const approveReceipt = (receiptId: string) => {
+  const approveReceipt = async (receiptId: string) => {
     const receipt = receipts.find((r) => r.id === receiptId);
     if (!receipt) return;
 
     const receiptTerm = receipt.term || '1st Term';
     const receiptSession = receipt.session || SCHOOL_INFO.session || '2025/2026';
 
-    // Retrieve ledger to calculate balance to zero out
     const feeStructure =
       feeStructures.find((fs) => fs.class_id === receipt.class_id && fs.term === receiptTerm && fs.published) ||
       feeStructures.find((fs) => fs.class_id === receipt.class_id && fs.published);
     const totalTermFee = feeStructure ? feeStructure.total_amount : 235000;
 
-    // Previous paid in transactions for this term
     const priorPaid = transactions
       .filter((tx) => tx.student_id === receipt.student_id && tx.term === receiptTerm)
       .reduce((sum, tx) => sum + tx.amount_credited, 0);
 
     const creditAmount = Math.max(0, totalTermFee - priorPaid > 0 ? totalTermFee - priorPaid : receipt.amount_claimed);
 
-    const updatedReceipts = receipts.map((r) =>
-      r.id === receiptId
-        ? {
-            ...r,
-            status: 'approved' as ReceiptStatus,
-            amount_approved: creditAmount,
-            reviewed_by: 'Bursar Admin',
-            reviewed_at: new Date().toISOString(),
-          }
-        : r
+    setReceipts((prev) =>
+      prev.map((r) =>
+        r.id === receiptId
+          ? {
+              ...r,
+              status: 'approved' as ReceiptStatus,
+              amount_approved: creditAmount,
+              reviewed_by: 'Bursar Admin',
+              reviewed_at: new Date().toISOString(),
+            }
+          : r
+      )
     );
-    saveReceipts(updatedReceipts);
 
-    // Add confirmed transaction record
     const newTx: PaymentTransaction = {
       id: `tx-${Date.now()}`,
       receipt_id: receiptId,
@@ -1047,22 +1180,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       note: 'Verified in full by Bursar. Results slip unlocked.',
     };
 
-    saveTransactions([newTx, ...transactions]);
+    setTransactions((prev) => [newTx, ...prev]);
 
-    // Student is now fully cleared for results
-    const updatedStudents = students.map((s) =>
-      s.id === receipt.student_id
-        ? {
-            ...s,
-            payment_status: 'paid' as const,
-            fee_paid: true,
-            tuition_status: 'paid' as const,
-          }
-        : s
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.id === receipt.student_id
+          ? {
+              ...s,
+              payment_status: 'paid' as const,
+              fee_paid: true,
+              tuition_status: 'paid' as const,
+            }
+          : s
+      )
     );
-    saveStudents(updatedStudents);
 
-    // Update invoice
     setInvoices((prev) =>
       prev.map((inv) =>
         inv.student_id === receipt.student_id && (inv.term === receiptTerm || !inv.term)
@@ -1076,9 +1208,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : inv
       )
     );
+
+    if (isSupabaseConfigured()) {
+      try {
+        await Promise.all([
+          supabase
+            .from('receipts')
+            .update({
+              status: 'approved',
+              amount_approved: creditAmount,
+              reviewed_by: 'Bursar Admin',
+              reviewed_at: new Date().toISOString(),
+            })
+            .eq('id', receiptId),
+          supabase
+            .from('students')
+            .update({
+              fee_paid: true,
+              payment_status: 'paid',
+              tuition_status: 'paid',
+            })
+            .eq('id', receipt.student_id),
+        ]);
+      } catch (err) {
+        console.error('Error approving receipt in Supabase:', err);
+      }
+    }
   };
 
-  const confirmPartialPayment = (receiptId: string, approvedAmount?: number, bursarNote?: string) => {
+  const confirmPartialPayment = async (receiptId: string, approvedAmount?: number, bursarNote?: string) => {
     const receipt = receipts.find((r) => r.id === receiptId);
     if (!receipt) return;
 
@@ -1092,7 +1250,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const creditAmount = approvedAmount !== undefined ? approvedAmount : receipt.amount_claimed;
 
-    // Prior paid in transactions for this term
     const priorPaid = transactions
       .filter((tx) => tx.student_id === receipt.student_id && tx.term === receiptTerm)
       .reduce((sum, tx) => sum + tx.amount_credited, 0);
@@ -1101,19 +1258,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newRemainingDebt = Math.max(0, totalTermFee - newTotalPaid);
     const isFullyPaidNow = newRemainingDebt === 0;
 
-    const updatedReceipts = receipts.map((r) =>
-      r.id === receiptId
-        ? {
-            ...r,
-            status: (isFullyPaidNow ? 'approved' : 'partially_approved') as ReceiptStatus,
-            amount_approved: creditAmount,
-            reviewed_by: 'Bursar Admin',
-            reviewed_at: new Date().toISOString(),
-            admin_note: bursarNote || `Partial payment of ${creditAmount} credited. Remaining: ${newRemainingDebt}`,
-          }
-        : r
+    setReceipts((prev) =>
+      prev.map((r) =>
+        r.id === receiptId
+          ? {
+              ...r,
+              status: (isFullyPaidNow ? 'approved' : 'partially_approved') as ReceiptStatus,
+              amount_approved: creditAmount,
+              reviewed_by: 'Bursar Admin',
+              reviewed_at: new Date().toISOString(),
+              admin_note: bursarNote || `Partial payment of ${creditAmount} credited. Remaining: ${newRemainingDebt}`,
+            }
+          : r
+      )
     );
-    saveReceipts(updatedReceipts);
 
     const newTx: PaymentTransaction = {
       id: `tx-${Date.now()}`,
@@ -1133,22 +1291,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       note: bursarNote || `Partial deposit credited. Remaining debt: ₦${newRemainingDebt.toLocaleString()}`,
     };
 
-    saveTransactions([newTx, ...transactions]);
+    setTransactions((prev) => [newTx, ...prev]);
 
-    // Update student: locked result slip if remaining debt > 0
-    const updatedStudents = students.map((s) =>
-      s.id === receipt.student_id
-        ? {
-            ...s,
-            payment_status: isFullyPaidNow ? ('paid' as const) : ('partially_paid' as const),
-            fee_paid: isFullyPaidNow,
-            tuition_status: isFullyPaidNow ? ('paid' as const) : ('partial' as const),
-          }
-        : s
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.id === receipt.student_id
+          ? {
+              ...s,
+              payment_status: isFullyPaidNow ? ('paid' as const) : ('partially_paid' as const),
+              fee_paid: isFullyPaidNow,
+              tuition_status: isFullyPaidNow ? ('paid' as const) : ('partial' as const),
+            }
+          : s
+      )
     );
-    saveStudents(updatedStudents);
 
-    // Update invoice
     setInvoices((prev) =>
       prev.map((inv) =>
         inv.student_id === receipt.student_id && (inv.term === receiptTerm || !inv.term)
@@ -1162,45 +1319,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : inv
       )
     );
+
+    if (isSupabaseConfigured()) {
+      try {
+        await Promise.all([
+          supabase
+            .from('receipts')
+            .update({
+              status: isFullyPaidNow ? 'approved' : 'partially_approved',
+              amount_approved: creditAmount,
+              reviewed_by: 'Bursar Admin',
+              reviewed_at: new Date().toISOString(),
+              admin_note: bursarNote,
+            })
+            .eq('id', receiptId),
+          supabase
+            .from('students')
+            .update({
+              fee_paid: isFullyPaidNow,
+              payment_status: isFullyPaidNow ? 'paid' : 'partially_paid',
+              tuition_status: isFullyPaidNow ? 'paid' : 'partial',
+            })
+            .eq('id', receipt.student_id),
+        ]);
+      } catch (err) {
+        console.error('Error confirming partial payment in Supabase:', err);
+      }
+    }
   };
 
-  const rejectReceipt = (receiptId: string, note?: string) => {
+  const rejectReceipt = async (receiptId: string, note?: string) => {
     const receipt = receipts.find((r) => r.id === receiptId);
     if (!receipt) return;
 
     const receiptTerm = receipt.term || '1st Term';
 
-    const updatedReceipts = receipts.map((r) =>
-      r.id === receiptId
-        ? {
-            ...r,
-            status: 'rejected' as ReceiptStatus,
-            reviewed_by: 'Bursar Admin',
-            reviewed_at: new Date().toISOString(),
-            admin_note: note || 'Proof of payment rejected. Please review and re-upload valid bank transfer receipt.',
-          }
-        : r
+    setReceipts((prev) =>
+      prev.map((r) =>
+        r.id === receiptId
+          ? {
+              ...r,
+              status: 'rejected' as ReceiptStatus,
+              reviewed_by: 'Bursar Admin',
+              reviewed_at: new Date().toISOString(),
+              admin_note: note || 'Proof of payment rejected. Please review and re-upload valid bank transfer receipt.',
+            }
+          : r
+      )
     );
-    saveReceipts(updatedReceipts);
 
-    // Recompute current student payment status from remaining transactions
     const priorPaid = transactions
       .filter((tx) => tx.student_id === receipt.student_id && tx.term === receiptTerm)
       .reduce((sum, tx) => sum + tx.amount_credited, 0);
 
     const hasPriorDeposit = priorPaid > 0;
 
-    const updatedStudents = students.map((s) =>
-      s.id === receipt.student_id
-        ? {
-            ...s,
-            payment_status: hasPriorDeposit ? ('partially_paid' as const) : ('unpaid' as const),
-            fee_paid: false,
-            tuition_status: hasPriorDeposit ? ('partial' as const) : ('pending' as const),
-          }
-        : s
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.id === receipt.student_id
+          ? {
+              ...s,
+              payment_status: hasPriorDeposit ? ('partially_paid' as const) : ('unpaid' as const),
+              fee_paid: false,
+              tuition_status: hasPriorDeposit ? ('partial' as const) : ('pending' as const),
+            }
+          : s
+      )
     );
-    saveStudents(updatedStudents);
 
     setInvoices((prev) =>
       prev.map((inv) =>
@@ -1209,27 +1394,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : inv
       )
     );
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('receipts')
+          .update({
+            status: 'rejected',
+            reviewed_by: 'Bursar Admin',
+            reviewed_at: new Date().toISOString(),
+            admin_note: note,
+          })
+          .eq('id', receiptId);
+      } catch (err) {
+        console.error('Error rejecting receipt in Supabase:', err);
+      }
+    }
   };
 
-  const saveTeachers = (newTeachers: TeacherProfile[]) => {
-    setTeachers(newTeachers);
-    try {
-      localStorage.setItem('apex_teachers', JSON.stringify(newTeachers));
-    } catch {}
-  };
-
-  // ── Teacher Registry & Security Controls ──────────────────────────────────
+  // Teacher Registry & Security Controls (Admin)
   const registerTeacher = (data: {
     fullName: string;
     phone: string;
     email: string;
     assignedSubjectIds: string[];
+    assignedSubjects?: string[];
     formClassId?: string;
+    assignedClassId?: string | null;
+    isPartTime?: boolean;
   }) => {
     const nextSeq = String(teachers.length + 1).padStart(3, '0');
     const teacherIdCode = `TCH/2026/${nextSeq}`;
     const generatedPassword = `Tch${Math.floor(1000 + Math.random() * 9000)}!`;
-    const formClass = classes.find((c) => c.id === data.formClassId);
+    const resolvedSubjectIds = data.assignedSubjects || data.assignedSubjectIds || [];
+    const isPartTime = Boolean(data.isPartTime);
+    const assignedClassId = isPartTime ? null : (data.assignedClassId ?? data.formClassId ?? null);
+    const formClass = !isPartTime && assignedClassId ? classes.find((c) => c.id === assignedClassId) : undefined;
 
     const newTeacher: TeacherProfile = {
       id: `t-${Date.now()}`,
@@ -1239,23 +1439,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       email: data.email,
       username: teacherIdCode.toLowerCase().replace(/\//g, '_'),
       password_hash: generatedPassword,
-      assigned_subject_ids: data.assignedSubjectIds,
-      form_class_id: data.formClassId,
-      form_class_name: formClass?.name,
+      assigned_subject_ids: resolvedSubjectIds,
+      assigned_subjects: resolvedSubjectIds,
+      form_class_id: isPartTime ? undefined : (assignedClassId || undefined),
+      assigned_class_id: assignedClassId,
+      form_class_name: isPartTime ? undefined : formClass?.name,
+      is_part_time: isPartTime,
       status: 'active',
       session_token: `token-${Date.now()}`,
       created_at: new Date().toISOString(),
     };
 
-    const updated = [newTeacher, ...teachers];
-    saveTeachers(updated);
+    setTeachers((prev) => [newTeacher, ...prev]);
 
-    // Also update class teacher name on academic classes if assigned as Form Teacher
-    if (data.formClassId) {
-      const updatedClasses = classes.map((c) =>
-        c.id === data.formClassId ? { ...c, class_teacher: data.fullName } : c
+    if (!isPartTime && assignedClassId) {
+      setClasses((prev) =>
+        prev.map((c) => (c.id === assignedClassId ? { ...c, class_teacher: data.fullName } : c))
       );
-      saveClasses(updatedClasses);
+    }
+
+    // Persist to Supabase staff table immediately
+    if (isSupabaseConfigured()) {
+      Promise.resolve(
+        supabase.from('staff').upsert({
+          id: newTeacher.id,
+          teacher_id_code: newTeacher.teacher_id_code,
+          full_name: newTeacher.full_name,
+          phone: newTeacher.phone,
+          email: newTeacher.email,
+          username: newTeacher.username,
+          password_hash: newTeacher.password_hash,
+          assigned_subjects: newTeacher.assigned_subjects,
+          assigned_subject_ids: newTeacher.assigned_subject_ids,
+          assigned_class_id: newTeacher.assigned_class_id,
+          form_class_id: newTeacher.form_class_id,
+          form_class_name: newTeacher.form_class_name,
+          is_part_time: newTeacher.is_part_time,
+          status: newTeacher.status,
+          session_token: newTeacher.session_token,
+          created_at: newTeacher.created_at,
+        })
+      )
+        .then((res: any) => {
+          if (res?.error) console.error('Error saving staff to Supabase:', res.error);
+        })
+        .catch((e: unknown) => console.error('Supabase staff upsert failed:', e));
     }
 
     return { teacher: newTeacher, initialPassword: generatedPassword };
@@ -1268,41 +1496,89 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       phone?: string;
       email?: string;
       assignedSubjectIds?: string[];
+      assignedSubjects?: string[];
       formClassId?: string;
+      assignedClassId?: string | null;
+      isPartTime?: boolean;
       resetCredentials?: boolean;
     }
   ) => {
     let newPassword: string | undefined = undefined;
     const newToken = `token-${Date.now()}`;
 
-    const formClass = updates.formClassId !== undefined
-      ? classes.find((c) => c.id === updates.formClassId)
-      : undefined;
+    setTeachers((prev) =>
+      prev.map((t) => {
+        if (t.id === teacherId) {
+          if (updates.resetCredentials) {
+            newPassword = `Reset${Math.floor(1000 + Math.random() * 9000)}#`;
+          }
 
-    const updatedTeachers = teachers.map((t) => {
-      if (t.id === teacherId) {
-        if (updates.resetCredentials) {
-          newPassword = `Reset${Math.floor(1000 + Math.random() * 9000)}#`;
+          const isPartTime = updates.isPartTime !== undefined ? Boolean(updates.isPartTime) : Boolean(t.is_part_time);
+          const resolvedSubjectIds = updates.assignedSubjects !== undefined
+            ? updates.assignedSubjects
+            : (updates.assignedSubjectIds !== undefined ? updates.assignedSubjectIds : t.assigned_subject_ids);
+
+          let targetClassId: string | null = null;
+          if (!isPartTime) {
+            if (updates.assignedClassId !== undefined) {
+              targetClassId = updates.assignedClassId;
+            } else if (updates.formClassId !== undefined) {
+              targetClassId = updates.formClassId || null;
+            } else {
+              targetClassId = t.assigned_class_id ?? t.form_class_id ?? null;
+            }
+          }
+
+          const formClass = targetClassId ? classes.find((c) => c.id === targetClassId) : undefined;
+
+          const updatedT: TeacherProfile = {
+            ...t,
+            full_name: updates.fullName !== undefined ? updates.fullName : t.full_name,
+            phone: updates.phone !== undefined ? updates.phone : t.phone,
+            email: updates.email !== undefined ? updates.email : t.email,
+            assigned_subject_ids: resolvedSubjectIds,
+            assigned_subjects: resolvedSubjectIds,
+            form_class_id: isPartTime ? undefined : (targetClassId || undefined),
+            assigned_class_id: isPartTime ? null : targetClassId,
+            form_class_name: isPartTime ? undefined : formClass?.name,
+            is_part_time: isPartTime,
+            password_hash: newPassword || t.password_hash,
+            session_token: updates.resetCredentials ? newToken : t.session_token,
+            last_credential_reset: updates.resetCredentials ? new Date().toISOString() : t.last_credential_reset,
+          };
+
+          if (isSupabaseConfigured()) {
+            Promise.resolve(
+              supabase.from('staff').upsert({
+                id: updatedT.id,
+                teacher_id_code: updatedT.teacher_id_code,
+                full_name: updatedT.full_name,
+                phone: updatedT.phone,
+                email: updatedT.email,
+                username: updatedT.username,
+                password_hash: updatedT.password_hash,
+                assigned_subjects: updatedT.assigned_subjects,
+                assigned_subject_ids: updatedT.assigned_subject_ids,
+                assigned_class_id: updatedT.assigned_class_id,
+                form_class_id: updatedT.form_class_id,
+                form_class_name: updatedT.form_class_name,
+                is_part_time: updatedT.is_part_time,
+                status: updatedT.status,
+                session_token: updatedT.session_token,
+                last_credential_reset: updatedT.last_credential_reset,
+              })
+            )
+              .then((res: any) => {
+                if (res?.error) console.error('Error updating staff in Supabase:', res.error);
+              })
+              .catch((e: unknown) => console.error('Supabase staff update failed:', e));
+          }
+
+          return updatedT;
         }
-
-        const updatedT: TeacherProfile = {
-          ...t,
-          full_name: updates.fullName !== undefined ? updates.fullName : t.full_name,
-          phone: updates.phone !== undefined ? updates.phone : t.phone,
-          email: updates.email !== undefined ? updates.email : t.email,
-          assigned_subject_ids: updates.assignedSubjectIds !== undefined ? updates.assignedSubjectIds : t.assigned_subject_ids,
-          form_class_id: updates.formClassId !== undefined ? updates.formClassId : t.form_class_id,
-          form_class_name: updates.formClassId !== undefined ? formClass?.name : t.form_class_name,
-          password_hash: newPassword || t.password_hash,
-          session_token: updates.resetCredentials ? newToken : t.session_token,
-          last_credential_reset: updates.resetCredentials ? new Date().toISOString() : t.last_credential_reset,
-        };
-        return updatedT;
-      }
-      return t;
-    });
-
-    saveTeachers(updatedTeachers);
+        return t;
+      })
+    );
 
     // If active user is this teacher and credentials were reset, force logout
     if (currentUser?.teacher_id === teacherId && updates.resetCredentials) {
@@ -1313,8 +1589,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTeacher = (teacherId: string) => {
-    const updated = teachers.filter((t) => t.id !== teacherId);
-    saveTeachers(updated);
+    setTeachers((prev) => prev.filter((t) => t.id !== teacherId));
+    if (isSupabaseConfigured()) {
+      Promise.resolve(supabase.from('staff').delete().eq('id', teacherId)).catch(() => {});
+    }
     if (currentUser?.teacher_id === teacherId) {
       logout();
     }
@@ -1327,6 +1605,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         currentUser,
         currentRole: currentUser?.role || null,
         isAuthenticated: !!currentUser,
+        isAuthReady,
         classes,
         subjects,
         allocations,

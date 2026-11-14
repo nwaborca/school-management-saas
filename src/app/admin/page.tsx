@@ -63,6 +63,7 @@ export default function AdminHubPage() {
     updateAdminPassword,
     currentUser,
     isAuthReady,
+    supabase, // Supabase client from AppContext
   } = useApp();
 
   // Route Guard: Require admin / bursar authentication
@@ -76,6 +77,27 @@ export default function AdminHubPage() {
       router.push('/academic-hub');
     }
   }, [currentUser, isAuthReady, router]);
+
+  // Realtime subscription setup to sync registrations across tabs and normal/incognito windows
+  useEffect(() => {
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel('admin-hub-realtime-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' },
+        (payload) => {
+          // Trigger data refresh on mutations across clients
+          window.location.reload();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase]);
 
   const [activeTab, setActiveTab] = useState<'roster' | 'receipts' | 'ledger' | 'teachers' | 'enroll' | 'notices' | 'admin-security'>('roster');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -1925,7 +1947,7 @@ export default function AdminHubPage() {
           </div>
         )}
       </div>
-          </AnimatedContent>
+      </AnimatedContent>
     </div>
   );
 }

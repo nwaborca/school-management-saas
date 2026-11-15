@@ -76,6 +76,9 @@ CREATE POLICY "Allow anon insert on term_results" ON public.term_results FOR INS
 DROP POLICY IF EXISTS "Allow anon update on term_results" ON public.term_results;
 CREATE POLICY "Allow anon update on term_results" ON public.term_results FOR UPDATE TO public USING (true);
 
+DROP POLICY IF EXISTS "Allow anon delete on term_results" ON public.term_results;
+CREATE POLICY "Allow anon delete on term_results" ON public.term_results FOR DELETE TO public USING (true);
+
 -- 7. Receipts policies
 DROP POLICY IF EXISTS "Allow anon select on receipts" ON public.receipts;
 CREATE POLICY "Allow anon select on receipts" ON public.receipts FOR SELECT TO public USING (true);

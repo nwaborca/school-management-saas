@@ -277,6 +277,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  // Helper to normalize result record from Supabase
+  const normalizeResult = (r: any): StudentResult => {
+    const student = students.find((s) => s.id === r.student_id);
+    const subject = subjects.find((sb) => sb.id === r.subject_id);
+    const ca1 = Number(r.ca1) || 0;
+    const ca2 = Number(r.ca2) || 0;
+    const exam = Number(r.exam) || 0;
+    const total_score = Number(r.total_score) || (ca1 + ca2 + exam);
+    return {
+      id: r.id,
+      student_id: r.student_id,
+      student_name: r.student_name || student?.full_name || 'Student',
+      reg_number: r.reg_number || student?.reg_number || 'N/A',
+      class_id: r.class_id,
+      subject_id: r.subject_id,
+      subject_name: r.subject_name || subject?.name || 'Subject',
+      term: r.term,
+      session: r.session,
+      ca1,
+      ca2,
+      exam,
+      total_score,
+      grade: r.grade,
+      remarks: r.remarks,
+      audited_by: r.audited_by,
+      graded_at: r.graded_at || new Date().toISOString().split('T')[0],
+      audit_timestamp: r.audit_timestamp,
+    };
+  };
   // Helper to normalize student record from Supabase or memory
   const normalizeStudent = (s: any): StudentProfile => {
     return {
@@ -442,7 +471,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (resData && Array.isArray(resData) && resData.length > 0) {
-        setResults(resData as StudentResult[]);
+        try {
+          const normalizedResults = resData.map(normalizeResult);
+          setResults(normalizedResults);
+        } catch (normResErr) {
+          console.warn('Error normalizing term_results payload:', normResErr);
+          setResults(resData as StudentResult[]);
+        }
       }
 
       if (classData && Array.isArray(classData) && classData.length > 0) {
@@ -551,13 +586,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { event: '*', schema: 'public', table: 'term_results' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            const inserted = payload.new as StudentResult;
+            const inserted = normalizeResult(payload.new);
             setResults((prev) => {
               if (prev.some((r) => r.id === inserted.id)) return prev;
-              return [inserted, ...prev];
+              const filtered = prev.filter(
+                (r) =>
+                  !(
+                    r.student_id === inserted.student_id &&
+                    r.subject_id === inserted.subject_id &&
+                    r.term === inserted.term &&
+                    r.session === inserted.session
+                  )
+              );
+              return [inserted, ...filtered];
             });
           } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as StudentResult;
+            const updated = normalizeResult(payload.new);
             setResults((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
           } else if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as any)?.id;
@@ -874,7 +918,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Direct Cloud Upsert to Supabase
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('term_results').upsert({
+        const payload = {
           student_id: updatedResultRecord.student_id,
           class_id: updatedResultRecord.class_id,
           subject_id: updatedResultRecord.subject_id,
@@ -888,7 +932,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           audited_by: updatedResultRecord.audited_by,
           graded_at: updatedResultRecord.graded_at,
           audit_timestamp: updatedResultRecord.audit_timestamp,
+        };
+
+        const { error } = await supabase.from('term_results').upsert(payload, {
+          onConflict: 'student_id, subject_id, term, session',
         });
+
+        if (error) {
+          console.error('CRITICAL: Error saving score to Supabase term_results:', error);
+        } else {
+          console.log('✓ Successfully saved student score to Supabase term_results:', updatedResultRecord.student_name, updatedResultRecord.subject_name);
+        }
       } catch (err) {
         console.error('Error saving score to Supabase term_results:', err);
       }

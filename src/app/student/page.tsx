@@ -197,19 +197,26 @@ export default function StudentDashboardPage() {
     const amountClaimed = currentPayableAmount;
     const currentFile = selectedFile;
 
-    if (!activeStudent) return;
+    if (!activeStudent) {
+      setIsUploading(false);
+      return;
+    }
     const studentId = activeStudent.id;
     const studentSession = activeStudent.session || schoolInfo.session || '2025/2026';
 
-    const storageResult = await uploadReceiptToStorage(currentFile, studentId);
+    try {
+      const storageResult = await uploadReceiptToStorage(currentFile, studentId);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+      const fileDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(currentFile);
+      });
 
-      uploadReceipt(studentId, {
+      const res = await uploadReceipt(studentId, {
         fileName: currentFile.name,
-        fileDataUrl: storageResult?.url || dataUrl,
+        fileDataUrl: storageResult?.url || fileDataUrl,
         fileType: currentFile.type || (currentFile.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
         storagePath: storageResult?.path,
         amountClaimed: amountClaimed,
@@ -219,14 +226,20 @@ export default function StudentDashboardPage() {
         session: studentSession,
       });
 
+      if (!res.success) {
+        alert(`Failed to save payment proof: ${res.error || 'Database submission error'}`);
+      } else {
+        setSelectedFile(null);
+        setUploadSuccessNotice(true);
+        setShowBankDetailsModal(false);
+        setTimeout(() => setUploadSuccessNotice(false), 5000);
+      }
+    } catch (err: any) {
+      console.error('Receipt upload failed:', err);
+      alert('An error occurred while uploading payment receipt.');
+    } finally {
       setIsUploading(false);
-      setSelectedFile(null);
-      setUploadSuccessNotice(true);
-      setShowBankDetailsModal(false);
-      setTimeout(() => setUploadSuccessNotice(false), 5000);
-    };
-
-    reader.readAsDataURL(currentFile);
+    }
   };
 
   const handleDownloadResultSlip = () => {

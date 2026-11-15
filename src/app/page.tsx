@@ -131,16 +131,13 @@ export default function HomePage() {
                 </div>
 
                 {/* Mobile Fallback: Lightweight, Battery-Efficient Academic Shield Hero */}
-                <div className="block md:hidden w-full rounded-3xl bg-gradient-to-br from-rose-950 via-gray-900 to-gray-950 border border-amber-500/30 p-8 text-center space-y-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-                  <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-amber-500 to-rose-700 p-0.5 shadow-lg">
-                    <div className="w-full h-full bg-gray-950 rounded-[22px] flex items-center justify-center text-amber-400">
-                      <GraduationCap className="w-10 h-10" />
-                    </div>
+                <div className="block md:hidden w-full rounded-3xl bg-[#111827] border border-gray-800 p-8 text-center space-y-6 shadow-xl relative overflow-hidden">
+                  <div className="w-20 h-20 mx-auto rounded-3xl bg-gray-800 border border-gray-700 flex items-center justify-center text-amber-400 shadow-lg">
+                    <GraduationCap className="w-10 h-10" />
                   </div>
 
                   <div className="space-y-2">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono font-semibold">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-amber-400 text-xs font-mono font-semibold">
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>APEX DIGITAL PORTAL</span>
                     </div>
@@ -149,11 +146,11 @@ export default function HomePage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-2 text-left">
-                    <div className="p-3 rounded-xl bg-gray-900/80 border border-gray-800">
+                    <div className="p-3 rounded-xl bg-gray-900 border border-gray-800">
                       <span className="text-[10px] text-gray-400 block font-mono">ACADEMIC ARM</span>
                       <strong className="text-xs text-gray-200 font-bold">Creche – SS3 F</strong>
                     </div>
-                    <div className="p-3 rounded-xl bg-gray-900/80 border border-gray-800">
+                    <div className="p-3 rounded-xl bg-gray-900 border border-gray-800">
                       <span className="text-[10px] text-gray-400 block font-mono">STANDARDS</span>
                       <strong className="text-xs text-amber-400 font-bold">WAEC / NECO</strong>
                     </div>

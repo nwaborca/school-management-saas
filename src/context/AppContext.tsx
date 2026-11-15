@@ -110,7 +110,7 @@ interface AppContextType {
     session?: string;
     fileType?: string;
     storagePath?: string;
-  }) => void;
+  }) => Promise<{ success: boolean; receipt?: PaymentReceipt; error?: string }>;
   approveReceipt: (receiptId: string) => void;
   confirmPartialPayment: (receiptId: string, approvedAmount?: number, bursarNote?: string) => void;
   rejectReceipt: (receiptId: string, note?: string) => void;
@@ -1311,7 +1311,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  const uploadReceipt = (
+  const uploadReceipt = async (
     studentId: string,
     data: {
       fileName: string;
@@ -1324,15 +1324,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fileType?: string;
       storagePath?: string;
     }
-  ) => {
+  ): Promise<{ success: boolean; receipt?: PaymentReceipt; error?: string }> => {
     const student = students.find((s) => s.id === studentId);
-    if (!student) return;
+    if (!student) {
+      return { success: false, error: 'Student not found' };
+    }
 
     const receiptTerm = data.term || '1st Term';
     const receiptSession = data.session || SCHOOL_INFO.session || '2025/2026';
+    const receiptUUID = generateUUID();
 
     const newReceipt: PaymentReceipt = {
-      id: `rcpt-${Date.now()}`,
+      id: receiptUUID,
       student_id: studentId,
       student_name: student.full_name,
       reg_number: student.reg_number,
@@ -1378,28 +1381,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Persist receipt to Supabase
     if (isSupabaseConfigured()) {
-      Promise.resolve(
-        supabase.from('receipts').insert({
+      try {
+        const payload = {
           id: newReceipt.id,
           student_id: newReceipt.student_id,
           class_id: newReceipt.class_id,
+          fee_structure_id: newReceipt.fee_structure_id || null,
           term: newReceipt.term,
           session: newReceipt.session,
           amount_claimed: newReceipt.amount_claimed,
           payment_mode: newReceipt.payment_mode,
           file_name: newReceipt.file_name,
           file_data_url: newReceipt.file_data_url,
-          storage_path: newReceipt.storage_path,
-          file_type: newReceipt.file_type,
+          storage_path: newReceipt.storage_path || null,
+          file_type: newReceipt.file_type || 'application/pdf',
           status: newReceipt.status,
           uploaded_at: newReceipt.uploaded_at,
-        })
-      )
-        .then((res: any) => {
-          if (res?.error) console.error('Error saving receipt to Supabase:', res.error);
-        })
-        .catch((e: unknown) => console.error('Supabase receipt insert failed:', e));
+        };
+
+        const { error } = await supabase.from('receipts').insert(payload);
+        if (error) {
+          console.error('CRITICAL: Supabase receipt insert failed:', error);
+          return { success: false, receipt: newReceipt, error: error.message };
+        } else {
+          console.log('✓ Successfully saved receipt to Supabase receipts table:', newReceipt.id);
+          return { success: true, receipt: newReceipt };
+        }
+      } catch (err: any) {
+        console.error('CRITICAL: Supabase receipt insert exception:', err);
+        return { success: false, receipt: newReceipt, error: err?.message || 'Network error' };
+      }
     }
+
+    return { success: true, receipt: newReceipt };
   };
 
   const approveReceipt = async (receiptId: string) => {
@@ -1489,7 +1503,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             .update({
               status: 'approved',
               amount_approved: creditAmount,
-              reviewed_by: 'Bursar Admin',
+              reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
               reviewed_at: new Date().toISOString(),
             })
             .eq('id', receiptId),
@@ -1600,7 +1614,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             .update({
               status: isFullyPaidNow ? 'approved' : 'partially_approved',
               amount_approved: creditAmount,
-              reviewed_by: 'Bursar Admin',
+              reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
               reviewed_at: new Date().toISOString(),
               admin_note: bursarNote,
             })
@@ -1673,7 +1687,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .from('receipts')
           .update({
             status: 'rejected',
-            reviewed_by: 'Bursar Admin',
+            reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
             reviewed_at: new Date().toISOString(),
             admin_note: note,
           })

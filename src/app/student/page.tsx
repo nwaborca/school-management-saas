@@ -96,27 +96,23 @@ export default function StudentDashboardPage() {
     }
   }, [currentUser, isAuthReady, router]);
 
-  if (!currentUser || !activeStudent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
-        <span>Authenticating session...</span>
-      </div>
-    );
-  }
-
-  const studentClass = classes.find((c) => c.id === activeStudent.class_id) ||
-    classes.find((c) => c.name === activeStudent.class_grade);
+  const studentClass = activeStudent
+    ? classes.find((c) => c.id === activeStudent.class_id) ||
+      classes.find((c) => c.name === activeStudent.class_grade)
+    : undefined;
 
   const allowedStreamSubjects = filterSubjectsForClassAndStream(subjects, studentClass);
   const allowedSubjectIds = new Set(allowedStreamSubjects.map((s) => s.id));
 
-  const studentResults = results.filter((r) => {
-    if (r.student_id !== activeStudent.id || r.term !== selectedTerm) return false;
-    if (studentClass?.stage === 'senior_secondary') {
-      return allowedSubjectIds.has(r.subject_id);
-    }
-    return true;
-  });
+  const studentResults = activeStudent
+    ? results.filter((r) => {
+        if (r.student_id !== activeStudent.id || r.term !== selectedTerm) return false;
+        if (studentClass?.stage === 'senior_secondary') {
+          return allowedSubjectIds.has(r.subject_id);
+        }
+        return true;
+      })
+    : [];
 
   const totalScoreObtained = studentResults.reduce((sum, r) => sum + r.total_score, 0);
   const totalMaxScore = studentResults.length * 100;
@@ -124,12 +120,22 @@ export default function StudentDashboardPage() {
     studentResults.length > 0 ? (totalScoreObtained / studentResults.length).toFixed(1) : '0.0';
   const subjectsPassed = studentResults.filter((r) => r.total_score >= 50).length;
 
-  const classFeeStructure = feeStructures.find(
-    (fs) => fs.class_id === activeStudent.class_id && fs.term === selectedTerm && fs.published
-  ) || feeStructures.find((fs) => fs.class_id === activeStudent.class_id && fs.published);
+  const classFeeStructure = activeStudent
+    ? feeStructures.find(
+        (fs) => fs.class_id === activeStudent.class_id && fs.term === selectedTerm && fs.published
+      ) || feeStructures.find((fs) => fs.class_id === activeStudent.class_id && fs.published)
+    : undefined;
 
   // Compute Term-Isolated Partial Payment & Ledger
-  const termLedger = getStudentTermLedger(activeStudent.id, selectedTerm);
+  const termLedger = activeStudent
+    ? getStudentTermLedger(activeStudent.id, selectedTerm)
+    : {
+        totalTermFee: 0,
+        totalPaid: 0,
+        remainingBalance: 0,
+        paymentStatus: 'unpaid' as const,
+        isUnlocked: false,
+      };
   const isPaid = termLedger.isUnlocked;
   const isPendingVerification = termLedger.paymentStatus === 'pending_verification';
   const isPartiallyPaid = termLedger.paymentStatus === 'partially_paid';
@@ -191,13 +197,17 @@ export default function StudentDashboardPage() {
     const amountClaimed = currentPayableAmount;
     const currentFile = selectedFile;
 
-    const storageResult = await uploadReceiptToStorage(currentFile, activeStudent.id);
+    if (!activeStudent) return;
+    const studentId = activeStudent.id;
+    const studentSession = activeStudent.session || schoolInfo.session || '2025/2026';
+
+    const storageResult = await uploadReceiptToStorage(currentFile, studentId);
 
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
 
-      uploadReceipt(activeStudent.id, {
+      uploadReceipt(studentId, {
         fileName: currentFile.name,
         fileDataUrl: storageResult?.url || dataUrl,
         fileType: currentFile.type || (currentFile.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
@@ -206,7 +216,7 @@ export default function StudentDashboardPage() {
         paymentMode: paymentChoice,
         feeStructureId: classFeeStructure?.id,
         term: selectedTerm,
-        session: activeStudent.session || schoolInfo.session || '2025/2026',
+        session: studentSession,
       });
 
       setIsUploading(false);
@@ -230,6 +240,14 @@ export default function StudentDashboardPage() {
     }
     setIsPrintModalOpen(true);
   };
+
+  if (!currentUser || !activeStudent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
+        <span>Authenticating session...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen text-gray-100 pb-16">

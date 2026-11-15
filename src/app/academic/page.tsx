@@ -52,17 +52,6 @@ export default function AcademicHubPage() {
     }
   }, [currentUser, isAuthReady, router]);
 
-  if (!isAuthReady) {
-    return (
-      <div className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-3 bg-[#111827] border border-gray-800 px-5 py-3 rounded-2xl shadow-xl">
-          <RefreshCw className="w-5 h-5 text-amber-500 animate-spin" />
-          <span className="text-sm font-medium text-gray-300">Synchronizing Session...</span>
-        </div>
-      </div>
-    );
-  }
-
   const loggedTeacher =
     teachers.find((t) => t.id === currentUser?.teacher_id || t.username === currentUser?.username) || null;
 
@@ -414,6 +403,17 @@ export default function AcademicHubPage() {
       passingStudents: passing,
     };
   }, [formClass, formClassStudents, formClassSubjects, results, selectedTerm, session]);
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-3 bg-[#111827] border border-gray-800 px-5 py-3 rounded-2xl shadow-xl">
+          <RefreshCw className="w-5 h-5 text-amber-500 animate-spin" />
+          <span className="text-sm font-medium text-gray-300">Synchronizing Session...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">

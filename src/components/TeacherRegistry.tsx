@@ -50,6 +50,7 @@ export default function TeacherRegistry() {
     isReset?: boolean;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [registerStatus, setRegisterStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Register form fields
   const [fullName, setFullName] = useState('');
@@ -93,38 +94,47 @@ export default function TeacherRegistry() {
     );
   }, [availableSubjects, editSubjectSearch]);
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !email.trim()) return;
 
-    const res = registerTeacher({
-      fullName: fullName.trim(),
-      phone: phone.trim().startsWith('+234') ? phone.trim() : `+234${phone.trim()}`,
-      email: email.trim(),
-      assignedSubjectIds: assignedSubjects,
-      assignedSubjects: assignedSubjects,
-      formClassId: isPartTime ? undefined : (formClassId || undefined),
-      assignedClassId: isPartTime ? null : (formClassId || null),
-      isPartTime,
-    });
+    try {
+      setRegisterStatus(null);
+      const res = registerTeacher({
+        fullName: fullName.trim(),
+        phone: phone.trim().startsWith('+234') ? phone.trim() : `+234${phone.trim()}`,
+        email: email.trim(),
+        assignedSubjectIds: assignedSubjects,
+        assignedSubjects: assignedSubjects,
+        formClassId: isPartTime ? undefined : (formClassId || undefined),
+        assignedClassId: isPartTime ? null : (formClassId || null),
+        isPartTime,
+      });
 
-    setIsRegisterOpen(false);
-    setNewCredentialsModal({
-      teacherName: res.teacher.full_name,
-      teacherIdCode: res.teacher.teacher_id_code,
-      username: res.teacher.username,
-      password: res.initialPassword,
-      isReset: false,
-    });
+      setIsRegisterOpen(false);
+      setNewCredentialsModal({
+        teacherName: res.teacher.full_name,
+        teacherIdCode: res.teacher.teacher_id_code,
+        username: res.teacher.username,
+        password: res.initialPassword,
+        isReset: false,
+      });
 
-    // Reset registration form
-    setFullName('');
-    setPhone('+234');
-    setEmail('');
-    setAssignedSubjects([]);
-    setFormClassId('');
-    setIsPartTime(false);
-    setSubjectSearch('');
+      // Reset registration form
+      setFullName('');
+      setPhone('+234');
+      setEmail('');
+      setAssignedSubjects([]);
+      setFormClassId('');
+      setIsPartTime(false);
+      setSubjectSearch('');
+    } catch (err: any) {
+      console.error('Failed to register teacher:', err);
+      setRegisterStatus({
+        type: 'error',
+        message: err?.message || 'Could not complete registration. Please check database connectivity.',
+      });
+    }
   };
 
   const openEdit = (t: TeacherProfile) => {
@@ -440,6 +450,18 @@ export default function TeacherRegistry() {
               <UserCheck className="w-5 h-5 text-amber-500" />
               <span>Register New Teacher</span>
             </h3>
+
+            {registerStatus && (
+              <div
+                className={`p-3 rounded-xl text-xs mb-3 flex items-center gap-2 ${
+                  registerStatus.type === 'error'
+                    ? 'bg-rose-950/80 border border-rose-800 text-rose-300'
+                    : 'bg-emerald-950/80 border border-emerald-800 text-emerald-300'
+                }`}
+              >
+                <span>{registerStatus.message}</span>
+              </div>
+            )}
 
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
               <div>

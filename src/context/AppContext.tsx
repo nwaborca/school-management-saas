@@ -20,6 +20,7 @@ import {
   calculateGradeAndRemark,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { generateUUID } from '@/lib/uuid';
 import {
   SCHOOL_INFO,
   INITIAL_CLASSES,
@@ -281,7 +282,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseConfigured() || isFetchingRef.current) return;
     isFetchingRef.current = true;
     try {
-      const [stdRes, staffRes, resRes, classRes, feeRes, recRes] = await Promise.all([
+      // First ensure core classes exist in Supabase so foreign keys and dropdowns never fail
+      try {
+        const { data: existingClasses } = await supabase.from('classes').select('id');
+        if (!existingClasses || existingClasses.length === 0) {
+          const classesPayload = INITIAL_CLASSES.map((c) => ({
+            id: c.id,
+            name: c.name,
+            session: c.session,
+            level: c.level,
+            arm: c.arm || null,
+            stage: c.stage,
+            student_count: 0,
+          }));
+          await supabase.from('classes').upsert(classesPayload, { onConflict: 'id' });
+        }
+      } catch (classInitErr) {
+        console.warn('Initial classes cloud check note:', classInitErr);
+      }
+
+      const [stdRes, staffRes, resRes, classRes, feeRes, recRes] = await Promise.allSettled([
         supabase.from('students').select('*').order('created_at', { ascending: false }),
         supabase.from('staff').select('*').order('created_at', { ascending: false }),
         supabase.from('term_results').select('*').order('created_at', { ascending: false }),
@@ -290,24 +310,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         supabase.from('receipts').select('*').order('created_at', { ascending: false }),
       ]);
 
-      if (stdRes.data && Array.isArray(stdRes.data) && stdRes.data.length > 0) {
-        setStudents(stdRes.data as StudentProfile[]);
+      if (stdRes.status === 'fulfilled' && stdRes.value.data && Array.isArray(stdRes.value.data) && stdRes.value.data.length > 0) {
+        setStudents(stdRes.value.data as StudentProfile[]);
       }
-      if (staffRes.data && Array.isArray(staffRes.data) && staffRes.data.length > 0) {
-        const normalizedStaff = (staffRes.data as any[]).map(normalizeTeacher);
+      if (staffRes.status === 'fulfilled' && staffRes.value.data && Array.isArray(staffRes.value.data) && staffRes.value.data.length > 0) {
+        const normalizedStaff = (staffRes.value.data as any[]).map(normalizeTeacher);
         setTeachers(normalizedStaff);
       }
-      if (resRes.data && Array.isArray(resRes.data) && resRes.data.length > 0) {
-        setResults(resRes.data as StudentResult[]);
+      if (resRes.status === 'fulfilled' && resRes.value.data && Array.isArray(resRes.value.data) && resRes.value.data.length > 0) {
+        setResults(resRes.value.data as StudentResult[]);
       }
-      if (classRes.data && Array.isArray(classRes.data) && classRes.data.length > 0) {
-        setClasses(classRes.data as AcademicClass[]);
+      if (classRes.status === 'fulfilled' && classRes.value.data && Array.isArray(classRes.value.data) && classRes.value.data.length > 0) {
+        setClasses(classRes.value.data as AcademicClass[]);
       }
-      if (feeRes.data && Array.isArray(feeRes.data) && feeRes.data.length > 0) {
-        setFeeStructures(feeRes.data as FeeStructure[]);
+      if (feeRes.status === 'fulfilled' && feeRes.value.data && Array.isArray(feeRes.value.data) && feeRes.value.data.length > 0) {
+        setFeeStructures(feeRes.value.data as FeeStructure[]);
       }
-      if (recRes.data && Array.isArray(recRes.data) && recRes.data.length > 0) {
-        setReceipts(recRes.data as PaymentReceipt[]);
+      if (recRes.status === 'fulfilled' && recRes.value.data && Array.isArray(recRes.value.data) && recRes.value.data.length > 0) {
+        setReceipts(recRes.value.data as PaymentReceipt[]);
       }
     } catch (err) {
       console.error('Error fetching live data from Supabase:', err);
@@ -826,7 +846,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const determinedName = data.enrolledByName || currentUser?.full_name || 'System Administrator';
 
     const newStudent: StudentProfile = {
-      id: `std-${Date.now()}`,
+      id: generateUUID(),
       reg_number: regNumber,
       access_pin: accessPin,
       full_name: data.fullName,
@@ -855,7 +875,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
 
     const newInvoice: TuitionInvoice = {
-      id: `inv-${Date.now()}`,
+      id: generateUUID(),
       student_id: newStudent.id,
       student_name: newStudent.full_name,
       reg_number: newStudent.reg_number,
@@ -875,7 +895,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setInvoices((prev) => [newInvoice, ...prev]);
 
-    // Centralize write to Supabase cloud
+    // Centralize write to Supabase cloud with exact database column mapping
     if (isSupabaseConfigured()) {
       Promise.resolve(
         supabase.from('students').insert({
@@ -1430,9 +1450,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const isPartTime = Boolean(data.isPartTime);
     const assignedClassId = isPartTime ? null : (data.assignedClassId ?? data.formClassId ?? null);
     const formClass = !isPartTime && assignedClassId ? classes.find((c) => c.id === assignedClassId) : undefined;
+    const newStaffUuid = generateUUID();
 
     const newTeacher: TeacherProfile = {
-      id: `t-${Date.now()}`,
+      id: newStaffUuid,
       teacher_id_code: teacherIdCode,
       full_name: data.fullName,
       phone: data.phone,
@@ -1446,7 +1467,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       form_class_name: isPartTime ? undefined : formClass?.name,
       is_part_time: isPartTime,
       status: 'active',
-      session_token: `token-${Date.now()}`,
+      session_token: generateUUID(),
       created_at: new Date().toISOString(),
     };
 
@@ -1458,32 +1479,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    // Persist to Supabase staff table immediately
+    // Persist to Supabase staff table immediately with exact column mappings matching PostgreSQL schema
     if (isSupabaseConfigured()) {
+      const staffPayload = {
+        id: newTeacher.id,
+        staff_id_code: newTeacher.teacher_id_code,
+        full_name: newTeacher.full_name,
+        phone: newTeacher.phone,
+        email: newTeacher.email,
+        username: newTeacher.username,
+        password_hash: newTeacher.password_hash,
+        role: 'teacher',
+        status: newTeacher.status,
+        assigned_subject_ids: newTeacher.assigned_subject_ids,
+        form_class_id: newTeacher.form_class_id || null,
+        session_token: newTeacher.session_token,
+      };
+
       Promise.resolve(
-        supabase.from('staff').upsert({
-          id: newTeacher.id,
-          teacher_id_code: newTeacher.teacher_id_code,
-          full_name: newTeacher.full_name,
-          phone: newTeacher.phone,
-          email: newTeacher.email,
-          username: newTeacher.username,
-          password_hash: newTeacher.password_hash,
-          assigned_subjects: newTeacher.assigned_subjects,
-          assigned_subject_ids: newTeacher.assigned_subject_ids,
-          assigned_class_id: newTeacher.assigned_class_id,
-          form_class_id: newTeacher.form_class_id,
-          form_class_name: newTeacher.form_class_name,
-          is_part_time: newTeacher.is_part_time,
-          status: newTeacher.status,
-          session_token: newTeacher.session_token,
-          created_at: newTeacher.created_at,
-        })
+        supabase.from('staff').insert(staffPayload)
       )
         .then((res: any) => {
-          if (res?.error) console.error('Error saving staff to Supabase:', res.error);
+          if (res?.error) {
+            console.error('CRITICAL: Supabase staff insert failed:', res.error);
+          } else {
+            console.log('✓ Successfully saved new teacher to Supabase staff table:', newTeacher.teacher_id_code);
+          }
         })
-        .catch((e: unknown) => console.error('Supabase staff upsert failed:', e));
+        .catch((e: unknown) => console.error('CRITICAL: Supabase staff insert exception:', e));
     }
 
     return { teacher: newTeacher, initialPassword: generatedPassword };
@@ -1504,7 +1527,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   ) => {
     let newPassword: string | undefined = undefined;
-    const newToken = `token-${Date.now()}`;
+    const newToken = generateUUID();
 
     setTeachers((prev) =>
       prev.map((t) => {
@@ -1548,25 +1571,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
 
           if (isSupabaseConfigured()) {
+            const staffUpdatePayload: Record<string, any> = {
+              full_name: updatedT.full_name,
+              phone: updatedT.phone,
+              email: updatedT.email,
+              assigned_subject_ids: updatedT.assigned_subject_ids,
+              form_class_id: updatedT.form_class_id || null,
+              status: updatedT.status,
+              session_token: updatedT.session_token,
+            };
+            if (newPassword) {
+              staffUpdatePayload.password_hash = updatedT.password_hash;
+              staffUpdatePayload.last_credential_reset = updatedT.last_credential_reset;
+            }
+
             Promise.resolve(
-              supabase.from('staff').upsert({
-                id: updatedT.id,
-                teacher_id_code: updatedT.teacher_id_code,
-                full_name: updatedT.full_name,
-                phone: updatedT.phone,
-                email: updatedT.email,
-                username: updatedT.username,
-                password_hash: updatedT.password_hash,
-                assigned_subjects: updatedT.assigned_subjects,
-                assigned_subject_ids: updatedT.assigned_subject_ids,
-                assigned_class_id: updatedT.assigned_class_id,
-                form_class_id: updatedT.form_class_id,
-                form_class_name: updatedT.form_class_name,
-                is_part_time: updatedT.is_part_time,
-                status: updatedT.status,
-                session_token: updatedT.session_token,
-                last_credential_reset: updatedT.last_credential_reset,
-              })
+              supabase.from('staff').update(staffUpdatePayload).eq('id', updatedT.id)
             )
               .then((res: any) => {
                 if (res?.error) console.error('Error updating staff in Supabase:', res.error);

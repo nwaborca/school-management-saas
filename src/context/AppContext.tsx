@@ -254,22 +254,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } catch {}
 
       if (isSupabaseConfigured()) {
-        supabase
-          .from('fee_structures')
-          .upsert({
-            id: '00000000-0000-0000-0000-000000000001',
-            class_id: 'cls-creche',
-            class_name: 'SYSTEM_SETTINGS_RESULTS_GATE',
-            term: 'GLOBAL_GATE',
-            session: '2025/2026',
-            line_items: [{ name: 'results_published', amount: 0 }],
-            total_amount: 0,
-            published: nextVal,
-            published_at: new Date().toISOString(),
-          })
-          .then(({ error }) => {
-            if (error) {
-              console.warn('Supabase results gate sync note:', error.message);
+        Promise.resolve(
+          supabase
+            .from('fee_structures')
+            .upsert({
+              id: '00000000-0000-0000-0000-000000000001',
+              class_id: 'cls-creche',
+              class_name: 'SYSTEM_SETTINGS_RESULTS_GATE',
+              term: 'GLOBAL_GATE',
+              session: '2025/2026',
+              line_items: [{ name: 'results_published', amount: 0 }],
+              total_amount: 0,
+              published: nextVal,
+              published_at: new Date().toISOString(),
+            })
+        )
+          .then((res: any) => {
+            if (res?.error) {
+              console.warn('Supabase results gate sync note:', res.error.message);
             }
           })
           .catch(() => {});

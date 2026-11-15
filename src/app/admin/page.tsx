@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { StudentProfile, formatNaira } from '@/types';
+import { supabase } from '@/lib/supabase';
 import TeacherRegistry from '@/components/TeacherRegistry';
 import EnrollStudentForm from '@/components/EnrollStudentForm';
 import {
@@ -63,7 +64,6 @@ export default function AdminHubPage() {
     updateAdminPassword,
     currentUser,
     isAuthReady,
-    supabase, // Supabase client from AppContext
   } = useApp();
 
   // Route Guard: Require admin / bursar authentication
@@ -78,18 +78,15 @@ export default function AdminHubPage() {
     }
   }, [currentUser, isAuthReady, router]);
 
-  // Realtime subscription setup to sync registrations across tabs and normal/incognito windows
+  // Clean Realtime sync refresh using router.refresh() without infinite window.location.reload()
   useEffect(() => {
-    if (!supabase) return;
-
     const channel = supabase
       .channel('admin-hub-realtime-sync')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public' },
-        (payload) => {
-          // Trigger data refresh on mutations across clients
-          window.location.reload();
+        () => {
+          router.refresh();
         }
       )
       .subscribe();
@@ -97,7 +94,7 @@ export default function AdminHubPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase]);
+  }, [router]);
 
   const [activeTab, setActiveTab] = useState<'roster' | 'receipts' | 'ledger' | 'teachers' | 'enroll' | 'notices' | 'admin-security'>('roster');
   const [copiedId, setCopiedId] = useState<string | null>(null);

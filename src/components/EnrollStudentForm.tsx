@@ -51,7 +51,9 @@ export default function EnrollStudentForm({
     currentUser?.full_name ||
     (targetRole === 'Form Teacher' ? 'Class Form Teacher' : 'Finance Desk');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEnrollStatus(null);
     if (!fullName.trim() || !parentName.trim()) return;
@@ -64,9 +66,10 @@ export default function EnrollStudentForm({
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const targetClass = classes.find((c) => c.id === selectedClassId);
-      const newStudent = generateStudentProfile({
+      const res = await generateStudentProfile({
         fullName: fullName.trim(),
         classId: selectedClassId,
         classGrade: targetClass?.name || 'SS1 Arm A',
@@ -80,6 +83,16 @@ export default function EnrollStudentForm({
         consentTimestamp: new Date().toISOString(),
       });
 
+      if (!res.success) {
+        setEnrollStatus({
+          type: 'error',
+          message: `Database sync issue: ${res.error}. If foreign key or RLS failed, please apply the SQL update in supabase/fix_rls_policies.sql.`,
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const newStudent = res.student;
       setCreatedStudent(newStudent);
       setEnrollStatus({
         type: 'success',
@@ -99,6 +112,8 @@ export default function EnrollStudentForm({
         type: 'error',
         message: err?.message || 'Could not complete student enrollment. Please verify database connection and constraints.',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

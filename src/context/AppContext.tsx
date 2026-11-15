@@ -84,7 +84,7 @@ interface AppContextType {
     enrolledByName?: string;
     ndpaConsentGranted?: boolean;
     consentTimestamp?: string;
-  }) => StudentProfile;
+  }) => Promise<{ success: boolean; student: StudentProfile; error?: string }>;
 
   // Tuition & Fee Status Toggle
   toggleStudentFeeStatus: (studentId: string, forceStatus?: boolean) => void;
@@ -956,7 +956,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Admin & Form Teacher Student Enrollment Generator
-  const generateStudentProfile = (data: {
+  const generateStudentProfile = async (data: {
     fullName: string;
     classId: string;
     classGrade: string;
@@ -968,7 +968,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     enrolledByName?: string;
     ndpaConsentGranted?: boolean;
     consentTimestamp?: string;
-  }) => {
+  }): Promise<{ success: boolean; student: StudentProfile; error?: string }> => {
     const nextSeq = Math.floor(100 + Math.random() * 900);
     const regNumber = data.customRegNumber?.trim().toUpperCase() || `STU-2026-${nextSeq}`;
     const accessPin = data.customPin?.trim() || `${Math.floor(1000 + Math.random() * 9000)}`;
@@ -1008,6 +1008,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       consent_timestamp: data.consentTimestamp || new Date().toISOString(),
     };
 
+    // Update in-memory state
     setStudents((prev) => [newStudent, ...prev]);
 
     setClasses((prev) =>
@@ -1059,9 +1060,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         created_at: newStudent.created_at,
       };
 
-      // Guarantee the referenced class exists in Supabase before foreign-key insertion
-      Promise.resolve(
-        supabase
+      try {
+        // Guarantee the referenced class exists in Supabase before foreign-key insertion
+        const { error: classUpsertError } = await supabase
           .from('classes')
           .upsert(
             {
@@ -1074,22 +1075,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               student_count: 0,
             },
             { onConflict: 'id' }
-          )
-      )
-        .then(() => {
-          return supabase.from('students').insert(studentPayload);
-        })
-        .then((res: any) => {
-          if (res?.error) {
-            console.error('CRITICAL: Supabase student insert failed:', res.error);
-          } else {
-            console.log('✓ Successfully saved new student to Supabase students table:', newStudent.reg_number);
-          }
-        })
-        .catch((e: unknown) => console.error('CRITICAL: Supabase student insert exception:', e));
+          );
+
+        if (classUpsertError) {
+          console.warn('Class upsert warning (may be restricted by RLS if classes table not seeded):', classUpsertError.message);
+        }
+
+        const { error: studentInsertError } = await supabase.from('students').insert(studentPayload);
+        if (studentInsertError) {
+          console.error('CRITICAL: Supabase student insert failed:', studentInsertError);
+          return {
+            success: false,
+            student: newStudent,
+            error: studentInsertError.message || 'Supabase student insert failed',
+          };
+        } else {
+          console.log('✓ Successfully saved new student to Supabase students table:', newStudent.reg_number);
+          return {
+            success: true,
+            student: newStudent,
+          };
+        }
+      } catch (e: any) {
+        console.error('CRITICAL: Supabase student insert exception:', e);
+        return {
+          success: false,
+          student: newStudent,
+          error: e?.message || 'Unexpected exception during cloud persistence',
+        };
+      }
     }
 
-    return newStudent;
+    return {
+      success: true,
+      student: newStudent,
+    };
   };
 
   const payInvoiceStub = (invoiceId: string) => {

@@ -2,7 +2,7 @@
 
 import { AnimatedContent } from '@/components/AnimatedContent';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { formatNaira, calculateGradeAndRemark } from '@/types';
@@ -178,12 +178,17 @@ export default function AcademicHubPage() {
     }
   }, []);
 
+  const updateStudentScoreRef = useRef(updateStudentScore);
+  useEffect(() => {
+    updateStudentScoreRef.current = updateStudentScore;
+  }, [updateStudentScore]);
+
   // Flush queue to AppContext when online
   const flushSyncQueue = useCallback(() => {
     if (pendingQueue.length === 0) return;
 
     pendingQueue.forEach((item) => {
-      updateStudentScore(
+      updateStudentScoreRef.current(
         item.studentId,
         item.subjectId,
         item.classId,
@@ -201,7 +206,7 @@ export default function AcademicHubPage() {
     setPendingQueue([]);
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 3000);
-  }, [pendingQueue, updateStudentScore]);
+  }, [pendingQueue]);
 
   // Auto-sync when transitioning to online with items in queue
   useEffect(() => {

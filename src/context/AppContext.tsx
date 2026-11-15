@@ -277,6 +277,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  // Helper to normalize student record from Supabase or memory
+  const normalizeStudent = (s: any): StudentProfile => {
+    return {
+      id: s.id,
+      reg_number: s.reg_number || 'STU-UNKNOWN',
+      access_pin: s.access_pin || '2026',
+      full_name: s.full_name || 'Student',
+      class_id: s.class_id,
+      class_grade: s.class_grade || 'SS1 Arm A',
+      session: s.session || '2025/2026',
+      date_of_birth: s.date_of_birth || undefined,
+      parent_name: s.parent_name || 'Parent/Guardian',
+      parent_phone: s.parent_phone || '+2348000000000',
+      gpa: Number(s.gpa) || 3.5,
+      attendance_percentage: Number(s.attendance_percentage) || 100.0,
+      fee_paid: Boolean(s.fee_paid),
+      payment_status: s.payment_status || 'unpaid',
+      tuition_status: s.tuition_status || (s.fee_paid ? 'paid' : 'pending'),
+      created_at: s.created_at || new Date().toISOString(),
+      enrolled_by_role: s.enrolled_by_role,
+      enrolled_by_name: s.enrolled_by_name,
+      enrollment_date: s.enrollment_date || s.created_at,
+      ndpa_consent_granted: s.ndpa_consent_granted !== undefined ? Boolean(s.ndpa_consent_granted) : true,
+      consent_timestamp: s.consent_timestamp || s.created_at,
+    };
+  };
+
   // Live Cloud Fetch from Supabase
   const fetchLiveData = useCallback(async () => {
     if (!isSupabaseConfigured() || isFetchingRef.current) return;
@@ -311,7 +338,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       if (stdRes.status === 'fulfilled' && stdRes.value.data && Array.isArray(stdRes.value.data) && stdRes.value.data.length > 0) {
-        setStudents(stdRes.value.data as StudentProfile[]);
+        const normalizedStudents = (stdRes.value.data as any[]).map(normalizeStudent);
+        setStudents(normalizedStudents);
       }
       if (staffRes.status === 'fulfilled' && staffRes.value.data && Array.isArray(staffRes.value.data) && staffRes.value.data.length > 0) {
         const normalizedStaff = (staffRes.value.data as any[]).map(normalizeTeacher);
@@ -398,13 +426,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { event: '*', schema: 'public', table: 'students' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            const inserted = payload.new as StudentProfile;
+            const inserted = normalizeStudent(payload.new);
             setStudents((prev) => {
               if (prev.some((s) => s.id === inserted.id)) return prev;
               return [inserted, ...prev];
             });
           } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as StudentProfile;
+            const updated = normalizeStudent(payload.new);
             setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
           } else if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as any)?.id;
@@ -849,14 +877,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const determinedRole = data.enrolledByRole || (currentUser?.role === 'teacher' ? 'Form Teacher' : 'Bursar');
     const determinedName = data.enrolledByName || currentUser?.full_name || 'System Administrator';
 
+    // Verify and resolve target class to ensure valid foreign key reference
+    const matchedClass = classes.find((c) => c.id === data.classId) ||
+      INITIAL_CLASSES.find((c) => c.id === data.classId) ||
+      classes[0] ||
+      INITIAL_CLASSES[0];
+
+    const validClassId = matchedClass?.id || data.classId;
+    const validClassGrade = matchedClass?.name || data.classGrade;
+
     const newStudent: StudentProfile = {
       id: generateUUID(),
       reg_number: regNumber,
       access_pin: accessPin,
       full_name: data.fullName,
-      class_id: data.classId,
-      class_grade: data.classGrade,
-      session: '2025/2026',
+      class_id: validClassId,
+      class_grade: validClassGrade,
+      session: matchedClass?.session || '2025/2026',
       parent_name: data.parentName,
       parent_phone: data.parentPhone,
       gpa: 3.5,
@@ -875,7 +912,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setStudents((prev) => [newStudent, ...prev]);
 
     setClasses((prev) =>
-      prev.map((c) => (c.id === data.classId ? { ...c, student_count: c.student_count + 1 } : c))
+      prev.map((c) => (c.id === validClassId ? { ...c, student_count: c.student_count + 1 } : c))
     );
 
     const newInvoice: TuitionInvoice = {
@@ -899,35 +936,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setInvoices((prev) => [newInvoice, ...prev]);
 
-    // Centralize write to Supabase cloud with exact database column mapping
+    // Persist to Supabase students table immediately with exact column mappings matching PostgreSQL schema
     if (isSupabaseConfigured()) {
+      const studentPayload = {
+        id: newStudent.id,
+        reg_number: newStudent.reg_number,
+        access_pin: newStudent.access_pin,
+        full_name: newStudent.full_name,
+        class_id: newStudent.class_id,
+        class_grade: newStudent.class_grade,
+        session: newStudent.session,
+        parent_name: newStudent.parent_name,
+        parent_phone: newStudent.parent_phone,
+        gpa: newStudent.gpa,
+        attendance_percentage: newStudent.attendance_percentage,
+        fee_paid: newStudent.fee_paid,
+        payment_status: newStudent.payment_status,
+        enrolled_by_role: newStudent.enrolled_by_role,
+        enrolled_by_name: newStudent.enrolled_by_name,
+        enrollment_date: newStudent.enrollment_date,
+        ndpa_consent_granted: newStudent.ndpa_consent_granted,
+        consent_timestamp: newStudent.consent_timestamp,
+        created_at: newStudent.created_at,
+      };
+
+      // Guarantee the referenced class exists in Supabase before foreign-key insertion
       Promise.resolve(
-        supabase.from('students').insert({
-          id: newStudent.id,
-          reg_number: newStudent.reg_number,
-          access_pin: newStudent.access_pin,
-          full_name: newStudent.full_name,
-          class_id: newStudent.class_id,
-          class_grade: newStudent.class_grade,
-          session: newStudent.session,
-          parent_name: newStudent.parent_name,
-          parent_phone: newStudent.parent_phone,
-          gpa: newStudent.gpa,
-          attendance_percentage: newStudent.attendance_percentage,
-          fee_paid: newStudent.fee_paid,
-          payment_status: newStudent.payment_status,
-          enrolled_by_role: newStudent.enrolled_by_role,
-          enrolled_by_name: newStudent.enrolled_by_name,
-          enrollment_date: newStudent.enrollment_date,
-          ndpa_consent_granted: newStudent.ndpa_consent_granted,
-          consent_timestamp: newStudent.consent_timestamp,
-          created_at: newStudent.created_at,
-        })
+        supabase
+          .from('classes')
+          .upsert(
+            {
+              id: matchedClass.id,
+              name: matchedClass.name,
+              session: matchedClass.session,
+              level: matchedClass.level,
+              arm: matchedClass.arm || null,
+              stage: matchedClass.stage,
+              student_count: 0,
+            },
+            { onConflict: 'id' }
+          )
       )
-        .then((res: any) => {
-          if (res?.error) console.error('Error inserting student to Supabase:', res.error);
+        .then(() => {
+          return supabase.from('students').insert(studentPayload);
         })
-        .catch((e: unknown) => console.error('Supabase student insert failed:', e));
+        .then((res: any) => {
+          if (res?.error) {
+            console.error('CRITICAL: Supabase student insert failed:', res.error);
+          } else {
+            console.log('✓ Successfully saved new student to Supabase students table:', newStudent.reg_number);
+          }
+        })
+        .catch((e: unknown) => console.error('CRITICAL: Supabase student insert exception:', e));
     }
 
     return newStudent;

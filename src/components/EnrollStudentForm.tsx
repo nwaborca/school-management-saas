@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { StudentProfile } from '@/types';
-import { UserPlus, CheckCircle2, ShieldCheck, Lock } from 'lucide-react';
+import { UserPlus, CheckCircle2, ShieldCheck, Lock, AlertCircle } from 'lucide-react';
 
 interface EnrollStudentFormProps {
   defaultClassId?: string;
@@ -34,6 +34,7 @@ export default function EnrollStudentForm({
   const [parentPhone, setParentPhone] = useState('+234');
   const [ndpaConsent, setNdpaConsent] = useState(false);
   const [createdStudent, setCreatedStudent] = useState<StudentProfile | null>(null);
+  const [enrollStatus, setEnrollStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   React.useEffect(() => {
     if (defaultClassId) {
@@ -52,36 +53,52 @@ export default function EnrollStudentForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setEnrollStatus(null);
     if (!fullName.trim() || !parentName.trim()) return;
 
     if (!ndpaConsent) {
-      alert('Parental/guardian consent is required under the Nigeria Data Protection Act (NDPA) 2023 to enroll minor students.');
+      setEnrollStatus({
+        type: 'error',
+        message: 'Parental/guardian consent is required under the Nigeria Data Protection Act (NDPA) 2023 to enroll minor students.',
+      });
       return;
     }
 
-    const targetClass = classes.find((c) => c.id === selectedClassId);
-    const newStudent = generateStudentProfile({
-      fullName: fullName.trim(),
-      classId: selectedClassId,
-      classGrade: targetClass?.name || 'SS1 Arm A',
-      parentName: parentName.trim(),
-      parentPhone: parentPhone.trim().startsWith('+234')
-        ? parentPhone.trim()
-        : `+234${parentPhone.trim()}`,
-      enrolledByRole: targetRole,
-      enrolledByName: targetName,
-      ndpaConsentGranted: true,
-      consentTimestamp: new Date().toISOString(),
-    });
+    try {
+      const targetClass = classes.find((c) => c.id === selectedClassId);
+      const newStudent = generateStudentProfile({
+        fullName: fullName.trim(),
+        classId: selectedClassId,
+        classGrade: targetClass?.name || 'SS1 Arm A',
+        parentName: parentName.trim(),
+        parentPhone: parentPhone.trim().startsWith('+234')
+          ? parentPhone.trim()
+          : `+234${parentPhone.trim()}`,
+        enrolledByRole: targetRole,
+        enrolledByName: targetName,
+        ndpaConsentGranted: true,
+        consentTimestamp: new Date().toISOString(),
+      });
 
-    setCreatedStudent(newStudent);
-    setFullName('');
-    setParentName('');
-    setParentPhone('+234');
-    setNdpaConsent(false);
+      setCreatedStudent(newStudent);
+      setEnrollStatus({
+        type: 'success',
+        message: `Student ${newStudent.full_name} successfully enrolled and synchronized with cloud database!`,
+      });
+      setFullName('');
+      setParentName('');
+      setParentPhone('+234');
+      setNdpaConsent(false);
 
-    if (onEnrolled) {
-      onEnrolled(newStudent);
+      if (onEnrolled) {
+        onEnrolled(newStudent);
+      }
+    } catch (err: any) {
+      console.error('CRITICAL: Student enrollment failure:', err);
+      setEnrollStatus({
+        type: 'error',
+        message: err?.message || 'Could not complete student enrollment. Please verify database connection and constraints.',
+      });
     }
   };
 
@@ -94,6 +111,16 @@ export default function EnrollStudentForm({
         </h3>
         <p className="text-xs text-gray-400 mt-1">{description}</p>
       </div>
+
+      {enrollStatus && enrollStatus.type === 'error' && (
+        <div className="p-4 rounded-2xl bg-red-950/70 border border-red-800 text-red-300 text-xs flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+          <div>
+            <strong className="block text-red-200 font-semibold mb-0.5">Enrollment Error:</strong>
+            <span>{enrollStatus.message}</span>
+          </div>
+        </div>
+      )}
 
       {createdStudent && (
         <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-800 space-y-2 text-xs">

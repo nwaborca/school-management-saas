@@ -20,6 +20,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   AlertCircle,
+  AlertTriangle,
   Building2,
   FileCheck,
   ChevronDown,
@@ -61,6 +62,9 @@ export default function AdminFeesPage() {
     { description: 'Tuition & Academic Fee', amount: 0 },
   ]);
   const [publishSuccess, setPublishSuccess] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [deletingFeeId, setDeletingFeeId] = useState<string | null>(null);
+  const [feeErrorMessage, setFeeErrorMessage] = useState('');
 
   // Receipt Viewer State
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
@@ -151,25 +155,59 @@ export default function AdminFeesPage() {
     );
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!selectedClassId || lineItems.length === 0) return;
     const validItems = lineItems.filter((i) => i.description.trim() && i.amount > 0);
     if (validItems.length === 0) return;
 
-    publishFeeStructure({
-      class_id: selectedClassId,
-      class_name: selectedClass?.name || selectedClassId,
-      term: selectedTerm,
-      session: schoolInfo.session,
-      line_items: validItems.map((item, idx) => ({
-        ...item,
-        id: `li-new-${idx}-${Date.now()}`,
-      })),
-      total_amount: validItems.reduce((s, i) => s + i.amount, 0),
-      created_by: currentUser?.username || 'admin',
-    });
-    setPublishSuccess(`Fee structure for ${selectedClass?.name} (${selectedTerm}) published successfully!`);
-    setTimeout(() => setPublishSuccess(''), 4000);
+    setIsPublishing(true);
+    setFeeErrorMessage('');
+    try {
+      const res = await publishFeeStructure({
+        class_id: selectedClassId,
+        class_name: selectedClass?.name || selectedClassId,
+        term: selectedTerm,
+        session: schoolInfo.session,
+        line_items: validItems.map((item, idx) => ({
+          ...item,
+          id: `li-new-${idx}-${Date.now()}`,
+        })),
+        total_amount: validItems.reduce((s, i) => s + i.amount, 0),
+        created_by: currentUser?.username || 'admin',
+      });
+
+      if (!res.success) {
+        setFeeErrorMessage(`Failed to save to database: ${res.error || 'Check RLS permissions'}`);
+      } else {
+        setPublishSuccess(`Fee structure for ${selectedClass?.name} (${selectedTerm}) published successfully!`);
+        setTimeout(() => setPublishSuccess(''), 4000);
+      }
+    } catch (err: any) {
+      setFeeErrorMessage(err?.message || 'Publishing error');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleDeleteFeeStructure = async (feeId: string, className: string, term: string) => {
+    if (!window.confirm(`Are you sure you want to delete the ${className} (${term}) fee structure? This will delete this tariff across all student hubs for this class arm.`)) {
+      return;
+    }
+    setDeletingFeeId(feeId);
+    setFeeErrorMessage('');
+    try {
+      const res = await deleteFeeStructure(feeId);
+      if (!res.success) {
+        setFeeErrorMessage(`Could not delete from database: ${res.error}`);
+      } else {
+        setPublishSuccess(`Fee schedule for ${className} (${term}) deleted.`);
+        setTimeout(() => setPublishSuccess(''), 3000);
+      }
+    } catch (e: any) {
+      setFeeErrorMessage(e?.message || 'Deletion error');
+    } finally {
+      setDeletingFeeId(null);
+    }
   };
 
   const activeReceipt = receipts.find((r) => r.id === viewingReceipt);
@@ -341,13 +379,20 @@ export default function AdminFeesPage() {
                   </div>
                   <button
                     onClick={handlePublish}
-                    disabled={!selectedClassId || totalAmount === 0}
+                    disabled={!selectedClassId || totalAmount === 0 || isPublishing}
                     className="px-5 py-2.5 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 font-bold text-xs flex items-center gap-2 border border-rose-800 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <Send className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Publish Fee Structure</span>
+                    <span>{isPublishing ? 'Publishing...' : 'Publish Fee Structure'}</span>
                   </button>
                 </div>
+
+                {feeErrorMessage && (
+                  <div className="p-3 bg-rose-950/60 border border-rose-800 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>{feeErrorMessage}</span>
+                  </div>
+                )}
 
                 {publishSuccess && (
                   <div className="p-3 bg-emerald-950/60 border border-emerald-800 rounded-xl text-emerald-300 text-xs flex items-center gap-2">
@@ -362,18 +407,34 @@ export default function AdminFeesPage() {
             <div className="lg:col-span-5 p-6 rounded-3xl bg-gray-800 border border-gray-700 space-y-4">
               <h3 className="text-sm font-bold text-gray-50">Published Class Fee Structures ({feeStructures.length})</h3>
               <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                {feeStructures.map((fs) => (
-                  <div key={fs.id} className="p-3.5 rounded-2xl bg-gray-900 border border-gray-700 space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-gray-100">{fs.class_name}</span>
-                      <span className="font-mono text-amber-400 font-bold">{fs.term}</span>
-                    </div>
-                    <div className="text-[11px] text-gray-400 flex justify-between items-center pt-1 border-t border-gray-800">
-                      <span>{fs.line_items.length} line items</span>
-                      <span className="font-mono font-bold text-gray-200">{formatNaira(fs.total_amount)}</span>
-                    </div>
+                {feeStructures.length === 0 ? (
+                  <div className="p-6 text-center text-gray-400 text-xs italic bg-gray-900 rounded-2xl border border-gray-800">
+                    No fee structures published yet. Select a class arm and term to publish one.
                   </div>
-                ))}
+                ) : (
+                  feeStructures.map((fs) => (
+                    <div key={fs.id} className="p-3.5 rounded-2xl bg-gray-900 border border-gray-700 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-100">{fs.class_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-amber-400 font-bold">{fs.term}</span>
+                          <button
+                            onClick={() => handleDeleteFeeStructure(fs.id, fs.class_name, fs.term)}
+                            disabled={deletingFeeId === fs.id}
+                            className="p-1.5 text-gray-400 hover:text-rose-400 rounded-lg hover:bg-rose-950/40 border border-transparent hover:border-rose-900 transition cursor-pointer disabled:opacity-40"
+                            title="Delete this fee structure across all student hubs for this class arm"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-gray-400 flex justify-between items-center pt-1 border-t border-gray-800">
+                        <span>{fs.line_items.length} line items</span>
+                        <span className="font-mono font-bold text-gray-200">{formatNaira(fs.total_amount)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

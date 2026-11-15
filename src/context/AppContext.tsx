@@ -93,9 +93,9 @@ interface AppContextType {
 
   // Fee Structure Builder (Admin)
   feeStructures: FeeStructure[];
-  publishFeeStructure: (structure: Omit<FeeStructure, 'id' | 'published' | 'published_at'>) => FeeStructure;
+  publishFeeStructure: (structure: Omit<FeeStructure, 'id' | 'published' | 'published_at'>) => Promise<{ success: boolean; structure: FeeStructure; error?: string }>;
   updateFeeStructure: (id: string, updates: Partial<FeeStructure>) => void;
-  deleteFeeStructure: (id: string) => void;
+  deleteFeeStructure: (id: string) => Promise<{ success: boolean; error?: string }>;
 
   // Receipt Verification & Partial Payment Ledger
   receipts: PaymentReceipt[];
@@ -595,11 +595,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
 
+    // Realtime listener for 'fee_structures' (Tuition & Fee Schedules)
+    const feesChannel = supabase
+      .channel('public:fee_structures_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'fee_structures' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const inserted = payload.new as FeeStructure;
+            setFeeStructures((prev) => {
+              if (prev.some((fs) => fs.id === inserted.id)) return prev;
+              const filtered = prev.filter(
+                (f) => !(f.class_id === inserted.class_id && f.term === inserted.term && f.session === inserted.session)
+              );
+              return [inserted, ...filtered];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as FeeStructure;
+            setFeeStructures((prev) => prev.map((fs) => (fs.id === updated.id ? updated : fs)));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              setFeeStructures((prev) => prev.filter((fs) => fs.id !== deletedId));
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(staffChannel);
       supabase.removeChannel(studentChannel);
       supabase.removeChannel(resultsChannel);
       supabase.removeChannel(receiptsChannel);
+      supabase.removeChannel(feesChannel);
     };
   }, []);
 
@@ -1138,10 +1168,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Fee Structure Builder
-  const publishFeeStructure = (data: Omit<FeeStructure, 'id' | 'published' | 'published_at'>): FeeStructure => {
+  const publishFeeStructure = async (
+    data: Omit<FeeStructure, 'id' | 'published' | 'published_at'>
+  ): Promise<{ success: boolean; structure: FeeStructure; error?: string }> => {
+    // Check if an existing fee structure matches class_id, term, and session to preserve ID or update
+    const existing = feeStructures.find(
+      (f) => f.class_id === data.class_id && f.term === data.term && f.session === data.session
+    );
+
+    const targetId = existing?.id && existing.id.includes('-') && existing.id.length === 36
+      ? existing.id
+      : generateUUID();
+
     const newStructure: FeeStructure = {
       ...data,
-      id: `fee-struct-${Date.now()}`,
+      id: targetId,
       published: true,
       published_at: new Date().toISOString().split('T')[0],
     };
@@ -1154,8 +1195,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (isSupabaseConfigured()) {
-      Promise.resolve(
-        supabase.from('fee_structures').upsert({
+      try {
+        const payload = {
           id: newStructure.id,
           class_id: newStructure.class_id,
           class_name: newStructure.class_name,
@@ -1165,11 +1206,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           total_amount: newStructure.total_amount,
           published: newStructure.published,
           published_at: newStructure.published_at,
-        })
-      ).catch(() => {});
+        };
+
+        const { error } = await supabase.from('fee_structures').upsert(payload, {
+          onConflict: 'class_id, term, session',
+        });
+
+        if (error) {
+          console.error('CRITICAL: Supabase fee structure publish error:', error);
+          return { success: false, structure: newStructure, error: error.message };
+        } else {
+          console.log('✓ Successfully published fee structure to Supabase:', newStructure.class_name, newStructure.term);
+          return { success: true, structure: newStructure };
+        }
+      } catch (err: any) {
+        console.error('CRITICAL: Supabase fee structure publish exception:', err);
+        return { success: false, structure: newStructure, error: err?.message || 'Network error' };
+      }
     }
 
-    return newStructure;
+    return { success: true, structure: newStructure };
   };
 
   const updateFeeStructure = (id: string, updates: Partial<FeeStructure>) => {
@@ -1178,11 +1234,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const deleteFeeStructure = (id: string) => {
+  const deleteFeeStructure = async (id: string): Promise<{ success: boolean; error?: string }> => {
     setFeeStructures((prev) => prev.filter((f) => f.id !== id));
     if (isSupabaseConfigured()) {
-      Promise.resolve(supabase.from('fee_structures').delete().eq('id', id)).catch(() => {});
+      try {
+        const { error } = await supabase.from('fee_structures').delete().eq('id', id);
+        if (error) {
+          console.error('CRITICAL: Supabase fee structure delete error:', error);
+          return { success: false, error: error.message };
+        } else {
+          console.log('✓ Successfully deleted fee structure from Supabase:', id);
+          return { success: true };
+        }
+      } catch (err: any) {
+        console.error('CRITICAL: Supabase fee structure delete exception:', err);
+        return { success: false, error: err?.message || 'Network error' };
+      }
     }
+    return { success: true };
   };
 
   // Receipt Upload & Verification & Debt Ledger

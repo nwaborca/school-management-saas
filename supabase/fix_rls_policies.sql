@@ -96,6 +96,9 @@ CREATE POLICY "Allow anon insert on fee_structures" ON public.fee_structures FOR
 DROP POLICY IF EXISTS "Allow anon update on fee_structures" ON public.fee_structures;
 CREATE POLICY "Allow anon update on fee_structures" ON public.fee_structures FOR UPDATE TO public USING (true);
 
+DROP POLICY IF EXISTS "Allow anon delete on fee_structures" ON public.fee_structures;
+CREATE POLICY "Allow anon delete on fee_structures" ON public.fee_structures FOR DELETE TO public USING (true);
+
 -- 9. Realtime Publication
 DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.staff;

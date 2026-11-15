@@ -278,8 +278,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Helper to normalize result record from Supabase
-  const normalizeResult = (r: any): StudentResult => {
-    const student = students.find((s) => s.id === r.student_id);
+  const normalizeResult = (r: any, studentList: StudentProfile[] = students): StudentResult => {
+    const student = studentList.find((s) => s.id === r.student_id);
     const subject = subjects.find((sb) => sb.id === r.subject_id);
     const ca1 = Number(r.ca1) || 0;
     const ca2 = Number(r.ca2) || 0;
@@ -452,9 +452,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       // Apply guarded updates only if data was successfully received
+      let activeStudentList = students;
       if (stdData && Array.isArray(stdData) && stdData.length > 0) {
         try {
           const normalizedStudents = stdData.map(normalizeStudent);
+          activeStudentList = normalizedStudents;
           setStudents(normalizedStudents);
         } catch (normStdErr) {
           console.warn('Error normalizing students payload:', normStdErr);
@@ -472,7 +474,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (resData && Array.isArray(resData) && resData.length > 0) {
         try {
-          const normalizedResults = resData.map(normalizeResult);
+          const normalizedResults = resData.map((r) => normalizeResult(r, activeStudentList));
           setResults(normalizedResults);
         } catch (normResErr) {
           console.warn('Error normalizing term_results payload:', normResErr);

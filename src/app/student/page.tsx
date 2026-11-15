@@ -2,11 +2,11 @@
 
 import { AnimatedContent } from '@/components/AnimatedContent';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { Trophy3DCanvas } from '@/components/3d/Trophy3DCanvas';
-import { formatNaira } from '@/types';
+import { formatNaira, StudentProfile } from '@/types';
 import { filterSubjectsForClassAndStream } from '@/lib/streamSpecialization';
 import { uploadReceiptToStorage } from '@/lib/supabase';
 import {
@@ -75,12 +75,34 @@ export default function StudentDashboardPage() {
   const [isUploading, setIsUploading] = useState(false);
 
   // Guard & Active student: Strict RBAC Isolation to currentUser.student_id only
-  const activeStudent =
-    currentUser?.role === 'student'
-      ? students.find((s) => s.id === currentUser?.student_id) ||
-        students.find((s) => s.reg_number === currentUser?.reg_number) ||
-        null
-      : null;
+  // If students list is still loading from Supabase, construct initial profile from currentUser session
+  const activeStudent: StudentProfile | null = useMemo(() => {
+    if (currentUser?.role !== 'student') return null;
+    const found = students.find((s) => s.id === currentUser?.student_id) ||
+      students.find((s) => s.reg_number === currentUser?.reg_number);
+    if (found) return found;
+
+    if (currentUser.student_id || currentUser.reg_number) {
+      return {
+        id: currentUser.student_id || currentUser.id,
+        reg_number: currentUser.reg_number || 'STU-PORTAL',
+        access_pin: '****',
+        full_name: currentUser.full_name || 'Student',
+        class_id: currentUser.class_id || 'cls-ss1-a',
+        class_grade: currentUser.class_grade || 'SS1 Arm A',
+        session: schoolInfo.session || '2025/2026',
+        parent_name: 'Parent / Guardian',
+        parent_phone: currentUser.parent_phone || '+2348000000000',
+        gpa: 3.5,
+        attendance_percentage: 100.0,
+        fee_paid: false,
+        payment_status: 'unpaid',
+        tuition_status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+    }
+    return null;
+  }, [currentUser, students, schoolInfo.session]);
 
   // RBAC Guard: If user is not authenticated, redirect to login
   useEffect(() => {

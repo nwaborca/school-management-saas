@@ -92,7 +92,7 @@ export default function AcademicHubPage() {
     if (teacherSubjects.length > 0 && !teacherSubjects.some((s) => s.id === selectedSubjectId)) {
       setSelectedSubjectId(teacherSubjects[0].id);
     }
-  }, [teacherSubjects, selectedSubjectId]);
+  }, [teacherSubjects]);
 
   // Find classes offering the currently selected subject
   const classesOfferingSubject = useMemo(() => {
@@ -111,7 +111,7 @@ export default function AcademicHubPage() {
     if (selectedClassId !== 'all' && !classesOfferingSubject.some((c) => c.id === selectedClassId)) {
       setSelectedClassId('all');
     }
-  }, [classesOfferingSubject, selectedClassId]);
+  }, [classesOfferingSubject]);
 
   const currentClass = selectedClassId === 'all' ? null : classes.find((c) => c.id === selectedClassId);
 

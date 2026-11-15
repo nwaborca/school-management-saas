@@ -336,8 +336,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // 1. Initial Mount: Authenticate session and trigger Cloud Sync
+  // 1. Initial Mount: Authenticate session and trigger Cloud Sync (strictly run once on mount)
+  const isInitialMountRef = useRef(false);
   useEffect(() => {
+    if (isInitialMountRef.current) return;
+    isInitialMountRef.current = true;
+
     try {
       const cookieUser = getSessionCookie();
       if (cookieUser) {
@@ -350,7 +354,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsAuthReady(true);
     }
 
-    // Immediately fetch from Supabase cloud
+    // Immediately fetch from Supabase cloud once on initial mount
     if (isSupabaseConfigured()) {
       fetchLiveData();
     }

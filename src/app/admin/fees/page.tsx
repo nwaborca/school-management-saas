@@ -49,6 +49,7 @@ export default function AdminFeesPage() {
     rejectReceipt,
     getStudentTermLedger,
     schoolInfo,
+    isAuthReady,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'builder' | 'receipts' | 'ledger'>('receipts');
@@ -105,12 +106,13 @@ export default function AdminFeesPage() {
 
   // Guard: admin only
   useEffect(() => {
+    if (!isAuthReady) return;
     if (!currentUser) {
       router.push('/login');
     } else if (currentRole !== 'admin') {
       router.push('/login');
     }
-  }, [currentUser, currentRole, router]);
+  }, [currentUser, currentRole, router, isAuthReady]);
 
   if (!currentUser || currentRole !== 'admin') {
     return (

@@ -136,11 +136,8 @@ export default function StudentDashboardPage() {
 
   // Default partial amount to remaining balance if student returns to pay balance
   useEffect(() => {
-    if (termLedger.remainingBalance > 0) {
-      setCustomPartialAmount(String(termLedger.remainingBalance));
-    } else {
-      setCustomPartialAmount('');
-    }
+    const targetVal = termLedger.remainingBalance > 0 ? String(termLedger.remainingBalance) : '';
+    setCustomPartialAmount((prev) => (prev !== targetVal ? targetVal : prev));
   }, [selectedTerm, termLedger.remainingBalance]);
 
   const copyBankInfo = (text: string, fieldKey: string) => {

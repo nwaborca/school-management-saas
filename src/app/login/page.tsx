@@ -27,34 +27,44 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleStudentLogin = (e: React.FormEvent) => {
+  const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const res = loginStudent(regNumber, pin);
-    setLoading(false);
-    if (res.success) {
-      // Force navigation and flush router state to prevent mobile stale-cache redirects
-      router.replace('/student-hub');
-    } else {
-      setError(res.message || 'Invalid registration number or PIN.');
+    try {
+      const res = await loginStudent(regNumber, pin);
+      if (res.success) {
+        // Force navigation and flush router state to prevent mobile stale-cache redirects
+        router.replace('/student-hub');
+      } else {
+        setError(res.message || 'Invalid registration number or PIN.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Login failed. Please check network connection.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleStaffLogin = (e: React.FormEvent) => {
+  const handleStaffLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const res = loginStaff(username, password);
-    setLoading(false);
-    if (res.success) {
-      const targetRoute = res.role === 'admin' ? '/admin-hub' : '/academic-hub';
-      // Force navigation and flush router state to prevent mobile stale-cache redirects
-      router.replace(targetRoute);
-    } else {
-      setError(res.message || 'Invalid username or password.');
+    try {
+      const res = await loginStaff(username, password);
+      if (res.success) {
+        const targetRoute = res.role === 'admin' ? '/admin-hub' : '/academic-hub';
+        // Force navigation and flush router state to prevent mobile stale-cache redirects
+        router.replace(targetRoute);
+      } else {
+        setError(res.message || 'Invalid username or password.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Login failed. Please check network connection.');
+    } finally {
+      setLoading(false);
     }
   };
 

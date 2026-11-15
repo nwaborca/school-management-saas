@@ -51,8 +51,8 @@ interface AppContextType {
   announcements: SchoolAnnouncement[];
 
   // Auth
-  loginStudent: (regNumber: string, pin: string) => { success: boolean; message?: string; role?: UserRole };
-  loginStaff: (username: string, pass: string) => { success: boolean; message?: string; role?: UserRole };
+  loginStudent: (regNumber: string, pin: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
+  loginStaff: (username: string, pass: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
   logout: () => void;
 
   // Teacher Score Entry Portal
@@ -732,13 +732,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Student Login (Reg Number + PIN)
-  const loginStudent = (regNumber: string, pin: string) => {
+  const loginStudent = async (regNumber: string, pin: string): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
     const cleanReg = regNumber.trim().toUpperCase();
     const cleanPin = pin.trim();
 
-    const student = students.find(
+    let student = students.find(
       (s) => s.reg_number.toUpperCase() === cleanReg && s.access_pin === cleanPin
     );
+
+    // Fallback: If in-memory state is still loading from cloud, fetch directly from Supabase
+    if (!student && isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('students')
+          .select('*')
+          .ilike('reg_number', cleanReg)
+          .eq('access_pin', cleanPin)
+          .maybeSingle();
+
+        if (!error && data) {
+          student = normalizeStudent(data);
+          setStudents((prev) => (prev.some((s) => s.id === student!.id) ? prev : [student!, ...prev]));
+        }
+      } catch (err) {
+        console.warn('Direct student login query note:', err);
+      }
+    }
 
     if (!student) {
       return { success: false, message: 'Invalid registration number or PIN.' };
@@ -762,7 +781,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Staff Login
-  const loginStaff = (username: string, pass: string): { success: boolean; message?: string; role?: UserRole } => {
+  const loginStaff = async (username: string, pass: string): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = pass.trim();
 
@@ -780,7 +799,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Dynamic match against live Supabase-synchronized teacher records
     const normalizedCleanUser = cleanUser.replace(/\s+/g, '');
-    const matchedTeacher = teachers.find((t) => {
+    let matchedTeacher = teachers.find((t) => {
       const matchUsername = (t.username || '').toLowerCase().replace(/\s+/g, '');
       const matchIdCode = (t.teacher_id_code || '').toLowerCase().replace(/\s+/g, '');
       const matchUnderscored = matchIdCode.replace(/\//g, '_');
@@ -794,6 +813,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       return matchesIdentifier && t.password_hash === cleanPass;
     });
+
+    // Fallback: If in-memory state is still loading from cloud, query Supabase staff table directly
+    if (!matchedTeacher && isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('staff')
+          .select('*')
+          .or(`username.ilike.${cleanUser},staff_id_code.ilike.${cleanUser}`)
+          .eq('password_hash', cleanPass)
+          .maybeSingle();
+
+        if (!error && data) {
+          matchedTeacher = normalizeTeacher(data);
+          setTeachers((prev) => (prev.some((t) => t.id === matchedTeacher!.id) ? prev : [matchedTeacher!, ...prev]));
+        }
+      } catch (err) {
+        console.warn('Direct staff login query note:', err);
+      }
+    }
 
     if (matchedTeacher) {
       if (matchedTeacher.status === 'revoked') {

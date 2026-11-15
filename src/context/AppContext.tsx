@@ -304,15 +304,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // Live Cloud Fetch from Supabase
+  // Live Cloud Fetch from Supabase with granular per-query error isolation
   const fetchLiveData = useCallback(async () => {
     if (!isSupabaseConfigured() || isFetchingRef.current) return;
     isFetchingRef.current = true;
     try {
-      // First ensure core classes exist in Supabase so foreign keys and dropdowns never fail
+      // 1. Ensure core classes exist in Supabase so foreign keys and dropdowns never fail
       try {
-        const { data: existingClasses } = await supabase.from('classes').select('id');
-        if (!existingClasses || existingClasses.length === 0) {
+        const { data: existingClasses, error: classSelectErr } = await supabase.from('classes').select('id');
+        if (!classSelectErr && (!existingClasses || existingClasses.length === 0)) {
           const classesPayload = INITIAL_CLASSES.map((c) => ({
             id: c.id,
             name: c.name,
@@ -328,37 +328,136 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.warn('Initial classes cloud check note:', classInitErr);
       }
 
-      const [stdRes, staffRes, resRes, classRes, feeRes, recRes] = await Promise.allSettled([
-        supabase.from('students').select('*').order('created_at', { ascending: false }),
-        supabase.from('staff').select('*').order('created_at', { ascending: false }),
-        supabase.from('term_results').select('*').order('created_at', { ascending: false }),
-        supabase.from('classes').select('*'),
-        supabase.from('fee_structures').select('*'),
-        supabase.from('receipts').select('*').order('created_at', { ascending: false }),
+      // 2. Fetch each table with dedicated try/catch guards so partial failures (e.g. 401 or network drop) never trigger error boundaries
+      const fetchStudentsPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('students').select('*').order('created_at', { ascending: false });
+          if (error) {
+            console.warn('Supabase students query returned error (falling back to cached/default state):', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (stdErr) {
+          console.warn('Supabase students fetch caught exception (falling back gracefully):', stdErr);
+          return null;
+        }
+      })();
+
+      const fetchStaffPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('staff').select('*').order('created_at', { ascending: false });
+          if (error) {
+            console.warn('Supabase staff query returned error (falling back to cached/default state):', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (staffErr) {
+          console.warn('Supabase staff fetch caught exception:', staffErr);
+          return null;
+        }
+      })();
+
+      const fetchResultsPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('term_results').select('*').order('created_at', { ascending: false });
+          if (error) {
+            console.warn('Supabase term_results query note:', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (resErr) {
+          console.warn('Supabase term_results fetch caught exception:', resErr);
+          return null;
+        }
+      })();
+
+      const fetchClassesPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('classes').select('*');
+          if (error) {
+            console.warn('Supabase classes query note:', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (clsErr) {
+          console.warn('Supabase classes fetch caught exception:', clsErr);
+          return null;
+        }
+      })();
+
+      const fetchFeesPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('fee_structures').select('*');
+          if (error) {
+            console.warn('Supabase fee_structures query note:', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (feeErr) {
+          console.warn('Supabase fee_structures fetch caught exception:', feeErr);
+          return null;
+        }
+      })();
+
+      const fetchReceiptsPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('receipts').select('*').order('created_at', { ascending: false });
+          if (error) {
+            console.warn('Supabase receipts query note:', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (recErr) {
+          console.warn('Supabase receipts fetch caught exception:', recErr);
+          return null;
+        }
+      })();
+
+      const [stdData, staffData, resData, classData, feeData, recData] = await Promise.all([
+        fetchStudentsPromise,
+        fetchStaffPromise,
+        fetchResultsPromise,
+        fetchClassesPromise,
+        fetchFeesPromise,
+        fetchReceiptsPromise,
       ]);
 
-      if (stdRes.status === 'fulfilled' && stdRes.value.data && Array.isArray(stdRes.value.data) && stdRes.value.data.length > 0) {
-        const normalizedStudents = (stdRes.value.data as any[]).map(normalizeStudent);
-        setStudents(normalizedStudents);
+      // Apply guarded updates only if data was successfully received
+      if (stdData && Array.isArray(stdData) && stdData.length > 0) {
+        try {
+          const normalizedStudents = stdData.map(normalizeStudent);
+          setStudents(normalizedStudents);
+        } catch (normStdErr) {
+          console.warn('Error normalizing students payload:', normStdErr);
+        }
       }
-      if (staffRes.status === 'fulfilled' && staffRes.value.data && Array.isArray(staffRes.value.data) && staffRes.value.data.length > 0) {
-        const normalizedStaff = (staffRes.value.data as any[]).map(normalizeTeacher);
-        setTeachers(normalizedStaff);
+
+      if (staffData && Array.isArray(staffData) && staffData.length > 0) {
+        try {
+          const normalizedStaff = staffData.map(normalizeTeacher);
+          setTeachers(normalizedStaff);
+        } catch (normStaffErr) {
+          console.warn('Error normalizing staff payload:', normStaffErr);
+        }
       }
-      if (resRes.status === 'fulfilled' && resRes.value.data && Array.isArray(resRes.value.data) && resRes.value.data.length > 0) {
-        setResults(resRes.value.data as StudentResult[]);
+
+      if (resData && Array.isArray(resData) && resData.length > 0) {
+        setResults(resData as StudentResult[]);
       }
-      if (classRes.status === 'fulfilled' && classRes.value.data && Array.isArray(classRes.value.data) && classRes.value.data.length > 0) {
-        setClasses(classRes.value.data as AcademicClass[]);
+
+      if (classData && Array.isArray(classData) && classData.length > 0) {
+        setClasses(classData as AcademicClass[]);
       }
-      if (feeRes.status === 'fulfilled' && feeRes.value.data && Array.isArray(feeRes.value.data) && feeRes.value.data.length > 0) {
-        setFeeStructures(feeRes.value.data as FeeStructure[]);
+
+      if (feeData && Array.isArray(feeData) && feeData.length > 0) {
+        setFeeStructures(feeData as FeeStructure[]);
       }
-      if (recRes.status === 'fulfilled' && recRes.value.data && Array.isArray(recRes.value.data) && recRes.value.data.length > 0) {
-        setReceipts(recRes.value.data as PaymentReceipt[]);
+
+      if (recData && Array.isArray(recData) && recData.length > 0) {
+        setReceipts(recData as PaymentReceipt[]);
       }
     } catch (err) {
-      console.error('Error fetching live data from Supabase:', err);
+      console.warn('Non-fatal error in fetchLiveData (safely falling back to default/cached data):', err);
     } finally {
       isFetchingRef.current = false;
     }

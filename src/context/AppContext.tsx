@@ -212,7 +212,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<PaymentTransaction[]>(INITIAL_TRANSACTIONS);
   const [teachers, setTeachers] = useState<TeacherProfile[]>(INITIAL_TEACHERS);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [resultsPublished, setResultsPublished] = useState<boolean>(false);
+  const [resultsPublished, setResultsPublished] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('apex_results_published');
+        if (cached !== null) return cached === 'true';
+      } catch {}
+    }
+    return false;
+  });
   const [adminPassword, setAdminPassword] = useState<string>('admin123');
 
   // Avoid unnecessary re-fetch loops
@@ -239,7 +247,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleResultsPublished = () => {
-    setResultsPublished((prev) => !prev);
+    setResultsPublished((prev) => {
+      const nextVal = !prev;
+      try {
+        localStorage.setItem('apex_results_published', String(nextVal));
+      } catch {}
+
+      if (isSupabaseConfigured()) {
+        supabase
+          .from('fee_structures')
+          .upsert({
+            id: '00000000-0000-0000-0000-000000000001',
+            class_id: 'cls-creche',
+            class_name: 'SYSTEM_SETTINGS_RESULTS_GATE',
+            term: 'GLOBAL_GATE',
+            session: '2025/2026',
+            line_items: [{ name: 'results_published', amount: 0 }],
+            total_amount: 0,
+            published: nextVal,
+            published_at: new Date().toISOString(),
+          })
+          .then(({ error }) => {
+            if (error) {
+              console.warn('Supabase results gate sync note:', error.message);
+            }
+          })
+          .catch(() => {});
+      }
+      return nextVal;
+    });
   };
 
   const updateAdminPassword = (currentPass: string, newPass: string) => {
@@ -488,6 +524,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (feeData && Array.isArray(feeData) && feeData.length > 0) {
         setFeeStructures(feeData as FeeStructure[]);
+        const gateRow = feeData.find((f: any) => f.id === '00000000-0000-0000-0000-000000000001');
+        if (gateRow) {
+          setResultsPublished(Boolean(gateRow.published));
+          try {
+            localStorage.setItem('apex_results_published', String(Boolean(gateRow.published)));
+          } catch {}
+        }
       }
 
       if (recData && Array.isArray(recData) && recData.length > 0) {
@@ -650,6 +693,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const inserted = payload.new as FeeStructure;
+            if (inserted.id === '00000000-0000-0000-0000-000000000001') {
+              setResultsPublished(Boolean(inserted.published));
+              try {
+                localStorage.setItem('apex_results_published', String(Boolean(inserted.published)));
+              } catch {}
+            }
             setFeeStructures((prev) => {
               if (prev.some((fs) => fs.id === inserted.id)) return prev;
               const filtered = prev.filter(
@@ -659,6 +708,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             });
           } else if (payload.eventType === 'UPDATE') {
             const updated = payload.new as FeeStructure;
+            if (updated.id === '00000000-0000-0000-0000-000000000001') {
+              setResultsPublished(Boolean(updated.published));
+              try {
+                localStorage.setItem('apex_results_published', String(Boolean(updated.published)));
+              } catch {}
+            }
             setFeeStructures((prev) => prev.map((fs) => (fs.id === updated.id ? updated : fs)));
           } else if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as any)?.id;

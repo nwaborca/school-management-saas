@@ -38,6 +38,8 @@ import {
   Award,
   Sparkles,
   Printer,
+  Download,
+  FileText,
 } from 'lucide-react';
 
 export default function AdminHubPage() {
@@ -118,6 +120,7 @@ export default function AdminHubPage() {
   const [selectedStudentForLedger, setSelectedStudentForLedger] = useState<StudentProfile | null>(null);
 
   // Action modals from Receipt Queue
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
   const [confirmFullModalReceipt, setConfirmFullModalReceipt] = useState<{
     id: string;
     studentName: string;
@@ -846,10 +849,28 @@ export default function AdminHubPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-gray-300 text-xs font-mono">{r.file_name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingReceipt(r.id)}
+                                  className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1.5 cursor-pointer text-xs"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span className="truncate max-w-[120px] sm:max-w-[160px] underline">{r.file_name}</span>
+                                </button>
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                  {/* 0. Eye: Preview / Download Receipt PDF */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingReceipt(r.id)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-300 border border-gray-700 font-bold text-[10px] flex items-center gap-1 cursor-pointer transition shadow-sm"
+                                    title="View and download payment receipt proof"
+                                  >
+                                    <Eye className="w-3 h-3 text-amber-400" />
+                                    <span>View PDF</span>
+                                  </button>
+
                                   {/* 1. Green: Confirm Full Payment */}
                                   <button
                                     onClick={() =>
@@ -1943,6 +1964,163 @@ export default function AdminHubPage() {
             </div>
           </div>
         )}
+      {/* VIEW RECEIPT PDF MODAL */}
+      {viewingReceipt && (() => {
+        const activeReceipt = receipts.find((r) => r.id === viewingReceipt);
+        if (!activeReceipt) return null;
+        return (
+          <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+            <div className="bg-gray-800 border border-gray-700 rounded-3xl max-w-4xl w-full p-5 sm:p-7 space-y-5 shadow-2xl relative my-auto max-h-[92vh] flex flex-col">
+              <div className="flex items-start justify-between gap-4 pb-3 border-b border-gray-700 flex-shrink-0">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-amber-500" />
+                    <h3 className="text-lg font-bold text-gray-50">Payment Receipt Review & PDF Proof</h3>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {activeReceipt.student_name} ({activeReceipt.reg_number}) • {activeReceipt.class_grade} ({activeReceipt.term || '1st Term'})
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewingReceipt(null)}
+                  className="p-2 rounded-xl bg-gray-900 text-gray-400 hover:text-white border border-gray-700 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0 overflow-y-auto">
+                <div className="lg:col-span-7 flex flex-col bg-gray-900 rounded-2xl border border-gray-700 overflow-hidden min-h-[380px] h-[480px]">
+                  {activeReceipt.file_data_url.startsWith('data:image') || /\.(png|jpe?g|webp|gif|svg)$/i.test(activeReceipt.file_name) ? (
+                    <div className="w-full h-full flex items-center justify-center p-4">
+                      <img
+                        src={activeReceipt.file_data_url}
+                        alt="Receipt"
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full flex flex-col">
+                      <div className="p-3 bg-gray-950 border-b border-gray-800 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-amber-400" />
+                          <span className="font-semibold text-gray-200 truncate max-w-[200px] sm:max-w-xs">{activeReceipt.file_name}</span>
+                        </div>
+                        <a
+                          href={activeReceipt.file_data_url}
+                          download={activeReceipt.file_name || 'payment_receipt.pdf'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-gray-950 font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download PDF</span>
+                        </a>
+                      </div>
+                      <iframe
+                        src={activeReceipt.file_data_url}
+                        className="w-full flex-1 border-none rounded-b-2xl bg-white"
+                        title={activeReceipt.file_name || 'Payment Receipt PDF'}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
+                  <div className="p-4 rounded-2xl bg-gray-900 border border-gray-700 space-y-3 text-xs">
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase font-semibold">Amount Claimed:</span>
+                      <p className="text-xl font-black text-amber-400 font-mono mt-0.5">{formatNaira(activeReceipt.amount_claimed)}</p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-800">
+                      <span className="text-gray-400 text-[10px] uppercase font-semibold">Student & Arm:</span>
+                      <p className="font-bold text-gray-200 mt-0.5">{activeReceipt.student_name} ({activeReceipt.class_grade})</p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-800">
+                      <span className="text-gray-400 text-[10px] uppercase font-semibold">Status:</span>
+                      <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-amber-950/70 text-amber-300 border border-amber-800">
+                        {activeReceipt.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {activeReceipt.status === 'pending_verification' && (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmFullModalReceipt({
+                            id: activeReceipt.id,
+                            studentName: activeReceipt.student_name,
+                            term: activeReceipt.term || '1st Term',
+                            amount: activeReceipt.amount_claimed,
+                            regNumber: activeReceipt.reg_number,
+                          });
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-emerald-900 hover:bg-emerald-800 text-emerald-100 font-bold text-xs flex items-center justify-center gap-2 border border-emerald-700 transition cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>Confirm Full Payment (₦0 Debt & Unlock Result)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rTerm = activeReceipt.term || '1st Term';
+                          const ledger = getStudentTermLedger(activeReceipt.student_id, rTerm);
+                          const previousPaid = transactions
+                            .filter((tx) => tx.student_id === activeReceipt.student_id && tx.term === rTerm)
+                            .reduce((sum, tx) => sum + tx.amount_credited, 0);
+                          const previousDebt = Math.max(0, ledger.totalTermFee - previousPaid);
+                          const claimed = activeReceipt.amount_claimed;
+
+                          setPartialModalReceipt({
+                            id: activeReceipt.id,
+                            studentId: activeReceipt.student_id,
+                            studentName: activeReceipt.student_name,
+                            term: rTerm,
+                            regNumber: activeReceipt.reg_number,
+                            amountClaimed: claimed,
+                            totalTermFee: ledger.totalTermFee,
+                            previousPaid,
+                            previousDebt,
+                            customApprovedAmount: claimed,
+                            newRemainingBalance: Math.max(0, previousDebt - claimed),
+                          });
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-gray-950 font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                      >
+                        <Clock className="w-4 h-4 text-gray-950" />
+                        <span>Mark Partial Payment (Leaves Result Locked)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRejectModalReceipt({
+                            id: activeReceipt.id,
+                            studentName: activeReceipt.student_name,
+                            regNumber: activeReceipt.reg_number,
+                            term: activeReceipt.term || '1st Term',
+                          });
+                          setCustomRejectNote('Invalid transfer receipt or mismatched credit. Please re-upload.');
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-rose-950 hover:bg-rose-900 text-rose-300 font-bold text-xs flex items-center justify-center gap-2 border border-rose-800 transition cursor-pointer"
+                      >
+                        <X className="w-4 h-4 text-rose-400" />
+                        <span>Reject Receipt</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       </div>
       </AnimatedContent>
     </div>

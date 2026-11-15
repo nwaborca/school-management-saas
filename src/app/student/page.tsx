@@ -517,7 +517,34 @@ export default function StudentDashboardPage() {
 
             {/* Grades Table */}
             <div className="bg-gray-800 border border-gray-700 rounded-2xl overflow-hidden">
-              {studentResults.length === 0 ? (
+              {!resultsPublished ? (
+                <div className="p-10 text-center space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-950/60 border border-amber-800/80 flex items-center justify-center text-amber-400">
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-200">Terminal Examination Results Not Yet Published</h4>
+                  <p className="text-xs text-gray-400 max-w-md mx-auto">
+                    Faculty grading for {selectedTerm} is undergoing institutional review. Once the Principal approves and publishes results, your score breakdown will appear here.
+                  </p>
+                </div>
+              ) : !isPaid ? (
+                <div className="p-10 text-center space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-rose-950/60 border border-rose-800/80 flex items-center justify-center text-rose-400">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-200">School Fees Clearance Required to View Results</h4>
+                  <p className="text-xs text-gray-400 max-w-md mx-auto">
+                    Official term grades are published by the Principal, but institutional policy requires school fees clearance to unlock your results. Please proceed to the Tuition & Fees tab to upload your payment receipt or clear your outstanding balance.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('fees')}
+                    className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold text-xs transition cursor-pointer"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Go to School Fees Hub</span>
+                  </button>
+                </div>
+              ) : studentResults.length === 0 ? (
                 <div className="p-8 text-center text-gray-400 text-xs italic">
                   No examination marks recorded for {selectedTerm} yet.
                 </div>

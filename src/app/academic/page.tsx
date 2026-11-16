@@ -107,6 +107,7 @@ export default function AcademicHubPage() {
   const [selectedTerm, setSelectedTerm] = useState('1st Term');
   const [session] = useState('2025/2026');
   const [saveToast, setSaveToast] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // --- MODULE 3: Offline-First Caching & Auto-Sync Engine ---
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -283,17 +284,57 @@ export default function AcademicHubPage() {
     }
   };
 
-  const handleSaveGrades = () => {
-    if (!isOnline && pendingQueue.length > 0) {
-      setSaveToast(true);
-      setTimeout(() => setSaveToast(false), 3000);
-      return;
-    }
-    if (isOnline && pendingQueue.length > 0) {
-      flushSyncQueue();
-    } else {
-      setSaveToast(true);
-      setTimeout(() => setSaveToast(false), 3000);
+  const handleSaveGrades = async () => {
+    setIsSaving(true);
+    try {
+      if (!isOnline && pendingQueue.length > 0) {
+        setSaveToast(true);
+        setTimeout(() => setSaveToast(false), 3000);
+        return;
+      }
+
+      if (isOnline) {
+        // If there's an offline pending queue, flush it first
+        if (pendingQueue.length > 0) {
+          flushSyncQueue();
+        }
+
+        // Explicitly guarantee every student in the current view is saved to Supabase
+        const savePromises = classStudents.map((std) => {
+          const result = results.find(
+            (r) =>
+              r.student_id === std.id &&
+              r.subject_id === selectedSubjectId &&
+              r.class_id === std.class_id &&
+              r.term === selectedTerm &&
+              r.session === session
+          );
+
+          const ca1 = result?.ca1 ?? 0;
+          const ca2 = result?.ca2 ?? 0;
+          const exam = result?.exam ?? 0;
+
+          return updateStudentScore(
+            std.id,
+            selectedSubjectId,
+            std.class_id,
+            selectedTerm,
+            session,
+            { ca1, ca2, exam }
+          );
+        });
+
+        await Promise.all(savePromises);
+        setSaveToast(true);
+        setTimeout(() => setSaveToast(false), 3000);
+      } else {
+        setSaveToast(true);
+        setTimeout(() => setSaveToast(false), 3000);
+      }
+    } catch (err) {
+      console.error('Error in handleSaveGrades:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -627,10 +668,15 @@ export default function AcademicHubPage() {
                   )}
                   <button
                     onClick={handleSaveGrades}
-                    className="px-4 py-2 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 font-bold text-xs flex items-center gap-2 border border-rose-800 transition cursor-pointer"
+                    disabled={isSaving}
+                    className="px-4 py-2 rounded-xl bg-rose-900 hover:bg-rose-800 disabled:opacity-50 text-gray-50 font-bold text-xs flex items-center gap-2 border border-rose-800 transition cursor-pointer"
                   >
-                    <Save className="w-4 h-4 text-amber-400" />
-                    <span>{isOnline ? 'Save Grades' : 'Cache Offline'}</span>
+                    {isSaving ? (
+                      <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 text-amber-400" />
+                    )}
+                    <span>{isSaving ? 'Saving...' : isOnline ? 'Save Grades' : 'Cache Offline'}</span>
                   </button>
                 </div>
               </div>

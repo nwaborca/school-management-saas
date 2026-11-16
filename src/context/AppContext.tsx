@@ -34,6 +34,8 @@ import {
   INITIAL_FEE_STRUCTURES,
   INITIAL_RECEIPTS,
   INITIAL_TRANSACTIONS,
+  toDbSubjectId,
+  fromDbSubjectId,
 } from '@/lib/mockData';
 
 interface AppContextType {
@@ -318,7 +320,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Helper to normalize result record from Supabase
   const normalizeResult = (r: any, studentList: StudentProfile[] = students): StudentResult => {
     const student = studentList.find((s) => s.id === r.student_id);
-    const subject = subjects.find((sb) => sb.id === r.subject_id);
+    const resolvedSubjectId = fromDbSubjectId(r.subject_id);
+    const subject = subjects.find((sb) => sb.id === resolvedSubjectId || sb.id === r.subject_id);
     const ca1 = Number(r.ca1) || 0;
     const ca2 = Number(r.ca2) || 0;
     const exam = Number(r.exam) || 0;
@@ -329,7 +332,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       student_name: r.student_name || student?.full_name || 'Student',
       reg_number: r.reg_number || student?.reg_number || 'N/A',
       class_id: r.class_id,
-      subject_id: r.subject_id,
+      subject_id: resolvedSubjectId,
       subject_name: r.subject_name || subject?.name || 'Subject',
       term: r.term,
       session: r.session,
@@ -1015,10 +1018,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Direct Cloud Upsert to Supabase
     if (isSupabaseConfigured()) {
       try {
+        const dbSubjectId = toDbSubjectId(updatedResultRecord.subject_id);
         const payload = {
           student_id: updatedResultRecord.student_id,
           class_id: updatedResultRecord.class_id,
-          subject_id: updatedResultRecord.subject_id,
+          subject_id: dbSubjectId,
           term: updatedResultRecord.term,
           session: updatedResultRecord.session,
           ca1: updatedResultRecord.ca1,

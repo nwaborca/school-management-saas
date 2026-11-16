@@ -135,6 +135,79 @@ export const INITIAL_SUBJECTS: AcademicSubject[] = [
   { id: 'subj-s-mkt', name: 'Marketing', code: 'SSS-MKT', stages: ['senior_secondary'], category: 'commercial' },
 ];
 
+// Canonical bidirectional Subject ID mapping between Frontend and Supabase
+export const FRONTEND_TO_DB_SUBJECT_MAP: Record<string, string> = {
+  // Senior Science
+  'subj-s-chem': 'sub-che',
+  'subj-s-bio': 'sub-bio',
+  'subj-s-phys': 'sub-phy',
+  'subj-s-fmath': 'sub-mth',
+  // Core English & Mathematics (Junior & Primary)
+  'subj-j-eng': 'sub-eng',
+  'subj-p-eng': 'sub-eng',
+  'subj-j-math': 'sub-mth',
+  'subj-p-math': 'sub-mth',
+  // Senior Humanities & Arts
+  'subj-s-govt': 'sub-gov',
+  'subj-s-lit': 'sub-eng',
+  'subj-p-crs': 'sub-crs',
+  'subj-p-hist': 'sub-gov',
+  // Senior Commercial
+  'subj-s-acct': 'sub-acc',
+  'subj-s-econ': 'sub-eco',
+  'subj-s-comm': 'sub-acc',
+  'subj-s-mkt': 'sub-eco',
+  // Junior & Vocational
+  'subj-j-agric': 'sub-agr',
+  'subj-j-civic': 'sub-civ',
+  'subj-j-bus': 'sub-acc',
+  'subj-j-soc': 'sub-civ',
+  'subj-j-digtech': 'sub-mth',
+  'subj-j-entrep': 'sub-acc',
+  'subj-btech': 'sub-phy',
+  'subj-dig-lit': 'sub-mth',
+  'subj-prevoc': 'sub-agr',
+  'subj-french': 'sub-eng',
+  // Early Childhood & Primary Foundation
+  'subj-p-lang-ng': 'sub-eng',
+  'subj-p-bsci': 'sub-bio',
+  'subj-p-phe': 'sub-bio',
+  'subj-p-social': 'sub-civ',
+  'subj-p-cca': 'sub-eng',
+  'subj-ec-lang': 'sub-eng',
+  'subj-ec-num': 'sub-mth',
+  'subj-ec-rhymes': 'sub-eng',
+  'subj-ec-social': 'sub-civ',
+  'subj-ec-health': 'sub-bio',
+  'subj-ec-env': 'sub-bio',
+  'subj-ec-art': 'sub-eng',
+  'subj-ec-pe': 'sub-bio',
+  'subj-ec-rel': 'sub-crs',
+  'subj-ec-sci': 'sub-bio',
+};
+
+export const DB_TO_FRONTEND_SUBJECT_MAP: Record<string, string> = {
+  'sub-che': 'subj-s-chem',
+  'sub-bio': 'subj-s-bio',
+  'sub-phy': 'subj-s-phys',
+  'sub-eng': 'subj-j-eng',
+  'sub-mth': 'subj-j-math',
+  'sub-gov': 'subj-s-govt',
+  'sub-acc': 'subj-s-acct',
+  'sub-eco': 'subj-s-econ',
+  'sub-agr': 'subj-j-agric',
+  'sub-civ': 'subj-j-civic',
+  'sub-crs': 'subj-p-crs',
+};
+
+export function toDbSubjectId(frontendId: string): string {
+  return FRONTEND_TO_DB_SUBJECT_MAP[frontendId] || frontendId;
+}
+
+export function fromDbSubjectId(dbId: string): string {
+  return DB_TO_FRONTEND_SUBJECT_MAP[dbId] || dbId;
+}
+
 // 3. Teacher_Subject_Allocations
 export const INITIAL_ALLOCATIONS: TeacherSubjectAllocation[] = [];
 

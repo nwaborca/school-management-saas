@@ -18,6 +18,8 @@ import {
   Search,
   BookOpen,
   GraduationCap,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 export default function TeacherRegistry() {
@@ -50,7 +52,25 @@ export default function TeacherRegistry() {
     isReset?: boolean;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [viewingCredentialsTeacher, setViewingCredentialsTeacher] = useState<TeacherProfile | null>(null);
+  const [visiblePasswords, setVisiblePasswords] = useState<{ [teacherId: string]: boolean }>({});
   const [registerStatus, setRegisterStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const togglePasswordVisibility = (teacherId: string) => {
+    setVisiblePasswords((prev) => ({
+      ...prev,
+      [teacherId]: !prev[teacherId],
+    }));
+  };
+
+  const copyTextToClipboard = (text: string, fieldId: string) => {
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldId);
+      setTimeout(() => setCopiedField(null), 2500);
+    }
+  };
 
   // Register form fields
   const [fullName, setFullName] = useState('');
@@ -229,6 +249,7 @@ export default function TeacherRegistry() {
           <thead className="bg-gray-900 text-gray-400 uppercase tracking-wider text-[11px] border-b border-gray-700">
             <tr>
               <th className="px-4 py-3">Teacher ID & Name</th>
+              <th className="px-4 py-3">Login Details (Staff Portal)</th>
               <th className="px-4 py-3">Contact (+234)</th>
               <th className="px-4 py-3">Form Class / Role</th>
               <th className="px-4 py-3">Assigned Subjects (NERDC)</th>
@@ -239,7 +260,7 @@ export default function TeacherRegistry() {
           <tbody className="divide-y divide-gray-700">
             {teachers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-400 italic">
+                <td colSpan={7} className="text-center py-8 text-gray-400 italic">
                   No staff members registered.
                 </td>
               </tr>
@@ -249,12 +270,78 @@ export default function TeacherRegistry() {
                 const formCls = availableClasses.find((c) => c.id === classId);
                 const assignedIds = t.assigned_subjects || t.assigned_subject_ids || [];
                 const assignedSubjs = availableSubjects.filter((s) => assignedIds.includes(s.id));
+                const isPwVisible = Boolean(visiblePasswords[t.id]);
 
                 return (
                   <tr key={t.id} className="hover:bg-gray-750 transition">
                     <td className="px-4 py-3 font-semibold text-gray-100">
                       <div>{t.full_name}</div>
                       <div className="text-[10px] text-amber-400 font-mono font-bold">{t.teacher_id_code}</div>
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="p-2 rounded-xl bg-gray-900 border border-gray-700/80 space-y-1.5 min-w-[210px]">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-gray-400 text-[10px] uppercase font-semibold">User:</span>
+                          <div className="flex items-center gap-1 font-mono">
+                            <span className="text-gray-200 font-bold">{t.username}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyTextToClipboard(t.username, `u-${t.id}`)}
+                              className="p-1 hover:text-amber-400 text-gray-400 transition cursor-pointer"
+                              title="Copy username"
+                            >
+                              {copiedField === `u-${t.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-800">
+                          <span className="text-gray-400 text-[10px] uppercase font-semibold">Pass:</span>
+                          <div className="flex items-center gap-1 font-mono">
+                            <span className="text-rose-300 font-bold tracking-wider">
+                              {isPwVisible ? t.password_hash : '••••••••'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => togglePasswordVisibility(t.id)}
+                              className="p-1 hover:text-amber-400 text-gray-400 transition cursor-pointer"
+                              title={isPwVisible ? 'Hide password' : 'Show password'}
+                            >
+                              {isPwVisible ? (
+                                <EyeOff className="w-3 h-3 text-amber-400" />
+                              ) : (
+                                <Eye className="w-3 h-3" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => copyTextToClipboard(t.password_hash, `p-${t.id}`)}
+                              className="p-1 hover:text-amber-400 text-gray-400 transition cursor-pointer"
+                              title="Copy password"
+                            >
+                              {copiedField === `p-${t.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setViewingCredentialsTeacher(t)}
+                          className="w-full mt-1 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-300 font-bold text-[10px] flex items-center justify-center gap-1 border border-gray-700 transition cursor-pointer"
+                        >
+                          <KeyRound className="w-3 h-3 text-amber-400" />
+                          <span>View Full Credential Slip</span>
+                        </button>
+                      </div>
                     </td>
 
                     <td className="px-4 py-3">
@@ -369,6 +456,66 @@ export default function TeacherRegistry() {
                     {t.status === 'active' ? <ShieldCheck className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />}
                     <span>{t.status}</span>
                   </span>
+                </div>
+
+                <div className="p-3 bg-gray-900 border border-gray-700 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold">Username:</span>
+                    <div className="flex items-center gap-1 font-mono">
+                      <span className="text-gray-100 font-bold">{t.username}</span>
+                      <button
+                        type="button"
+                        onClick={() => copyTextToClipboard(t.username, `mob-u-${t.id}`)}
+                        className="p-1 hover:text-amber-400 text-gray-400 transition"
+                      >
+                        {copiedField === `mob-u-${t.id}` ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-800">
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold">Password:</span>
+                    <div className="flex items-center gap-1 font-mono">
+                      <span className="text-rose-300 font-bold">
+                        {Boolean(visiblePasswords[t.id]) ? t.password_hash : '••••••••'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => togglePasswordVisibility(t.id)}
+                        className="p-1 hover:text-amber-400 text-gray-400 transition"
+                      >
+                        {Boolean(visiblePasswords[t.id]) ? (
+                          <EyeOff className="w-3 h-3 text-amber-400" />
+                        ) : (
+                          <Eye className="w-3 h-3" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyTextToClipboard(t.password_hash, `mob-p-${t.id}`)}
+                        className="p-1 hover:text-amber-400 text-gray-400 transition"
+                      >
+                        {copiedField === `mob-p-${t.id}` ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setViewingCredentialsTeacher(t)}
+                    className="w-full py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-300 font-bold text-[10px] flex items-center justify-center gap-1 border border-gray-700 transition"
+                  >
+                    <KeyRound className="w-3 h-3 text-amber-400" />
+                    <span>View Full Credential Slip</span>
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 pt-1 border-t border-gray-700/60">
@@ -911,6 +1058,124 @@ export default function TeacherRegistry() {
                 <span>Save Staff Updates</span>
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Staff Credentials Review Modal */}
+      {viewingCredentialsTeacher && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-3xl max-w-md w-full p-6 text-gray-100 shadow-2xl space-y-4 relative">
+            <button
+              onClick={() => setViewingCredentialsTeacher(null)}
+              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white rounded-lg bg-gray-900 border border-gray-700 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-gray-900 text-amber-400 border border-gray-700">
+                <KeyRound className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-50">Staff Login Dossier</h3>
+                <p className="text-xs text-gray-400">Official authentication details for staff access.</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-900 border border-gray-700 rounded-2xl font-mono text-xs space-y-3 text-gray-300">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
+                <span className="text-gray-400 font-sans text-[11px]">Staff Name:</span>
+                <strong className="text-white text-xs">{viewingCredentialsTeacher.full_name}</strong>
+              </div>
+
+              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
+                <span className="text-gray-400 font-sans text-[11px]">Staff / Teacher ID:</span>
+                <div className="flex items-center gap-1.5">
+                  <strong className="text-amber-400">{viewingCredentialsTeacher.teacher_id_code}</strong>
+                  <button
+                    type="button"
+                    onClick={() => copyTextToClipboard(viewingCredentialsTeacher.teacher_id_code, 'dossier-id')}
+                    className="p-1 hover:text-amber-400 text-gray-400 transition"
+                  >
+                    {copiedField === 'dossier-id' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
+                <span className="text-gray-400 font-sans text-[11px]">Portal Username:</span>
+                <div className="flex items-center gap-1.5">
+                  <strong className="text-gray-100">{viewingCredentialsTeacher.username}</strong>
+                  <button
+                    type="button"
+                    onClick={() => copyTextToClipboard(viewingCredentialsTeacher.username, 'dossier-user')}
+                    className="p-1 hover:text-amber-400 text-gray-400 transition"
+                  >
+                    {copiedField === 'dossier-user' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-sans text-[11px]">Access Password:</span>
+                <div className="flex items-center gap-1.5">
+                  <strong className="text-rose-300 text-sm font-bold tracking-wider">
+                    {Boolean(visiblePasswords[viewingCredentialsTeacher.id])
+                      ? viewingCredentialsTeacher.password_hash
+                      : '••••••••'}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility(viewingCredentialsTeacher.id)}
+                    className="p-1 hover:text-amber-400 text-gray-400 transition"
+                    title={Boolean(visiblePasswords[viewingCredentialsTeacher.id]) ? 'Hide password' : 'Show password'}
+                  >
+                    {Boolean(visiblePasswords[viewingCredentialsTeacher.id]) ? (
+                      <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => copyTextToClipboard(viewingCredentialsTeacher.password_hash, 'dossier-pass')}
+                    className="p-1 hover:text-amber-400 text-gray-400 transition"
+                  >
+                    {copiedField === 'dossier-pass' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-300 flex items-start gap-2">
+              <KeyRound className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                Staff can log in to the Academic Hub using either their <strong>Teacher ID</strong> (<code>{viewingCredentialsTeacher.teacher_id_code}</code>) or <strong>Username</strong> with their access password.
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const summary = `Staff Credentials:\nName: ${viewingCredentialsTeacher.full_name}\nTeacher ID: ${viewingCredentialsTeacher.teacher_id_code}\nUsername: ${viewingCredentialsTeacher.username}\nPassword: ${viewingCredentialsTeacher.password_hash}\nLogin URL: ${window?.location?.origin || ''}/login`;
+                  copyTextToClipboard(summary, 'dossier-all');
+                }}
+                className="py-2.5 rounded-xl bg-gray-900 hover:bg-gray-700 text-amber-400 border border-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                {copiedField === 'dossier-all' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedField === 'dossier-all' ? 'Copied Slip!' : 'Copy Full Slip'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewingCredentialsTeacher(null)}
+                className="py-2.5 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 border border-rose-800 font-bold text-xs transition cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

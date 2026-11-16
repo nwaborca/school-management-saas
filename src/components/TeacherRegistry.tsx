@@ -589,7 +589,7 @@ export default function TeacherRegistry() {
           <div className="bg-white border border-slate-200 rounded-xl max-w-xl w-full p-6 text-slate-900 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsRegisterOpen(false)}
-              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -619,7 +619,7 @@ export default function TeacherRegistry() {
                   placeholder="e.g. Dr. Ngozi Okafor"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                 />
               </div>
 
@@ -631,7 +631,7 @@ export default function TeacherRegistry() {
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 font-mono"
                   />
                 </div>
                 <div>
@@ -642,7 +642,7 @@ export default function TeacherRegistry() {
                     placeholder="teacher@apexacademy.sch.ng"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                    className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -702,7 +702,7 @@ export default function TeacherRegistry() {
                   value={formClassId}
                   disabled={isPartTime}
                   onChange={(e) => setFormClassId(e.target.value)}
-                  className={`w-full bg-slate-50 border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 transition ${
+                  className={`w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
                     isPartTime
                       ? 'opacity-40 cursor-not-allowed border-slate-200 bg-gray-950/70 text-slate-9000'
                       : 'border-slate-200 cursor-pointer'
@@ -755,7 +755,7 @@ export default function TeacherRegistry() {
                             onClick={() =>
                               toggleSubject(subId, assignedSubjects, setAssignedSubjects)
                             }
-                            className="hover:text-white cursor-pointer"
+                            className="hover:text-slate-900 cursor-pointer"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -773,7 +773,7 @@ export default function TeacherRegistry() {
                     placeholder="Search NERDC subjects (e.g. Mathematics, Biology, English)..."
                     value={subjectSearch}
                     onChange={(e) => setSubjectSearch(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                    className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   />
                 </div>
 
@@ -832,7 +832,7 @@ export default function TeacherRegistry() {
           <div className="bg-white border border-slate-200 rounded-xl max-w-xl w-full p-6 text-slate-900 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setEditingTeacher(null)}
-              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -850,7 +850,7 @@ export default function TeacherRegistry() {
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                 />
               </div>
 
@@ -862,7 +862,7 @@ export default function TeacherRegistry() {
                     required
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 font-mono"
                   />
                 </div>
                 <div>
@@ -872,7 +872,7 @@ export default function TeacherRegistry() {
                     required
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                    className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -932,7 +932,7 @@ export default function TeacherRegistry() {
                   value={editFormClassId}
                   disabled={editIsPartTime}
                   onChange={(e) => setEditFormClassId(e.target.value)}
-                  className={`w-full bg-slate-50 border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 transition ${
+                  className={`w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
                     editIsPartTime
                       ? 'opacity-40 cursor-not-allowed border-slate-200 bg-gray-950/70 text-slate-9000'
                       : 'border-slate-200 cursor-pointer'
@@ -979,7 +979,7 @@ export default function TeacherRegistry() {
                             onClick={() =>
                               toggleSubject(subId, editAssignedSubjects, setEditAssignedSubjects)
                             }
-                            className="hover:text-white cursor-pointer"
+                            className="hover:text-slate-900 cursor-pointer"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -996,7 +996,7 @@ export default function TeacherRegistry() {
                     placeholder="Search NERDC subjects..."
                     value={editSubjectSearch}
                     onChange={(e) => setEditSubjectSearch(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+                    className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   />
                 </div>
 
@@ -1068,7 +1068,7 @@ export default function TeacherRegistry() {
           <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 text-slate-900 shadow-2xl space-y-4 relative">
             <button
               onClick={() => setViewingCredentialsTeacher(null)}
-              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1086,7 +1086,7 @@ export default function TeacherRegistry() {
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs space-y-3 text-slate-700">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                 <span className="text-slate-500 font-sans text-[11px]">Staff Name:</span>
-                <strong className="text-white text-xs">{viewingCredentialsTeacher.full_name}</strong>
+                <strong className="text-slate-900 text-xs font-semibold">{viewingCredentialsTeacher.full_name}</strong>
               </div>
 
               <div className="flex items-center justify-between pb-2 border-b border-slate-200">
@@ -1197,7 +1197,7 @@ export default function TeacherRegistry() {
             </div>
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs space-y-2 text-slate-700">
-              <div>Staff: <strong className="text-white">{newCredentialsModal.teacherName}</strong></div>
+              <div>Staff: <strong className="text-slate-900 font-semibold">{newCredentialsModal.teacherName}</strong></div>
               <div>Teacher ID: <strong className="text-blue-600">{newCredentialsModal.teacherIdCode}</strong></div>
               <div>Username: <strong className="text-slate-900">{newCredentialsModal.username}</strong></div>
               <div>Password: <strong className="text-rose-300">{newCredentialsModal.password}</strong></div>

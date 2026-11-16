@@ -365,7 +365,7 @@ export default function AdminHubPage() {
 
           {/* Instant Search Suggestions / Matches */}
           {masterSearchQuery.trim() !== '' && (
-            <div className="border border-gray-200  rounded-xl overflow-hidden bg-gray-50  divide-y divide-gray-200 dark:divide-slate-200 max-h-60 overflow-y-auto">
+            <div className="border border-gray-200  rounded-xl overflow-hidden bg-gray-50  divide-y divide-gray-200  max-h-60 overflow-y-auto">
               {students.filter(
                 (s) =>
                   s.full_name.toLowerCase().includes(masterSearchQuery.toLowerCase()) ||
@@ -576,7 +576,7 @@ export default function AdminHubPage() {
                 <select
                   value={filterClassId}
                   onChange={(e) => setFilterClassId(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600 w-full sm:w-48 cursor-pointer"
+                  className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 w-full sm:w-48 cursor-pointer"
                 >
                   <option value="all">All 33 Class Arms</option>
                   {classes.map((c) => (
@@ -1117,7 +1117,7 @@ export default function AdminHubPage() {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer"
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-blue-600" />
                 <span>Broadcast to School Portals</span>
@@ -1264,13 +1264,13 @@ export default function AdminHubPage() {
         {/* PROMOTE CLASS MODAL */}
         {isPromoteModalOpen && (
           <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 sm:p-8 text-slate-900 shadow-2xl relative">
+            <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 sm:p-8 text-slate-900 shadow-xl relative">
               <button
                 onClick={() => {
                   setIsPromoteModalOpen(false);
                   setPromoteNotice(null);
                 }}
-                className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
+                className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -1367,7 +1367,7 @@ export default function AdminHubPage() {
                   <button
                     type="submit"
                     disabled={studentsInSourceClass.length === 0}
-                    className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer disabled:opacity-50"
+                    className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer disabled:opacity-50"
                   >
                     <TrendingUp className="w-4 h-4 text-blue-600" />
                     <span>Confirm Promotion of Students</span>
@@ -1384,7 +1384,7 @@ export default function AdminHubPage() {
             <div className="bg-white border border-slate-200 rounded-xl max-w-2xl w-full p-6 sm:p-7 text-slate-900 shadow-2xl relative space-y-5">
               <button
                 onClick={() => setSelectedStudentForLedger(null)}
-                className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
+                className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -1550,7 +1550,7 @@ export default function AdminHubPage() {
             <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 text-slate-900 shadow-2xl space-y-5 relative">
               <button
                 onClick={() => setPartialModalReceipt(null)}
-                className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
+                className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -1703,7 +1703,7 @@ export default function AdminHubPage() {
                     rejectReceipt(rejectModalReceipt.id, customRejectNote);
                     setRejectModalReceipt(null);
                   }}
-                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs flex items-center justify-center gap-1.5 border border-blue-600 transition cursor-pointer"
+                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 border border-blue-600 transition cursor-pointer"
                 >
                   <X className="w-4 h-4 text-blue-600" />
                   <span>Reject & Request Re-upload</span>
@@ -1858,7 +1858,7 @@ export default function AdminHubPage() {
                           <th className="px-4 py-2.5">Audited By</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-slate-200">
+                      <tbody className="divide-y divide-gray-200 ">
                         {results
                           .filter((r) => r.student_id === selectedStudentForDossier.id && r.term === '1st Term')
                           .map((res) => {
@@ -1918,7 +1918,7 @@ export default function AdminHubPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedStudentForDossier(null)}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs transition cursor-pointer shadow-sm"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer shadow-sm"
                 >
                   Close Dossier
                 </button>

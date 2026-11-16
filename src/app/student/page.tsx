@@ -278,7 +278,7 @@ export default function StudentDashboardPage() {
 
   if (!currentUser || !activeStudent) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-9000  text-xs">
+      <div className="min-h-screen flex items-center justify-center text-slate-600  text-xs">
         <span>Authenticating session...</span>
       </div>
     );
@@ -300,7 +300,7 @@ export default function StudentDashboardPage() {
                   {activeStudent.reg_number}
                 </span>
                 <span className="text-xs text-rose-300 font-semibold">{activeStudent.class_grade}</span>
-                <span className="text-xs text-slate-9000">•</span>
+                <span className="text-xs text-slate-600">•</span>
                 <span className="text-xs text-slate-500 font-mono">Session: {activeStudent.session}</span>
               </div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
@@ -343,7 +343,7 @@ export default function StudentDashboardPage() {
                 logout();
                 router.push('/login');
               }}
-              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-500 hover:text-white transition cursor-pointer border border-slate-200"
+              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition cursor-pointer border border-slate-200"
               title="Sign Out"
             >
               <LogOut className="w-4 h-4" />
@@ -380,7 +380,7 @@ export default function StudentDashboardPage() {
               Cumulative Marks
             </span>
             <div className="text-2xl sm:text-3xl font-black text-rose-300 font-mono mt-1">
-              {totalScoreObtained} <span className="text-xs text-slate-9000 font-normal">/ {totalMaxScore}</span>
+              {totalScoreObtained} <span className="text-xs text-slate-600 font-normal">/ {totalMaxScore}</span>
             </div>
             <span className="text-[10px] text-slate-500">{studentResults.length} Enrolled Subjects</span>
           </div>
@@ -507,7 +507,7 @@ export default function StudentDashboardPage() {
               <button
                 onClick={handleDownloadResultSlip}
                 className={`text-xs font-semibold flex items-center gap-1 cursor-pointer ${
-                  isPaid ? 'text-blue-600 hover:underline' : 'text-slate-9000'
+                  isPaid ? 'text-blue-600 hover:underline' : 'text-slate-600'
                 }`}
               >
                 <Printer className="w-3.5 h-3.5" />
@@ -654,7 +654,7 @@ export default function StudentDashboardPage() {
                   <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
                     {formatNaira(termLedger.totalTermFee)}
                   </div>
-                  <span className="text-[10px] text-slate-9000">Official Class Tariff</span>
+                  <span className="text-[10px] text-slate-600">Official Class Tariff</span>
                 </div>
 
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
@@ -719,7 +719,7 @@ export default function StudentDashboardPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                      <CheckCircle2 className={`w-4 h-4 ${paymentChoice === 'full' ? 'text-blue-600' : 'text-slate-9000'}`} />
+                      <CheckCircle2 className={`w-4 h-4 ${paymentChoice === 'full' ? 'text-blue-600' : 'text-slate-600'}`} />
                       <span>Full Payment</span>
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800 font-semibold">
@@ -757,7 +757,7 @@ export default function StudentDashboardPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                      <PieChart className={`w-4 h-4 ${paymentChoice === 'partial' ? 'text-blue-600' : 'text-slate-9000'}`} />
+                      <PieChart className={`w-4 h-4 ${paymentChoice === 'partial' ? 'text-blue-600' : 'text-slate-600'}`} />
                       <span>Partial Payment (Installment Deposit)</span>
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800 font-semibold">
@@ -780,7 +780,7 @@ export default function StudentDashboardPage() {
                         }
                         value={customPartialAmount}
                         onChange={(e) => setCustomPartialAmount(e.target.value)}
-                        className="w-full bg-gray-950 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                        className="w-full bg-white border border-slate-300 rounded-lg pl-8 pr-3 py-2 text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                         min="1"
                         max={termLedger.remainingBalance > 0 ? termLedger.remainingBalance : undefined}
                       />
@@ -876,7 +876,7 @@ export default function StudentDashboardPage() {
                     <p className="text-xs font-semibold text-slate-800">
                       {selectedFile ? selectedFile.name : 'Click to select receipt image or PDF'}
                     </p>
-                    <p className="text-[10px] text-slate-9000 mt-1">PNG, JPG, or PDF (Max 5MB)</p>
+                    <p className="text-[10px] text-slate-600 mt-1">PNG, JPG, or PDF (Max 5MB)</p>
                   </div>
 
                   <button
@@ -905,7 +905,7 @@ export default function StudentDashboardPage() {
             <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 sm:p-7 text-slate-900 shadow-2xl relative space-y-5">
               <button
                 onClick={() => setShowBankDetailsModal(false)}
-                className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
+                className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -927,7 +927,7 @@ export default function StudentDashboardPage() {
                 <strong className="text-amber-300 uppercase">
                   {paymentChoice === 'full' ? 'Full Payment' : 'Partial Payment Deposit'}
                 </strong>{' '}
-                — Amount: <strong className="text-white font-mono">{formatNaira(currentPayableAmount)}</strong>
+                — Amount: <strong className="text-slate-900 font-mono">{formatNaira(currentPayableAmount)}</strong>
               </div>
 
               {/* Bank Details List with Copy Buttons */}
@@ -942,7 +942,7 @@ export default function StudentDashboardPage() {
                   </div>
                   <button
                     onClick={() => copyBankInfo('First Bank of Nigeria', 'bank')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
                   >
                     {copiedBankField === 'bank' ? (
                       <>
@@ -968,7 +968,7 @@ export default function StudentDashboardPage() {
                   </div>
                   <button
                     onClick={() => copyBankInfo('0123456789', 'account_no')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
                   >
                     {copiedBankField === 'account_no' ? (
                       <>
@@ -996,7 +996,7 @@ export default function StudentDashboardPage() {
                   </div>
                   <button
                     onClick={() => copyBankInfo(`${schoolInfo.name} Educational Services`, 'account_name')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer shrink-0"
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer shrink-0"
                   >
                     {copiedBankField === 'account_name' ? (
                       <>
@@ -1024,7 +1024,7 @@ export default function StudentDashboardPage() {
                   </div>
                   <button
                     onClick={() => copyBankInfo(`${activeStudent.reg_number} ${activeStudent.full_name}`, 'narration')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
                   >
                     {copiedBankField === 'narration' ? (
                       <>
@@ -1087,7 +1087,7 @@ export default function StudentDashboardPage() {
                   </button>
                   <button
                     onClick={() => setIsPrintModalOpen(false)}
-                    className="p-2 text-slate-9000 hover:text-gray-900 rounded-xl border border-gray-200 cursor-pointer"
+                    className="p-2 text-slate-600 hover:text-gray-900 rounded-xl border border-gray-200 cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1111,19 +1111,19 @@ export default function StudentDashboardPage() {
                 {/* Student Info Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <div>
-                    <span className="text-[10px] text-slate-9000 uppercase block font-semibold">Student Name:</span>
+                    <span className="text-[10px] text-slate-600 uppercase block font-semibold">Student Name:</span>
                     <strong className="text-gray-900 text-sm">{activeStudent.full_name}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-9000 uppercase block font-semibold">Reg Number:</span>
+                    <span className="text-[10px] text-slate-600 uppercase block font-semibold">Reg Number:</span>
                     <strong className="font-mono text-gray-900">{activeStudent.reg_number}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-9000 uppercase block font-semibold">Class / Arm:</span>
+                    <span className="text-[10px] text-slate-600 uppercase block font-semibold">Class / Arm:</span>
                     <strong className="text-gray-900">{activeStudent.class_grade}</strong>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-9000 uppercase block font-semibold">Term Clearance:</span>
+                    <span className="text-[10px] text-slate-600 uppercase block font-semibold">Term Clearance:</span>
                     <strong className="text-emerald-700 font-bold">Verified & Paid in Full</strong>
                   </div>
                 </div>
@@ -1161,15 +1161,15 @@ export default function StudentDashboardPage() {
                 {/* Score Summary */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-gray-50 border border-gray-200 text-xs">
                   <div>
-                    <span className="text-slate-9000">Term Average Score:</span>
+                    <span className="text-slate-600">Term Average Score:</span>
                     <strong className="text-rose-900 font-bold ml-1 text-base">{averageScore}%</strong>
                   </div>
                   <div>
-                    <span className="text-slate-9000">Subjects Passed:</span>
+                    <span className="text-slate-600">Subjects Passed:</span>
                     <strong className="text-gray-900 font-bold ml-1">{subjectsPassed} of {studentResults.length}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-9000">Principal Sign-off:</span>
+                    <span className="text-slate-600">Principal Sign-off:</span>
                     <strong className="text-gray-900 font-bold ml-1">{schoolInfo.principal_name}</strong>
                   </div>
                 </div>

@@ -41,3 +41,24 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* Global Form Controls & Contrast System */
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]),
+select,
+textarea {
+  color: #0F172A;
+  background-color: #FFFFFF;
+}
+
+/* Force dropdown options to crisp dark slate on pure white */
+select option {
+  color: #0F172A;
+  background-color: #FFFFFF;
+}
+
+/* Placeholder contrast */
+input::placeholder,
+textarea::placeholder {
+  color: #94A3B8;
+}
+

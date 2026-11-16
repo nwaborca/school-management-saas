@@ -227,7 +227,7 @@ export default function AdminFeesPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/admin')}
-              className="p-2 rounded-xl bg-white hover:bg-slate-100 text-slate-500 hover:text-white transition cursor-pointer border border-slate-200"
+              className="p-2 rounded-xl bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition cursor-pointer border border-slate-200"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
@@ -635,7 +635,7 @@ export default function AdminFeesPage() {
               {/* Transactions History Table */}
               <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-950 text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3">Transaction Date</th>
                       <th className="px-4 py-3">Student Name & Reg No</th>
@@ -656,7 +656,7 @@ export default function AdminFeesPage() {
                         return matchesTerm && matchesSearch;
                       })
                       .map((tx) => (
-                        <tr key={tx.id} className="hover:bg-gray-850 transition">
+                        <tr key={tx.id} className="hover:bg-slate-50 transition">
                           <td className="px-4 py-3 font-mono text-slate-500 text-[11px]">
                             {new Date(tx.transaction_date).toLocaleDateString('en-NG', {
                               day: '2-digit',
@@ -733,7 +733,7 @@ export default function AdminFeesPage() {
 
               <button
                 onClick={() => setViewingReceipt(null)}
-                className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:text-white border border-slate-200 transition cursor-pointer"
+                className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:text-slate-900 border border-slate-200 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -751,7 +751,7 @@ export default function AdminFeesPage() {
                   </div>
                 ) : (
                   <div className="w-full h-full flex flex-col">
-                    <div className="p-3 bg-gray-950 border-b border-slate-200 flex items-center justify-between text-xs">
+                    <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-blue-600" />
                         <span className="font-semibold text-slate-800 truncate max-w-[200px] sm:max-w-xs">{activeReceipt.file_name}</span>
@@ -880,7 +880,7 @@ export default function AdminFeesPage() {
                 <span className="text-emerald-300 font-bold">{confirmFullModalReceipt.term}</span>)?
               </p>
               <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-slate-500 text-[11px]">
-                <span>Reg: <strong className="text-white font-mono">{confirmFullModalReceipt.regNumber}</strong></span>
+                <span>Reg: <strong className="text-slate-900 font-mono">{confirmFullModalReceipt.regNumber}</strong></span>
                 <span>Claimed: <strong className="text-blue-600 font-mono">{formatNaira(confirmFullModalReceipt.amount)}</strong></span>
               </div>
               <p className="text-[11px] text-emerald-400 pt-1">
@@ -921,7 +921,7 @@ export default function AdminFeesPage() {
           <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 text-slate-900 shadow-2xl space-y-5 relative">
             <button
               onClick={() => setPartialModalReceipt(null)}
-              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-900 rounded-lg bg-slate-100 border border-slate-200 cursor-pointer"
             >
               ✕
             </button>
@@ -985,7 +985,7 @@ export default function AdminFeesPage() {
                         newRemainingBalance: newBal,
                       });
                     }}
-                    className="w-full bg-gray-950 border border-slate-200 rounded-xl pl-7 pr-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                    className="w-full bg-white border border-slate-300 rounded-lg pl-7 pr-3 py-2 text-xs font-mono font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                   />
                 </div>
               </div>

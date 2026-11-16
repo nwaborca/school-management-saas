@@ -128,26 +128,26 @@ export default function EnrollStudentForm({
       </div>
 
       {enrollStatus && enrollStatus.type === 'error' && (
-        <div className="p-4 rounded-xl bg-red-950/70 border border-red-800 text-red-300 text-xs flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
           <div>
-            <strong className="block text-red-200 font-semibold mb-0.5">Enrollment Error:</strong>
+            <strong className="block text-rose-900 font-semibold mb-0.5">Enrollment Error:</strong>
             <span>{enrollStatus.message}</span>
           </div>
         </div>
       )}
 
       {createdStudent && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-800 space-y-2 text-xs">
-          <div className="flex items-center gap-2 font-bold text-emerald-300">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2 text-xs">
+          <div className="flex items-center gap-2 font-bold text-emerald-800">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Student Enrolled Successfully!</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 font-mono text-slate-700 text-[11px] pt-1 border-t border-emerald-900/60">
-            <div>Name: <strong className="text-white">{createdStudent.full_name}</strong></div>
-            <div>Reg No: <strong className="text-blue-600">{createdStudent.reg_number}</strong></div>
-            <div>Class: <strong className="text-white">{createdStudent.class_grade}</strong></div>
-            <div>PIN: <strong className="text-blue-600">{createdStudent.access_pin}</strong></div>
+          <div className="grid grid-cols-2 gap-2 font-mono text-slate-700 text-[11px] pt-1 border-t border-emerald-200">
+            <div>Name: <strong className="text-slate-900">{createdStudent.full_name}</strong></div>
+            <div>Reg No: <strong className="text-blue-700 font-semibold">{createdStudent.reg_number}</strong></div>
+            <div>Class: <strong className="text-slate-900">{createdStudent.class_grade}</strong></div>
+            <div>PIN: <strong className="text-blue-700 font-semibold">{createdStudent.access_pin}</strong></div>
           </div>
         </div>
       )}
@@ -161,7 +161,7 @@ export default function EnrollStudentForm({
             placeholder="e.g. Chidera Eze"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+            className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
           />
         </div>
 
@@ -171,7 +171,7 @@ export default function EnrollStudentForm({
             value={selectedClassId}
             disabled={lockClassSelection}
             onChange={(e) => setSelectedClassId(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer disabled:opacity-50"
+            className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 cursor-pointer disabled:opacity-50"
           >
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
@@ -190,7 +190,7 @@ export default function EnrollStudentForm({
               placeholder="e.g. Chief Eze"
               value={parentName}
               onChange={(e) => setParentName(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
             />
           </div>
           <div>
@@ -200,7 +200,7 @@ export default function EnrollStudentForm({
               required
               value={parentPhone}
               onChange={(e) => setParentPhone(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+              className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 font-mono"
             />
           </div>
         </div>
@@ -228,9 +228,9 @@ export default function EnrollStudentForm({
         <button
           type="submit"
           disabled={!ndpaConsent}
-          className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
         >
-          <UserPlus className="w-4 h-4 text-blue-600" />
+          <UserPlus className="w-4 h-4 text-white" />
           <span>Complete Enrollment & Generate PIN</span>
         </button>
       </form>

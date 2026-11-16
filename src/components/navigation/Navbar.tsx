@@ -241,40 +241,40 @@ export function Navbar() {
       {/* Admin Password Security Modal */}
       {isPasswordModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 relative max-h-[90vh] overflow-y-auto my-auto transition-colors duration-200">
+          <div className="max-w-md w-full bg-white  rounded-xl p-6 shadow-2xl border border-gray-200  text-gray-900  relative max-h-[90vh] overflow-y-auto my-auto transition-colors duration-200">
             <button
               onClick={() => {
                 setIsPasswordModalOpen(false);
                 setPasswordError(null);
                 setPasswordSuccess(false);
               }}
-              className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white rounded-lg bg-gray-100 dark:bg-gray-700 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-900  :text-white rounded-lg bg-gray-100  cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
             <div className="flex items-center gap-3 mb-5">
-              <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+              <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600  border border-amber-500/30">
                 <Shield className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-gray-50">Admin Password Security</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">Self-service credential management</p>
+                <h3 className="text-base font-bold text-gray-900 ">Admin Password Security</h3>
+                <p className="text-xs text-gray-500  font-mono">Self-service credential management</p>
               </div>
             </div>
 
             {passwordError && (
-              <div className="p-3 mb-4 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+              <div className="p-3 mb-4 rounded-xl bg-rose-50  border border-rose-200  text-rose-700  text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 " />
                 <span>{passwordError}</span>
               </div>
             )}
 
             {passwordSuccess ? (
-              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-center space-y-2">
+              <div className="p-4 rounded-2xl bg-emerald-50  border border-emerald-200  text-emerald-800  text-center space-y-2">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
                 <p className="font-bold text-xs">Admin password successfully updated!</p>
-                <p className="text-[11px] text-gray-600 dark:text-gray-400">Use your new credentials on future logins.</p>
+                <p className="text-[11px] text-gray-600 ">Use your new credentials on future logins.</p>
                 <button
                   onClick={() => setIsPasswordModalOpen(false)}
                   className="mt-3 px-4 py-2 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 font-bold text-xs cursor-pointer"
@@ -304,7 +304,7 @@ export function Navbar() {
                 className="space-y-4 text-xs"
               >
                 <div>
-                  <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
+                  <label className="block text-gray-700  font-semibold mb-1">
                     Current Password:
                   </label>
                   <input
@@ -313,12 +313,12 @@ export function Navbar() {
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="Enter current admin password"
-                    className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400"
+                    className="w-full bg-white  border border-gray-300  rounded-xl px-3.5 py-2.5 text-xs text-gray-900  focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-slate-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
+                  <label className="block text-gray-700  font-semibold mb-1">
                     New Password (min 6 characters):
                   </label>
                   <input
@@ -328,12 +328,12 @@ export function Navbar() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="At least 6 characters"
-                    className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400"
+                    className="w-full bg-white  border border-gray-300  rounded-xl px-3.5 py-2.5 text-xs text-gray-900  focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-slate-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
+                  <label className="block text-gray-700  font-semibold mb-1">
                     Confirm New Password:
                   </label>
                   <input
@@ -343,7 +343,7 @@ export function Navbar() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter new password"
-                    className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400"
+                    className="w-full bg-white  border border-gray-300  rounded-xl px-3.5 py-2.5 text-xs text-gray-900  focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-slate-500"
                   />
                 </div>
 

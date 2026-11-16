@@ -698,7 +698,7 @@ export default function AcademicHubPage() {
                           <th className="px-4 py-3 text-center">CA 1 (20)</th>
                           <th className="px-4 py-3 text-center">CA 2 (20)</th>
                           <th className="px-4 py-3 text-center">Exam (60)</th>
-                          <th className="px-4 py-3 text-center font-bold text-gray-100">Total (100)</th>
+                          <th className="px-4 py-3 text-center font-semibold text-slate-900">Total (100)</th>
                           <th className="px-4 py-3 text-center">Grade</th>
                           <th className="px-4 py-3">Remark</th>
                         </tr>
@@ -828,51 +828,51 @@ export default function AcademicHubPage() {
                               <h4 className="font-bold text-slate-900 text-sm">{std.full_name}</h4>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-[10px] text-gray-400 font-mono">{std.reg_number}</span>
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-900 text-amber-300 border border-gray-700">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                                   {studentClass?.name || std.class_grade || 'Class'}
                                 </span>
                               </div>
                             </div>
                             <div className="text-right">
-                              <span className="font-mono font-black text-base text-gray-100 mr-2">{total}%</span>
+                              <span className="font-mono font-bold text-base text-slate-900 mr-2">{total}%</span>
                               <span className={`inline-block px-2 py-0.5 rounded font-mono font-bold text-[10px] ${gradeBadge}`}>
                                 {grade}
                               </span>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-gray-700/70">
+                          <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                             <div>
-                              <label className="block text-[10px] text-gray-400 font-medium mb-1">CA 1 (20)</label>
+                              <label className="block text-[10px] text-slate-600 font-medium mb-1">CA 1 (20)</label>
                               <input
                                 type="number"
                                 min="0"
                                 max="20"
                                 value={ca1}
                                 onChange={(e) => handleScoreInput(std.id, std.class_id, 'ca1', Number(e.target.value))}
-                                className="w-full bg-gray-950 border border-gray-700 rounded-lg py-1 px-2 text-center font-mono font-bold text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                className="w-full bg-white border border-slate-300 rounded-md py-1.5 px-2 text-center font-mono font-semibold text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                               />
                             </div>
                             <div>
-                              <label className="block text-[10px] text-gray-400 font-medium mb-1">CA 2 (20)</label>
+                              <label className="block text-[10px] text-slate-600 font-medium mb-1">CA 2 (20)</label>
                               <input
                                 type="number"
                                 min="0"
                                 max="20"
                                 value={ca2}
                                 onChange={(e) => handleScoreInput(std.id, std.class_id, 'ca2', Number(e.target.value))}
-                                className="w-full bg-gray-950 border border-gray-700 rounded-lg py-1 px-2 text-center font-mono font-bold text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                className="w-full bg-white border border-slate-300 rounded-md py-1.5 px-2 text-center font-mono font-semibold text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                               />
                             </div>
                             <div>
-                              <label className="block text-[10px] text-gray-400 font-medium mb-1">Exam (60)</label>
+                              <label className="block text-[10px] text-slate-600 font-medium mb-1">Exam (60)</label>
                               <input
                                 type="number"
                                 min="0"
                                 max="60"
                                 value={exam}
                                 onChange={(e) => handleScoreInput(std.id, std.class_id, 'exam', Number(e.target.value))}
-                                className="w-full bg-gray-950 border border-gray-700 rounded-lg py-1 px-2 text-center font-mono font-bold text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                className="w-full bg-white border border-slate-300 rounded-md py-1.5 px-2 text-center font-mono font-semibold text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                               />
                             </div>
                           </div>
@@ -921,7 +921,7 @@ export default function AcademicHubPage() {
                 <span className="text-xs text-emerald-400 font-mono bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-800">
                   Class Avg: {broadsheetData.classAverage}% ({broadsheetData.passingStudents}/{broadsheetData.totalStudents} passing)
                 </span>
-                <span className="text-xs text-gray-300 font-mono bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-700">
+                <span className="text-xs text-slate-700 font-mono bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
                   Session: {session} • Term: {selectedTerm}
                 </span>
               </div>
@@ -940,7 +940,7 @@ export default function AcademicHubPage() {
                           {sub.code}
                         </th>
                       ))}
-                      <th className="px-4 py-3 text-center font-bold text-gray-100">Total Score</th>
+                      <th className="px-4 py-3 text-center font-semibold text-slate-900">Total Score</th>
                       <th className="px-4 py-3 text-center font-bold text-amber-400">Average %</th>
                       <th className="px-4 py-3 text-center font-bold text-gray-300">Grade</th>
                       <th className="px-4 py-3 text-center">Standing</th>
@@ -990,7 +990,7 @@ export default function AcademicHubPage() {
                               </td>
                             ))}
 
-                            <td className="px-4 py-3 text-center font-mono font-extrabold text-gray-100">{row.totalAll}</td>
+                            <td className="px-4 py-3 text-center font-mono font-bold text-slate-900">{row.totalAll}</td>
                             <td className="px-4 py-3 text-center font-mono font-bold text-amber-400">
                               {row.count > 0 ? `${row.average}%` : '—'}
                             </td>

@@ -222,31 +222,31 @@ export default function TeacherRegistry() {
   return (
     <div className="space-y-6">
       {/* Top Banner & Action */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-gray-800 border border-gray-700">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-xl bg-white border border-slate-200">
         <div>
-          <h2 className="text-base font-bold text-gray-50 flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-amber-500" />
+          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-blue-600" />
             <span>Faculty Staff Registry & Security Administration</span>
           </h2>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Register teachers with automated ID generation, NERDC curriculum subject multi-allocation, 33-tier class assignment, and part-time controls.
           </p>
         </div>
 
         <button
           onClick={() => setIsRegisterOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 font-bold text-xs flex items-center gap-2 border border-rose-800 transition cursor-pointer shadow-sm"
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs flex items-center gap-2 border border-blue-600 transition cursor-pointer shadow-sm"
         >
-          <Plus className="w-4 h-4 text-amber-400" />
+          <Plus className="w-4 h-4 text-blue-600" />
           <span>Register New Teacher</span>
         </button>
       </div>
 
       {/* Teachers Roster: Desktop Table (hidden md:block) & Mobile Stacked Cards (block md:hidden) */}
       {/* Desktop Table View */}
-      <div className="hidden md:block overflow-x-auto rounded-2xl border border-gray-700 bg-gray-800">
-        <table className="w-full text-left text-xs text-gray-300">
-          <thead className="bg-gray-900 text-gray-400 uppercase tracking-wider text-[11px] border-b border-gray-700">
+      <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="w-full text-left text-xs text-slate-700">
+          <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[11px] border-b border-slate-200">
             <tr>
               <th className="px-4 py-3">Teacher ID & Name</th>
               <th className="px-4 py-3">Login Details (Staff Portal)</th>
@@ -257,10 +257,10 @@ export default function TeacherRegistry() {
               <th className="px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-700">
+          <tbody className="divide-y divide-slate-200">
             {teachers.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-400 italic">
+                <td colSpan={7} className="text-center py-8 text-slate-500 italic">
                   No staff members registered.
                 </td>
               </tr>
@@ -273,22 +273,22 @@ export default function TeacherRegistry() {
                 const isPwVisible = Boolean(visiblePasswords[t.id]);
 
                 return (
-                  <tr key={t.id} className="hover:bg-gray-750 transition">
-                    <td className="px-4 py-3 font-semibold text-gray-100">
+                  <tr key={t.id} className="hover:bg-slate-50 transition">
+                    <td className="px-4 py-3 font-semibold text-slate-900">
                       <div>{t.full_name}</div>
-                      <div className="text-[10px] text-amber-400 font-mono font-bold">{t.teacher_id_code}</div>
+                      <div className="text-[10px] text-blue-600 font-mono font-bold">{t.teacher_id_code}</div>
                     </td>
 
                     <td className="px-4 py-3">
-                      <div className="p-2 rounded-xl bg-gray-900 border border-gray-700/80 space-y-1.5 min-w-[210px]">
+                      <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5 min-w-[210px]">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-gray-400 text-[10px] uppercase font-semibold">User:</span>
+                          <span className="text-slate-500 text-[10px] uppercase font-semibold">User:</span>
                           <div className="flex items-center gap-1 font-mono">
-                            <span className="text-gray-200 font-bold">{t.username}</span>
+                            <span className="text-slate-800 font-bold">{t.username}</span>
                             <button
                               type="button"
                               onClick={() => copyTextToClipboard(t.username, `u-${t.id}`)}
-                              className="p-1 hover:text-amber-400 text-gray-400 transition cursor-pointer"
+                              className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
                               title="Copy username"
                             >
                               {copiedField === `u-${t.id}` ? (
@@ -300,8 +300,8 @@ export default function TeacherRegistry() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-800">
-                          <span className="text-gray-400 text-[10px] uppercase font-semibold">Pass:</span>
+                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200">
+                          <span className="text-slate-500 text-[10px] uppercase font-semibold">Pass:</span>
                           <div className="flex items-center gap-1 font-mono">
                             <span className="text-rose-300 font-bold tracking-wider">
                               {isPwVisible ? t.password_hash : '••••••••'}
@@ -309,11 +309,11 @@ export default function TeacherRegistry() {
                             <button
                               type="button"
                               onClick={() => togglePasswordVisibility(t.id)}
-                              className="p-1 hover:text-amber-400 text-gray-400 transition cursor-pointer"
+                              className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
                               title={isPwVisible ? 'Hide password' : 'Show password'}
                             >
                               {isPwVisible ? (
-                                <EyeOff className="w-3 h-3 text-amber-400" />
+                                <EyeOff className="w-3 h-3 text-blue-600" />
                               ) : (
                                 <Eye className="w-3 h-3" />
                               )}
@@ -321,7 +321,7 @@ export default function TeacherRegistry() {
                             <button
                               type="button"
                               onClick={() => copyTextToClipboard(t.password_hash, `p-${t.id}`)}
-                              className="p-1 hover:text-amber-400 text-gray-400 transition cursor-pointer"
+                              className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
                               title="Copy password"
                             >
                               {copiedField === `p-${t.id}` ? (
@@ -336,17 +336,17 @@ export default function TeacherRegistry() {
                         <button
                           type="button"
                           onClick={() => setViewingCredentialsTeacher(t)}
-                          className="w-full mt-1 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-300 font-bold text-[10px] flex items-center justify-center gap-1 border border-gray-700 transition cursor-pointer"
+                          className="w-full mt-1 py-1 rounded-lg bg-white hover:bg-slate-100 text-amber-300 font-bold text-[10px] flex items-center justify-center gap-1 border border-slate-200 transition cursor-pointer"
                         >
-                          <KeyRound className="w-3 h-3 text-amber-400" />
+                          <KeyRound className="w-3 h-3 text-blue-600" />
                           <span>View Full Credential Slip</span>
                         </button>
                       </div>
                     </td>
 
                     <td className="px-4 py-3">
-                      <div className="text-gray-200 font-mono">{t.phone}</div>
-                      <div className="text-[10px] text-gray-400">{t.email}</div>
+                      <div className="text-slate-800 font-mono">{t.phone}</div>
+                      <div className="text-[10px] text-slate-500">{t.email}</div>
                     </td>
 
                     <td className="px-4 py-3">
@@ -355,11 +355,11 @@ export default function TeacherRegistry() {
                           Part-Time (No Form Class)
                         </span>
                       ) : formCls ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-900 text-amber-300 border border-gray-700">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 text-amber-300 border border-slate-200">
                           {formCls.name}
                         </span>
                       ) : (
-                        <span className="text-gray-500 italic text-[11px]">Subject Teacher</span>
+                        <span className="text-slate-9000 italic text-[11px]">Subject Teacher</span>
                       )}
                     </td>
 
@@ -369,14 +369,14 @@ export default function TeacherRegistry() {
                           assignedSubjs.map((s) => (
                             <span
                               key={s.id}
-                              className="px-1.5 py-0.5 rounded text-[10px] bg-gray-900 border border-gray-700 text-gray-300"
+                              className="px-1.5 py-0.5 rounded text-[10px] bg-slate-50 border border-slate-200 text-slate-700"
                               title={s.name}
                             >
                               {s.code || s.name}
                             </span>
                           ))
                         ) : (
-                          <span className="text-gray-500 italic text-[10px]">No subjects assigned</span>
+                          <span className="text-slate-9000 italic text-[10px]">No subjects assigned</span>
                         )}
                       </div>
                     </td>
@@ -386,7 +386,7 @@ export default function TeacherRegistry() {
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                           t.status === 'active'
                             ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
-                            : 'bg-rose-950/60 text-rose-400 border border-rose-800'
+                            : 'bg-rose-950/60 text-rose-400 border border-blue-600'
                         }`}
                       >
                         {t.status === 'active' ? <ShieldCheck className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />}
@@ -398,7 +398,7 @@ export default function TeacherRegistry() {
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => openEdit(t)}
-                          className="px-2.5 py-1 rounded-lg bg-gray-900 hover:bg-gray-700 text-amber-400 font-bold text-[11px] border border-gray-700 transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-blue-600 font-bold text-[11px] border border-slate-200 transition cursor-pointer"
                         >
                           Edit
                         </button>
@@ -408,7 +408,7 @@ export default function TeacherRegistry() {
                               deleteTeacher(t.id);
                             }
                           }}
-                          className="p-1 rounded-lg bg-gray-900 hover:bg-rose-900/50 text-rose-400 border border-gray-700 hover:border-rose-800 transition cursor-pointer"
+                          className="p-1 rounded-lg bg-slate-50 hover:bg-blue-600/50 text-rose-400 border border-slate-200 hover:border-blue-600 transition cursor-pointer"
                           title="Delete staff"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -426,7 +426,7 @@ export default function TeacherRegistry() {
       {/* Mobile Stacked Card View */}
       <div className="block md:hidden space-y-3">
         {teachers.length === 0 ? (
-          <div className="p-6 text-center text-gray-400 italic bg-gray-800 rounded-2xl border border-gray-700 text-xs">
+          <div className="p-6 text-center text-slate-500 italic bg-white rounded-xl border border-slate-200 text-xs">
             No staff members registered.
           </div>
         ) : (
@@ -439,18 +439,18 @@ export default function TeacherRegistry() {
             return (
               <div
                 key={t.id}
-                className="p-4 bg-gray-800 rounded-2xl border border-gray-700 space-y-3 shadow-sm"
+                className="p-4 bg-white rounded-xl border border-slate-200 space-y-3 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h4 className="font-bold text-gray-100 text-sm">{t.full_name}</h4>
-                    <span className="text-[10px] text-amber-400 font-mono font-bold">{t.teacher_id_code}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{t.full_name}</h4>
+                    <span className="text-[10px] text-blue-600 font-mono font-bold">{t.teacher_id_code}</span>
                   </div>
                   <span
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                       t.status === 'active'
                         ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
-                        : 'bg-rose-950/60 text-rose-400 border border-rose-800'
+                        : 'bg-rose-950/60 text-rose-400 border border-blue-600'
                     }`}
                   >
                     {t.status === 'active' ? <ShieldCheck className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />}
@@ -458,15 +458,15 @@ export default function TeacherRegistry() {
                   </span>
                 </div>
 
-                <div className="p-3 bg-gray-900 border border-gray-700 rounded-xl space-y-2">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[10px] text-gray-400 uppercase font-semibold">Username:</span>
+                    <span className="text-[10px] text-slate-500 uppercase font-semibold">Username:</span>
                     <div className="flex items-center gap-1 font-mono">
-                      <span className="text-gray-100 font-bold">{t.username}</span>
+                      <span className="text-slate-900 font-bold">{t.username}</span>
                       <button
                         type="button"
                         onClick={() => copyTextToClipboard(t.username, `mob-u-${t.id}`)}
-                        className="p-1 hover:text-amber-400 text-gray-400 transition"
+                        className="p-1 hover:text-blue-600 text-slate-500 transition"
                       >
                         {copiedField === `mob-u-${t.id}` ? (
                           <Check className="w-3 h-3 text-emerald-400" />
@@ -477,8 +477,8 @@ export default function TeacherRegistry() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-800">
-                    <span className="text-[10px] text-gray-400 uppercase font-semibold">Password:</span>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
+                    <span className="text-[10px] text-slate-500 uppercase font-semibold">Password:</span>
                     <div className="flex items-center gap-1 font-mono">
                       <span className="text-rose-300 font-bold">
                         {Boolean(visiblePasswords[t.id]) ? t.password_hash : '••••••••'}
@@ -486,10 +486,10 @@ export default function TeacherRegistry() {
                       <button
                         type="button"
                         onClick={() => togglePasswordVisibility(t.id)}
-                        className="p-1 hover:text-amber-400 text-gray-400 transition"
+                        className="p-1 hover:text-blue-600 text-slate-500 transition"
                       >
                         {Boolean(visiblePasswords[t.id]) ? (
-                          <EyeOff className="w-3 h-3 text-amber-400" />
+                          <EyeOff className="w-3 h-3 text-blue-600" />
                         ) : (
                           <Eye className="w-3 h-3" />
                         )}
@@ -497,7 +497,7 @@ export default function TeacherRegistry() {
                       <button
                         type="button"
                         onClick={() => copyTextToClipboard(t.password_hash, `mob-p-${t.id}`)}
-                        className="p-1 hover:text-amber-400 text-gray-400 transition"
+                        className="p-1 hover:text-blue-600 text-slate-500 transition"
                       >
                         {copiedField === `mob-p-${t.id}` ? (
                           <Check className="w-3 h-3 text-emerald-400" />
@@ -511,57 +511,57 @@ export default function TeacherRegistry() {
                   <button
                     type="button"
                     onClick={() => setViewingCredentialsTeacher(t)}
-                    className="w-full py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-300 font-bold text-[10px] flex items-center justify-center gap-1 border border-gray-700 transition"
+                    className="w-full py-1 rounded-lg bg-white hover:bg-slate-100 text-amber-300 font-bold text-[10px] flex items-center justify-center gap-1 border border-slate-200 transition"
                   >
-                    <KeyRound className="w-3 h-3 text-amber-400" />
+                    <KeyRound className="w-3 h-3 text-blue-600" />
                     <span>View Full Credential Slip</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 pt-1 border-t border-gray-700/60">
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-700 pt-1 border-t border-slate-200/60">
                   <div>
-                    <div className="text-[10px] text-gray-400">Contact</div>
+                    <div className="text-[10px] text-slate-500">Contact</div>
                     <div className="font-mono text-[11px]">{t.phone}</div>
-                    <div className="text-[10px] text-gray-400 truncate">{t.email}</div>
+                    <div className="text-[10px] text-slate-500 truncate">{t.email}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-gray-400">Class Role</div>
+                    <div className="text-[10px] text-slate-500">Class Role</div>
                     {t.is_part_time ? (
                       <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
                         Part-Time
                       </span>
                     ) : formCls ? (
-                      <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-gray-900 text-amber-300 border border-gray-700">
+                      <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 text-amber-300 border border-slate-200">
                         {formCls.name}
                       </span>
                     ) : (
-                      <span className="text-gray-500 italic text-[11px]">Subject Teacher</span>
+                      <span className="text-slate-9000 italic text-[11px]">Subject Teacher</span>
                     )}
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-gray-700/60">
-                  <div className="text-[10px] text-gray-400 mb-1">Assigned Subjects ({assignedSubjs.length})</div>
+                <div className="pt-2 border-t border-slate-200/60">
+                  <div className="text-[10px] text-slate-500 mb-1">Assigned Subjects ({assignedSubjs.length})</div>
                   <div className="flex flex-wrap gap-1">
                     {assignedSubjs.length > 0 ? (
                       assignedSubjs.map((s) => (
                         <span
                           key={s.id}
-                          className="px-2 py-0.5 rounded text-[10px] bg-gray-900 border border-gray-700 text-gray-300"
+                          className="px-2 py-0.5 rounded text-[10px] bg-slate-50 border border-slate-200 text-slate-700"
                         >
                           {s.code || s.name}
                         </span>
                       ))
                     ) : (
-                      <span className="text-gray-500 italic text-[10px]">No subjects assigned</span>
+                      <span className="text-slate-9000 italic text-[10px]">No subjects assigned</span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-700/60">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60">
                   <button
                     onClick={() => openEdit(t)}
-                    className="flex-1 py-1.5 rounded-xl bg-gray-900 hover:bg-gray-700 text-amber-400 font-bold text-xs border border-gray-700 transition"
+                    className="flex-1 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-blue-600 font-bold text-xs border border-slate-200 transition"
                   >
                     Edit / Reset
                   </button>
@@ -571,7 +571,7 @@ export default function TeacherRegistry() {
                         deleteTeacher(t.id);
                       }
                     }}
-                    className="p-2 rounded-xl bg-gray-900 hover:bg-rose-900/50 text-rose-400 border border-gray-700 hover:border-rose-800 transition"
+                    className="p-2 rounded-xl bg-slate-50 hover:bg-blue-600/50 text-rose-400 border border-slate-200 hover:border-blue-600 transition"
                     title="Delete staff"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -585,16 +585,16 @@ export default function TeacherRegistry() {
 
       {/* Register Modal */}
       {isRegisterOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-gray-800 border border-gray-700 rounded-3xl max-w-xl w-full p-6 text-gray-100 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-xl w-full p-6 text-slate-900 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsRegisterOpen(false)}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white rounded-lg bg-gray-900 border border-gray-700 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
-            <h3 className="text-lg font-bold text-gray-50 mb-4 flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-amber-500" />
+            <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-blue-600" />
               <span>Register New Teacher</span>
             </h3>
 
@@ -602,7 +602,7 @@ export default function TeacherRegistry() {
               <div
                 className={`p-3 rounded-xl text-xs mb-3 flex items-center gap-2 ${
                   registerStatus.type === 'error'
-                    ? 'bg-rose-950/80 border border-rose-800 text-rose-300'
+                    ? 'bg-rose-950/80 border border-blue-600 text-rose-300'
                     : 'bg-emerald-950/80 border border-emerald-800 text-emerald-300'
                 }`}
               >
@@ -612,45 +612,45 @@ export default function TeacherRegistry() {
 
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Full Name:</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name:</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Dr. Ngozi Okafor"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Phone (+234):</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone (+234):</label>
                   <input
                     type="text"
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Email:</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Email:</label>
                   <input
                     type="email"
                     required
                     placeholder="teacher@apexacademy.sch.ng"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
 
               {/* Part-Time Teacher Toggle Switch */}
-              <div className="p-3.5 bg-gray-900/90 border border-gray-700 rounded-2xl flex items-center justify-between">
+              <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-xl flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-gray-200 flex items-center gap-2">
+                  <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
                     <span>Part-Time Teacher</span>
                     {isPartTime && (
                       <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-semibold">
@@ -658,7 +658,7 @@ export default function TeacherRegistry() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
+                  <p className="text-[11px] text-slate-500 mt-0.5">
                     {isPartTime
                       ? 'Part-time faculty: Class assignment disabled (no fixed form class).'
                       : 'Full-time faculty: Can be assigned as a Form Class Teacher.'}
@@ -689,23 +689,23 @@ export default function TeacherRegistry() {
 
               {/* Class Assignment Dropdown (33-tier Nigerian Hierarchy) */}
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <GraduationCap className="w-3.5 h-3.5 text-amber-400" />
+                    <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
                     <span>What class will they be assigned to? (Creche to SS3 Arm F):</span>
                   </span>
                   {isPartTime && (
-                    <span className="text-[10px] text-amber-400 italic">Disabled for Part-Time</span>
+                    <span className="text-[10px] text-blue-600 italic">Disabled for Part-Time</span>
                   )}
                 </label>
                 <select
                   value={formClassId}
                   disabled={isPartTime}
                   onChange={(e) => setFormClassId(e.target.value)}
-                  className={`w-full bg-gray-900 border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition ${
+                  className={`w-full bg-slate-50 border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 transition ${
                     isPartTime
-                      ? 'opacity-40 cursor-not-allowed border-gray-800 bg-gray-950/70 text-gray-500'
-                      : 'border-gray-700 cursor-pointer'
+                      ? 'opacity-40 cursor-not-allowed border-slate-200 bg-gray-950/70 text-slate-9000'
+                      : 'border-slate-200 cursor-pointer'
                   }`}
                 >
                   <option value="">
@@ -721,7 +721,7 @@ export default function TeacherRegistry() {
                     ))}
                 </select>
                 {isPartTime && (
-                  <p className="text-[10px] text-amber-400/80 mt-1 italic">
+                  <p className="text-[10px] text-blue-600/80 mt-1 italic">
                     Part-time teachers do not manage a fixed form class. They teach their assigned subject(s) across classes.
                   </p>
                 )}
@@ -729,19 +729,19 @@ export default function TeacherRegistry() {
 
               {/* NERDC Subjects Multi-Select */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-gray-300 flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                    <BookOpen className="w-3.5 h-3.5 text-blue-600" />
                     <span>What subject(s) will the teacher be teaching? (NERDC Curriculum):</span>
                   </span>
-                  <span className="text-[11px] font-mono text-amber-400">
+                  <span className="text-[11px] font-mono text-blue-600">
                     {assignedSubjects.length} selected
                   </span>
                 </label>
 
                 {/* Selected subjects tags */}
                 {assignedSubjects.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-gray-900/60 rounded-xl border border-gray-700 max-h-24 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50/60 rounded-xl border border-slate-200 max-h-24 overflow-y-auto">
                     {assignedSubjects.map((subId) => {
                       const subj = availableSubjects.find((s) => s.id === subId);
                       return (
@@ -767,18 +767,18 @@ export default function TeacherRegistry() {
 
                 {/* Search Bar for Subjects */}
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
                   <input
                     type="text"
                     placeholder="Search NERDC subjects (e.g. Mathematics, Biology, English)..."
                     value={subjectSearch}
                     onChange={(e) => setSubjectSearch(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
                 {/* Scrollable multi-select subject list */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto p-2 bg-gray-900/40 border border-gray-700 rounded-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto p-2 bg-slate-50/40 border border-slate-200 rounded-xl">
                   {filteredRegisterSubjects.map((subj) => {
                     const isSelected = assignedSubjects.includes(subj.id);
                     return (
@@ -790,13 +790,13 @@ export default function TeacherRegistry() {
                         }
                         className={`text-left p-2 rounded-lg border text-xs flex items-center justify-between transition cursor-pointer ${
                           isSelected
-                            ? 'bg-rose-900/30 border-rose-700 text-gray-100 font-bold'
-                            : 'bg-gray-900/60 border-gray-800 text-gray-300 hover:bg-gray-800'
+                            ? 'bg-blue-600/30 border-rose-700 text-slate-900 font-bold'
+                            : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-white'
                         }`}
                       >
                         <div className="truncate mr-2">
                           <div className="truncate text-[11px]">{subj.name}</div>
-                          <div className="text-[9px] text-gray-500 font-mono">
+                          <div className="text-[9px] text-slate-9000 font-mono">
                             {subj.code} • {subj.category || 'General'}
                           </div>
                         </div>
@@ -804,7 +804,7 @@ export default function TeacherRegistry() {
                           className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
                             isSelected
                               ? 'bg-amber-500 border-amber-500 text-gray-950 font-bold'
-                              : 'border-gray-600'
+                              : 'border-slate-200'
                           }`}
                         >
                           {isSelected && <Check className="w-3 h-3" />}
@@ -817,7 +817,7 @@ export default function TeacherRegistry() {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 font-bold text-xs flex items-center justify-center gap-2 border border-rose-800 transition cursor-pointer shadow-md mt-2"
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer shadow-md mt-2"
               >
                 <span>Save Teacher & Generate Credentials</span>
               </button>
@@ -828,59 +828,59 @@ export default function TeacherRegistry() {
 
       {/* Edit Modal */}
       {editingTeacher && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-gray-800 border border-gray-700 rounded-3xl max-w-xl w-full p-6 text-gray-100 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-xl w-full p-6 text-slate-900 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setEditingTeacher(null)}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white rounded-lg bg-gray-900 border border-gray-700 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
-            <h3 className="text-lg font-bold text-gray-50 mb-1 flex items-center gap-2">
-              <Edit3 className="w-5 h-5 text-amber-500" />
+            <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <Edit3 className="w-5 h-5 text-blue-600" />
               <span>Update Faculty Staff Member</span>
             </h3>
-            <p className="text-xs text-gray-400 mb-4 font-mono">{editingTeacher.teacher_id_code}</p>
+            <p className="text-xs text-slate-500 mb-4 font-mono">{editingTeacher.teacher_id_code}</p>
 
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Full Name:</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name:</label>
                 <input
                   type="text"
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Phone (+234):</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone (+234):</label>
                   <input
                     type="text"
                     required
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Email:</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Email:</label>
                   <input
                     type="email"
                     required
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
 
               {/* Part-Time Toggle Switch */}
-              <div className="p-3.5 bg-gray-900/90 border border-gray-700 rounded-2xl flex items-center justify-between">
+              <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-xl flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-gray-200 flex items-center gap-2">
+                  <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
                     <span>Part-Time Teacher</span>
                     {editIsPartTime && (
                       <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-semibold">
@@ -888,7 +888,7 @@ export default function TeacherRegistry() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
+                  <p className="text-[11px] text-slate-500 mt-0.5">
                     {editIsPartTime
                       ? 'Part-time faculty: Class assignment disabled (no fixed form class).'
                       : 'Full-time faculty: Can be assigned as a Form Class Teacher.'}
@@ -919,23 +919,23 @@ export default function TeacherRegistry() {
 
               {/* Class Assignment Dropdown */}
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <GraduationCap className="w-3.5 h-3.5 text-amber-400" />
+                    <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
                     <span>What class will they be assigned to? (33-tier Hierarchy):</span>
                   </span>
                   {editIsPartTime && (
-                    <span className="text-[10px] text-amber-400 italic">Disabled for Part-Time</span>
+                    <span className="text-[10px] text-blue-600 italic">Disabled for Part-Time</span>
                   )}
                 </label>
                 <select
                   value={editFormClassId}
                   disabled={editIsPartTime}
                   onChange={(e) => setEditFormClassId(e.target.value)}
-                  className={`w-full bg-gray-900 border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition ${
+                  className={`w-full bg-slate-50 border rounded-xl p-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600 transition ${
                     editIsPartTime
-                      ? 'opacity-40 cursor-not-allowed border-gray-800 bg-gray-950/70 text-gray-500'
-                      : 'border-gray-700 cursor-pointer'
+                      ? 'opacity-40 cursor-not-allowed border-slate-200 bg-gray-950/70 text-slate-9000'
+                      : 'border-slate-200 cursor-pointer'
                   }`}
                 >
                   <option value="">
@@ -954,18 +954,18 @@ export default function TeacherRegistry() {
 
               {/* NERDC Subjects Multi-Select */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-gray-300 flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                    <BookOpen className="w-3.5 h-3.5 text-blue-600" />
                     <span>Assigned Subjects (NERDC Curriculum):</span>
                   </span>
-                  <span className="text-[11px] font-mono text-amber-400">
+                  <span className="text-[11px] font-mono text-blue-600">
                     {editAssignedSubjects.length} selected
                   </span>
                 </label>
 
                 {editAssignedSubjects.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-gray-900/60 rounded-xl border border-gray-700 max-h-24 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50/60 rounded-xl border border-slate-200 max-h-24 overflow-y-auto">
                     {editAssignedSubjects.map((subId) => {
                       const subj = availableSubjects.find((s) => s.id === subId);
                       return (
@@ -990,17 +990,17 @@ export default function TeacherRegistry() {
                 )}
 
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
                   <input
                     type="text"
                     placeholder="Search NERDC subjects..."
                     value={editSubjectSearch}
                     onChange={(e) => setEditSubjectSearch(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto p-2 bg-gray-900/40 border border-gray-700 rounded-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto p-2 bg-slate-50/40 border border-slate-200 rounded-xl">
                   {filteredEditSubjects.map((subj) => {
                     const isSelected = editAssignedSubjects.includes(subj.id);
                     return (
@@ -1012,13 +1012,13 @@ export default function TeacherRegistry() {
                         }
                         className={`text-left p-2 rounded-lg border text-xs flex items-center justify-between transition cursor-pointer ${
                           isSelected
-                            ? 'bg-rose-900/30 border-rose-700 text-gray-100 font-bold'
-                            : 'bg-gray-900/60 border-gray-800 text-gray-300 hover:bg-gray-800'
+                            ? 'bg-blue-600/30 border-rose-700 text-slate-900 font-bold'
+                            : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-white'
                         }`}
                       >
                         <div className="truncate mr-2">
                           <div className="truncate text-[11px]">{subj.name}</div>
-                          <div className="text-[9px] text-gray-500 font-mono">
+                          <div className="text-[9px] text-slate-9000 font-mono">
                             {subj.code} • {subj.category || 'General'}
                           </div>
                         </div>
@@ -1026,7 +1026,7 @@ export default function TeacherRegistry() {
                           className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
                             isSelected
                               ? 'bg-amber-500 border-amber-500 text-gray-950 font-bold'
-                              : 'border-gray-600'
+                              : 'border-slate-200'
                           }`}
                         >
                           {isSelected && <Check className="w-3 h-3" />}
@@ -1038,22 +1038,22 @@ export default function TeacherRegistry() {
               </div>
 
               {/* Password Reset Option */}
-              <div className="p-3 bg-gray-900/80 border border-gray-700 rounded-xl flex items-center gap-3">
+              <div className="p-3 bg-slate-50/80 border border-slate-200 rounded-xl flex items-center gap-3">
                 <input
                   type="checkbox"
                   id="resetCredentials"
                   checked={resetCredentials}
                   onChange={(e) => setResetCredentials(e.target.checked)}
-                  className="rounded border-gray-700 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                  className="rounded border-slate-200 text-blue-600 focus:ring-blue-600 w-4 h-4 cursor-pointer"
                 />
-                <label htmlFor="resetCredentials" className="text-xs text-gray-300 cursor-pointer">
+                <label htmlFor="resetCredentials" className="text-xs text-slate-700 cursor-pointer">
                   Revoke & Regenerate Credentials (Generates a new secure password)
                 </label>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 font-bold text-xs flex items-center justify-center gap-2 border border-rose-800 transition cursor-pointer shadow-md"
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer shadow-md"
               >
                 <span>Save Staff Updates</span>
               </button>
@@ -1065,52 +1065,52 @@ export default function TeacherRegistry() {
       {/* Direct Staff Credentials Review Modal */}
       {viewingCredentialsTeacher && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
-          <div className="bg-gray-800 border border-gray-700 rounded-3xl max-w-md w-full p-6 text-gray-100 shadow-2xl space-y-4 relative">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 text-slate-900 shadow-2xl space-y-4 relative">
             <button
               onClick={() => setViewingCredentialsTeacher(null)}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white rounded-lg bg-gray-900 border border-gray-700 cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white rounded-lg bg-slate-50 border border-slate-200 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-2xl bg-gray-900 text-amber-400 border border-gray-700">
+              <div className="p-3 rounded-xl bg-slate-50 text-blue-600 border border-slate-200">
                 <KeyRound className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-50">Staff Login Dossier</h3>
-                <p className="text-xs text-gray-400">Official authentication details for staff access.</p>
+                <h3 className="text-base font-bold text-slate-900">Staff Login Dossier</h3>
+                <p className="text-xs text-slate-500">Official authentication details for staff access.</p>
               </div>
             </div>
 
-            <div className="p-4 bg-gray-900 border border-gray-700 rounded-2xl font-mono text-xs space-y-3 text-gray-300">
-              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
-                <span className="text-gray-400 font-sans text-[11px]">Staff Name:</span>
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs space-y-3 text-slate-700">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="text-slate-500 font-sans text-[11px]">Staff Name:</span>
                 <strong className="text-white text-xs">{viewingCredentialsTeacher.full_name}</strong>
               </div>
 
-              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
-                <span className="text-gray-400 font-sans text-[11px]">Staff / Teacher ID:</span>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="text-slate-500 font-sans text-[11px]">Staff / Teacher ID:</span>
                 <div className="flex items-center gap-1.5">
-                  <strong className="text-amber-400">{viewingCredentialsTeacher.teacher_id_code}</strong>
+                  <strong className="text-blue-600">{viewingCredentialsTeacher.teacher_id_code}</strong>
                   <button
                     type="button"
                     onClick={() => copyTextToClipboard(viewingCredentialsTeacher.teacher_id_code, 'dossier-id')}
-                    className="p-1 hover:text-amber-400 text-gray-400 transition"
+                    className="p-1 hover:text-blue-600 text-slate-500 transition"
                   >
                     {copiedField === 'dossier-id' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pb-2 border-b border-gray-800">
-                <span className="text-gray-400 font-sans text-[11px]">Portal Username:</span>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="text-slate-500 font-sans text-[11px]">Portal Username:</span>
                 <div className="flex items-center gap-1.5">
-                  <strong className="text-gray-100">{viewingCredentialsTeacher.username}</strong>
+                  <strong className="text-slate-900">{viewingCredentialsTeacher.username}</strong>
                   <button
                     type="button"
                     onClick={() => copyTextToClipboard(viewingCredentialsTeacher.username, 'dossier-user')}
-                    className="p-1 hover:text-amber-400 text-gray-400 transition"
+                    className="p-1 hover:text-blue-600 text-slate-500 transition"
                   >
                     {copiedField === 'dossier-user' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
@@ -1118,7 +1118,7 @@ export default function TeacherRegistry() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 font-sans text-[11px]">Access Password:</span>
+                <span className="text-slate-500 font-sans text-[11px]">Access Password:</span>
                 <div className="flex items-center gap-1.5">
                   <strong className="text-rose-300 text-sm font-bold tracking-wider">
                     {Boolean(visiblePasswords[viewingCredentialsTeacher.id])
@@ -1128,11 +1128,11 @@ export default function TeacherRegistry() {
                   <button
                     type="button"
                     onClick={() => togglePasswordVisibility(viewingCredentialsTeacher.id)}
-                    className="p-1 hover:text-amber-400 text-gray-400 transition"
+                    className="p-1 hover:text-blue-600 text-slate-500 transition"
                     title={Boolean(visiblePasswords[viewingCredentialsTeacher.id]) ? 'Hide password' : 'Show password'}
                   >
                     {Boolean(visiblePasswords[viewingCredentialsTeacher.id]) ? (
-                      <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                      <EyeOff className="w-3.5 h-3.5 text-blue-600" />
                     ) : (
                       <Eye className="w-3.5 h-3.5" />
                     )}
@@ -1140,7 +1140,7 @@ export default function TeacherRegistry() {
                   <button
                     type="button"
                     onClick={() => copyTextToClipboard(viewingCredentialsTeacher.password_hash, 'dossier-pass')}
-                    className="p-1 hover:text-amber-400 text-gray-400 transition"
+                    className="p-1 hover:text-blue-600 text-slate-500 transition"
                   >
                     {copiedField === 'dossier-pass' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
@@ -1149,7 +1149,7 @@ export default function TeacherRegistry() {
             </div>
 
             <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-300 flex items-start gap-2">
-              <KeyRound className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <KeyRound className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <span>
                 Staff can log in to the Academic Hub using either their <strong>Teacher ID</strong> (<code>{viewingCredentialsTeacher.teacher_id_code}</code>) or <strong>Username</strong> with their access password.
               </span>
@@ -1162,7 +1162,7 @@ export default function TeacherRegistry() {
                   const summary = `Staff Credentials:\nName: ${viewingCredentialsTeacher.full_name}\nTeacher ID: ${viewingCredentialsTeacher.teacher_id_code}\nUsername: ${viewingCredentialsTeacher.username}\nPassword: ${viewingCredentialsTeacher.password_hash}\nLogin URL: ${window?.location?.origin || ''}/login`;
                   copyTextToClipboard(summary, 'dossier-all');
                 }}
-                className="py-2.5 rounded-xl bg-gray-900 hover:bg-gray-700 text-amber-400 border border-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                className="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-blue-600 border border-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
                 {copiedField === 'dossier-all' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                 <span>{copiedField === 'dossier-all' ? 'Copied Slip!' : 'Copy Full Slip'}</span>
@@ -1171,7 +1171,7 @@ export default function TeacherRegistry() {
               <button
                 type="button"
                 onClick={() => setViewingCredentialsTeacher(null)}
-                className="py-2.5 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 border border-rose-800 font-bold text-xs transition cursor-pointer"
+                className="py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 border border-blue-600 font-bold text-xs transition cursor-pointer"
               >
                 Done
               </button>
@@ -1183,23 +1183,23 @@ export default function TeacherRegistry() {
       {/* Copyable Credentials Popup */}
       {newCredentialsModal && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
-          <div className="bg-gray-800 border border-gray-700 rounded-3xl max-w-md w-full p-6 text-gray-100 shadow-2xl space-y-4 relative">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 text-slate-900 shadow-2xl space-y-4 relative">
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-2xl bg-gray-900 text-amber-400 border border-gray-700">
+              <div className="p-3 rounded-xl bg-slate-50 text-blue-600 border border-slate-200">
                 <KeyRound className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-50">
+                <h3 className="text-base font-bold text-slate-900">
                   {newCredentialsModal.isReset ? 'Credentials Revoked & Reset' : 'Teacher Registered Successfully'}
                 </h3>
-                <p className="text-xs text-gray-400">Secure staff login credentials generated.</p>
+                <p className="text-xs text-slate-500">Secure staff login credentials generated.</p>
               </div>
             </div>
 
-            <div className="p-4 bg-gray-900 border border-gray-700 rounded-2xl font-mono text-xs space-y-2 text-gray-300">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs space-y-2 text-slate-700">
               <div>Staff: <strong className="text-white">{newCredentialsModal.teacherName}</strong></div>
-              <div>Teacher ID: <strong className="text-amber-400">{newCredentialsModal.teacherIdCode}</strong></div>
-              <div>Username: <strong className="text-gray-100">{newCredentialsModal.username}</strong></div>
+              <div>Teacher ID: <strong className="text-blue-600">{newCredentialsModal.teacherIdCode}</strong></div>
+              <div>Username: <strong className="text-slate-900">{newCredentialsModal.username}</strong></div>
               <div>Password: <strong className="text-rose-300">{newCredentialsModal.password}</strong></div>
             </div>
 
@@ -1207,7 +1207,7 @@ export default function TeacherRegistry() {
               <button
                 type="button"
                 onClick={copyCredentials}
-                className="py-2.5 rounded-xl bg-gray-900 hover:bg-gray-700 text-amber-400 border border-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                className="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-blue-600 border border-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
                 {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                 <span>{copied ? 'Copied!' : 'Copy Info'}</span>
@@ -1216,7 +1216,7 @@ export default function TeacherRegistry() {
               <button
                 type="button"
                 onClick={() => setNewCredentialsModal(null)}
-                className="py-2.5 rounded-xl bg-rose-900 hover:bg-rose-800 text-gray-50 border border-rose-800 font-bold text-xs transition cursor-pointer"
+                className="py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 border border-blue-600 font-bold text-xs transition cursor-pointer"
               >
                 Done
               </button>

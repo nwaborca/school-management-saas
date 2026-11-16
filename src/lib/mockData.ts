@@ -16,14 +16,14 @@ import {
 } from '@/types';
 
 export const SCHOOL_INFO = {
-  name: 'Apex Academy Nigeria',
+  name: 'Aegis Academy',
   motto: 'Excellence, Character, and Innovation',
   session: '2025/2026',
   academic_year: '2025/2026',
   term: '1st Term',
   address: 'Plot 12, Admiralty Way, Lekki Phase 1, Lagos, Nigeria',
   contact_phone: '+2348033479547',
-  contact_email: 'admissions@apexacademy.sch.ng',
+  contact_email: 'admin@aegisschools.ng',
   principal_name: 'School Administrator',
   currency_code: 'NGN',
   currency_symbol: '₦',

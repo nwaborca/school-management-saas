@@ -447,30 +447,30 @@ export default function AcademicHubPage() {
 
   if (!isAuthReady) {
     return (
-      <div className="min-h-screen bg-[#0B0F19] text-gray-200 flex flex-col items-center justify-center p-4">
-        <div className="flex items-center gap-3 bg-[#111827] border border-gray-800 px-5 py-3 rounded-2xl shadow-xl">
-          <RefreshCw className="w-5 h-5 text-amber-500 animate-spin" />
-          <span className="text-sm font-medium text-gray-300">Synchronizing Session...</span>
+      <div className="min-h-screen bg-[#F8FAFC] text-slate-700 flex flex-col items-center justify-center p-4">
+        <div className="flex items-center gap-3 bg-white border border-slate-200 px-5 py-3 rounded-lg shadow-xs">
+          <RefreshCw className="w-5 h-5 text-[#1D4ED8] animate-spin" />
+          <span className="text-sm font-medium text-slate-700">Synchronizing Session...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] p-4 sm:p-6 lg:p-8">
       <AnimatedContent distance={100} direction="vertical" duration={0.8} ease="power3.out" blur={0} stagger={0.08} threshold={0.1}>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200">
           <div>
-            <div className="flex items-center gap-2 text-amber-500 text-xs font-semibold uppercase tracking-wider mb-1">
+            <div className="flex items-center gap-2 text-[#1D4ED8] text-xs font-semibold uppercase tracking-wider mb-1">
               <BookOpen className="w-4 h-4 text-amber-500" />
               <span>Nigerian Curriculum & Examination Matrix (WAEC / NECO Standards)</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-gray-50 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight">
               Faculty Academic Hub
             </h1>
-            <p className="text-gray-400 text-xs sm:text-sm mt-1">
+            <p className="text-slate-500 text-xs sm:text-sm mt-1">
               Continuous Assessment (CA1: 20, CA2: 20, Exam: 60 = 100) • Subject Grading & Form Broadsheet
             </p>
           </div>
@@ -478,12 +478,12 @@ export default function AcademicHubPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Offline Sync State Indicator */}
             {isOnline ? (
-              <span className="px-3.5 py-1.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800 text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+              <span className="px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5 shadow-xs">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 <span>Online • Synced to Cloud</span>
               </span>
             ) : (
-              <span className="px-3.5 py-1.5 rounded-full bg-amber-950/90 text-amber-300 border border-amber-700 text-xs font-semibold flex items-center gap-1.5 shadow-sm animate-pulse">
+              <span className="px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold flex items-center gap-1.5 shadow-xs">
                 <WifiOff className="w-4 h-4 text-amber-400" />
                 <span>Offline Mode • Saved to Local Cache ({pendingQueue.length} pending updates)</span>
               </span>
@@ -492,7 +492,7 @@ export default function AcademicHubPage() {
             {isOnline && pendingQueue.length > 0 && (
               <button
                 onClick={flushSyncQueue}
-                className="px-3 py-1.5 rounded-full bg-amber-600/80 hover:bg-amber-600 text-amber-100 border border-amber-500 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                className="px-3 py-1.5 rounded-full bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer"
                 title="Push queued scores to server"
               >
                 <CloudUpload className="w-3.5 h-3.5 animate-bounce" />
@@ -500,13 +500,13 @@ export default function AcademicHubPage() {
               </button>
             )}
 
-            <span className="px-3.5 py-1.5 rounded-full bg-gray-800 text-amber-300 border border-gray-700 text-xs font-semibold flex items-center gap-1.5">
+            <span className="px-3.5 py-1.5 rounded-full bg-white text-slate-800 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-xs">
               <GraduationCap className="w-4 h-4 text-amber-400" />
               <span>Faculty: {teacherName}</span>
             </span>
 
             {formClass && (
-              <span className="px-3 py-1.5 rounded-full bg-rose-900/60 text-rose-200 border border-rose-800 text-xs font-semibold flex items-center gap-1.5">
+              <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-amber-400" />
                 <span>Form Teacher: {formClass.name}</span>
               </span>
@@ -515,13 +515,13 @@ export default function AcademicHubPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-800 gap-4 overflow-x-auto">
+        <div className="flex border-b border-slate-200 gap-4 overflow-x-auto">
           <button
             onClick={() => setActiveTab('entry')}
             className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'entry'
-                ? 'border-amber-500 text-amber-400'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-[#1D4ED8] text-[#1D4ED8] font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
             <CheckSquare className="w-4 h-4" />
@@ -533,8 +533,8 @@ export default function AcademicHubPage() {
               onClick={() => setActiveTab('form_roster')}
               className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 activeTab === 'form_roster'
-                  ? 'border-amber-500 text-amber-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-200'
+                  ? 'border-[#1D4ED8] text-[#1D4ED8] font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
@@ -546,8 +546,8 @@ export default function AcademicHubPage() {
             onClick={() => setActiveTab('enroll_student')}
             className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'enroll_student'
-                ? 'border-amber-500 text-amber-400'
-                : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-[#1D4ED8] text-[#1D4ED8] font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
             <UserPlus className="w-4 h-4" />
@@ -559,9 +559,9 @@ export default function AcademicHubPage() {
         {activeTab === 'entry' && (
           <div className="space-y-6">
             {/* Filter Controls Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-gray-800 border border-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
                   <span>Grading Subject (NERDC):</span>
                   {currentUser?.role === 'teacher' && (
                     <span className="text-[10px] text-amber-400 font-mono">Assigned</span>
@@ -570,7 +570,7 @@ export default function AcademicHubPage() {
                 <select
                   value={selectedSubjectId}
                   onChange={(e) => setSelectedSubjectId(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-transparent cursor-pointer"
                 >
                   {teacherSubjects.map((sub) => (
                     <option key={sub.id} value={sub.id}>
@@ -581,7 +581,7 @@ export default function AcademicHubPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
                   <span>Target Class / Scope:</span>
                   {currentClass?.stage === 'senior_secondary' && (
                     <span className="text-[10px] text-amber-400 uppercase font-bold">
@@ -592,7 +592,7 @@ export default function AcademicHubPage() {
                 <select
                   value={selectedClassId}
                   onChange={(e) => setSelectedClassId(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-transparent cursor-pointer"
                 >
                   <option value="all">
                     ⭐ All Classes & Arms Offering {currentSubject?.name || 'Subject'} ({classesOfferingSubject.length} Arms)
@@ -606,13 +606,13 @@ export default function AcademicHubPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Academic Term:
                 </label>
                 <select
                   value={selectedTerm}
                   onChange={(e) => setSelectedTerm(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl p-2.5 text-xs text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-transparent cursor-pointer"
                 >
                   <option value="1st Term">1st Term</option>
                   <option value="2nd Term">2nd Term</option>
@@ -623,34 +623,34 @@ export default function AcademicHubPage() {
 
             {/* Quick Metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 bg-gray-800 border border-gray-700 rounded-xl text-center">
-                <span className="text-[11px] text-gray-400 font-medium">Enrolled in Subject</span>
-                <p className="text-xl font-black text-gray-100">{classStudents.length}</p>
+              <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
+                <span className="text-xs text-slate-500 font-medium">Enrolled in Subject</span>
+                <p className="text-2xl font-extrabold text-slate-900 tabular-nums">{classStudents.length}</p>
               </div>
-              <div className="p-3 bg-gray-800 border border-gray-700 rounded-xl text-center">
-                <span className="text-[11px] text-gray-400 font-medium">Subject Average</span>
-                <p className="text-xl font-black text-amber-400">{classAverage}%</p>
+              <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
+                <span className="text-xs text-slate-500 font-medium">Subject Average</span>
+                <p className="text-2xl font-extrabold text-slate-900 tabular-nums">{classAverage}%</p>
               </div>
-              <div className="p-3 bg-gray-800 border border-gray-700 rounded-xl text-center">
-                <span className="text-[11px] text-gray-400 font-medium">Highest / Lowest</span>
-                <p className="text-xl font-black text-gray-100">
+              <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
+                <span className="text-xs text-slate-500 font-medium">Highest / Lowest</span>
+                <p className="text-2xl font-extrabold text-slate-900 tabular-nums">
                   {highestScore}% <span className="text-xs text-gray-500">/ {lowestScore}%</span>
                 </p>
               </div>
-              <div className="p-3 bg-gray-800 border border-gray-700 rounded-xl text-center">
-                <span className="text-[11px] text-gray-400 font-medium">Pass Rate (≥50%)</span>
-                <p className="text-xl font-black text-rose-400">{passRate}%</p>
+              <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
+                <span className="text-xs text-slate-500 font-medium">Pass Rate (≥50%)</span>
+                <p className="text-2xl font-extrabold text-emerald-700 tabular-nums">{passRate}%</p>
               </div>
             </div>
 
             {/* Spreadsheet-Like Score Entry Grid */}
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl overflow-hidden">
-              <div className="p-4 border-b border-gray-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-900/60">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <div className="p-4 border-b border-gray-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50">
                 <div>
-                  <h3 className="font-bold text-gray-100 text-sm">
+                  <h3 className="font-bold text-slate-900 text-sm">
                     {currentSubject?.name} — {selectedClassId === 'all' ? 'All Classes Offering Subject' : currentClass?.name}
                   </h3>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-slate-500">
                     Enter scores: CA1 (Max 20) + CA2 (Max 20) + Terminal Exam (Max 60) = 100%
                   </p>
                 </div>
@@ -669,7 +669,7 @@ export default function AcademicHubPage() {
                   <button
                     onClick={handleSaveGrades}
                     disabled={isSaving}
-                    className="px-4 py-2 rounded-xl bg-rose-900 hover:bg-rose-800 disabled:opacity-50 text-gray-50 font-bold text-xs flex items-center gap-2 border border-rose-800 transition cursor-pointer"
+                    className="px-4 py-2 rounded-xl px-4 py-2 rounded-lg bg-[#0F172A] hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-xs flex items-center gap-2 transition cursor-pointer shadow-xs"
                   >
                     {isSaving ? (
                       <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />
@@ -690,7 +690,7 @@ export default function AcademicHubPage() {
                   {/* Desktop Table View */}
                   <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-gray-900 text-gray-400 uppercase tracking-wider text-[11px] border-b border-gray-700">
+                      <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider text-[11px] border-b border-slate-200 font-semibold">
                         <tr>
                           <th className="px-4 py-3">Student Name</th>
                           <th className="px-4 py-3">Class / Arm</th>
@@ -703,7 +703,7 @@ export default function AcademicHubPage() {
                           <th className="px-4 py-3">Remark</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-700">
+                      <tbody className="divide-y divide-slate-100">
                         {classStudents.map((std) => {
                           const result = results.find(
                             (r) =>
@@ -722,24 +722,24 @@ export default function AcademicHubPage() {
 
                           const gradeBadge =
                             grade === 'A'
-                              ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold'
                               : grade === 'B'
-                              ? 'bg-amber-950/60 text-amber-300 border border-amber-800'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200 font-bold'
                               : grade === 'C'
-                              ? 'bg-gray-900 text-gray-200 border border-gray-700'
-                              : 'bg-rose-950/60 text-rose-400 border border-rose-800';
+                              ? 'bg-slate-100 text-slate-700 border border-slate-200 font-bold'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200 font-bold';
 
                           const studentClass = classes.find((c) => c.id === std.class_id);
 
                           return (
-                            <tr key={std.id} className="hover:bg-gray-750 transition">
-                              <td className="px-4 py-3 font-semibold text-gray-100">{std.full_name}</td>
+                            <tr key={std.id} className="hover:bg-slate-50/80 transition">
+                              <td className="px-4 py-3 font-semibold text-slate-900">{std.full_name}</td>
                               <td className="px-4 py-3">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-900 text-amber-300 border border-gray-700">
+                                <span className="px-2 py-0.5 rounded text-[11px] font-medium text-slate-600">
                                   {studentClass?.name || std.class_grade || 'Class'}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 font-mono text-gray-400">{std.reg_number}</td>
+                              <td className="px-4 py-3 font-mono tabular-nums text-slate-500">{std.reg_number}</td>
 
                               <td className="px-4 py-3 text-center">
                                 <input
@@ -748,7 +748,7 @@ export default function AcademicHubPage() {
                                   max="20"
                                   value={ca1}
                                   onChange={(e) => handleScoreInput(std.id, std.class_id, 'ca1', Number(e.target.value))}
-                                  className="w-16 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                  className="w-16 bg-white border border-slate-300 rounded-md py-1.5 px-2 text-center font-mono tabular-nums font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-transparent"
                                 />
                               </td>
 
@@ -759,7 +759,7 @@ export default function AcademicHubPage() {
                                   max="20"
                                   value={ca2}
                                   onChange={(e) => handleScoreInput(std.id, std.class_id, 'ca2', Number(e.target.value))}
-                                  className="w-16 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                  className="w-16 bg-white border border-slate-300 rounded-md py-1.5 px-2 text-center font-mono tabular-nums font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-transparent"
                                 />
                               </td>
 
@@ -770,12 +770,12 @@ export default function AcademicHubPage() {
                                   max="60"
                                   value={exam}
                                   onChange={(e) => handleScoreInput(std.id, std.class_id, 'exam', Number(e.target.value))}
-                                  className="w-20 bg-gray-900 border border-gray-700 rounded-lg py-1.5 px-2 text-center font-mono font-bold text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                  className="w-20 bg-white border border-slate-300 rounded-md py-1.5 px-2 text-center font-mono tabular-nums font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-transparent"
                                 />
                               </td>
 
                               <td className="px-4 py-3 text-center">
-                                <span className="font-mono font-extrabold text-sm text-gray-100">{total}</span>
+                                <span className="font-mono tabular-nums font-extrabold text-sm text-slate-900">{total}</span>
                               </td>
 
                               <td className="px-4 py-3 text-center">
@@ -784,7 +784,7 @@ export default function AcademicHubPage() {
                                 </span>
                               </td>
 
-                              <td className="px-4 py-3 text-gray-300 text-xs italic">{remark}</td>
+                              <td className="px-4 py-3 text-slate-500 text-xs">{remark}</td>
                             </tr>
                           );
                         })}
@@ -793,7 +793,7 @@ export default function AcademicHubPage() {
                   </div>
 
                   {/* Mobile Stacked Score Card View */}
-                  <div className="block md:hidden divide-y divide-gray-700 p-3 space-y-4">
+                  <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-4">
                     {classStudents.map((std) => {
                       const result = results.find(
                         (r) =>
@@ -812,12 +812,12 @@ export default function AcademicHubPage() {
 
                       const gradeBadge =
                         grade === 'A'
-                          ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold'
                           : grade === 'B'
-                          ? 'bg-amber-950/60 text-amber-300 border border-amber-800'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200 font-bold'
                           : grade === 'C'
-                          ? 'bg-gray-900 text-gray-200 border border-gray-700'
-                          : 'bg-rose-950/60 text-rose-400 border border-rose-800';
+                          ? 'bg-slate-100 text-slate-700 border border-slate-200 font-bold'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200 font-bold';
 
                       const studentClass = classes.find((c) => c.id === std.class_id);
 
@@ -825,7 +825,7 @@ export default function AcademicHubPage() {
                         <div key={std.id} className="pt-3 first:pt-0 space-y-2.5">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <h4 className="font-bold text-gray-100 text-sm">{std.full_name}</h4>
+                              <h4 className="font-bold text-slate-900 text-sm">{std.full_name}</h4>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-[10px] text-gray-400 font-mono">{std.reg_number}</span>
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-900 text-amber-300 border border-gray-700">
@@ -841,7 +841,7 @@ export default function AcademicHubPage() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2 bg-gray-900/60 p-2.5 rounded-xl border border-gray-700/70">
+                          <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-gray-700/70">
                             <div>
                               <label className="block text-[10px] text-gray-400 font-medium mb-1">CA 1 (20)</label>
                               <input
@@ -888,7 +888,7 @@ export default function AcademicHubPage() {
             </div>
 
             {/* WAEC / NECO Standards Guide */}
-            <div className="p-4 rounded-2xl bg-gray-800 border border-gray-700 text-xs text-gray-400 flex flex-wrap items-center justify-between gap-4">
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs text-xs text-slate-500 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-1.5 text-gray-200 font-semibold">
                 <HelpCircle className="w-4 h-4 text-amber-500" />
                 <span>WAEC / NECO Official Assessment Key:</span>
@@ -907,13 +907,13 @@ export default function AcademicHubPage() {
         {/* TAB 2: BROADSHEET */}
         {activeTab === 'form_roster' && formClass && (
           <div className="space-y-6">
-            <div className="p-4 bg-gray-800 border border-gray-700 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-gray-50 text-base flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                   <FileSpreadsheet className="w-5 h-5 text-amber-500" />
                   <span>Master Broadsheet: {formClass.name}</span>
                 </h3>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-slate-500">
                   Form Teacher terminal score overview across all subjects taught to your class • Zero-lag client-rendered.
                 </p>
               </div>
@@ -927,13 +927,13 @@ export default function AcademicHubPage() {
               </div>
             </div>
 
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl overflow-hidden shadow-lg">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shadow-lg">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-900 text-gray-400 uppercase tracking-wider text-[11px] border-b border-gray-700">
+                  <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider text-[11px] border-b border-slate-200 font-semibold">
                     <tr>
                       <th className="px-3 py-3 text-center w-12">Pos</th>
-                      <th className="px-4 py-3 sticky left-0 bg-gray-900 z-10">Student</th>
+                      <th className="px-4 py-3 sticky left-0 bg-slate-50 z-10">Student</th>
                       <th className="px-4 py-3">Reg No</th>
                       {formClassSubjects.map((sub) => (
                         <th key={sub.id} className="px-3 py-3 text-center whitespace-nowrap">
@@ -946,7 +946,7 @@ export default function AcademicHubPage() {
                       <th className="px-4 py-3 text-center">Standing</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-700">
+                  <tbody className="divide-y divide-slate-100">
                     {broadsheetData.rows.length === 0 ? (
                       <tr>
                         <td colSpan={formClassSubjects.length + 7} className="text-center py-8 text-gray-400 italic">
@@ -957,32 +957,32 @@ export default function AcademicHubPage() {
                       broadsheetData.rows.map((row) => {
                         const gradeBadge =
                           row.grade === 'A'
-                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold'
                             : row.grade === 'B'
-                            ? 'bg-amber-950/60 text-amber-300 border border-amber-800'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200 font-bold'
                             : row.grade === 'C'
-                            ? 'bg-gray-900 text-gray-200 border border-gray-700'
-                            : 'bg-rose-950/60 text-rose-400 border border-rose-800';
+                            ? 'bg-slate-100 text-slate-700 border border-slate-200 font-bold'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200 font-bold';
 
                         return (
-                          <tr key={row.student.id} className="hover:bg-gray-750 transition">
+                          <tr key={row.student.id} className="hover:bg-slate-50/80 transition">
                             <td className="px-3 py-3 text-center font-mono font-bold text-gray-300">
                               <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs ${
                                 row.position === 1
-                                  ? 'bg-amber-500/20 text-amber-400 font-extrabold border border-amber-500/40'
+                                  ? 'bg-amber-100 text-amber-800 font-extrabold border border-amber-300'
                                   : row.position === 2
-                                  ? 'bg-gray-400/20 text-gray-200 font-bold border border-gray-400/40'
+                                  ? 'bg-slate-200 text-slate-800 font-bold border border-slate-300'
                                   : row.position === 3
-                                  ? 'bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40'
+                                  ? 'bg-amber-50 text-amber-900 font-bold border border-amber-200'
                                   : 'text-gray-400'
                               }`}>
                                 {row.position}
                               </span>
                             </td>
-                            <td className="px-4 py-3 font-semibold text-gray-100 sticky left-0 bg-gray-800 z-10">
+                            <td className="px-4 py-3 font-semibold text-slate-900 sticky left-0 bg-white z-10">
                               {row.student.full_name}
                             </td>
-                            <td className="px-4 py-3 font-mono text-gray-400">{row.student.reg_number}</td>
+                            <td className="px-4 py-3 font-mono tabular-nums text-slate-500">{row.student.reg_number}</td>
 
                             {row.subjectScores.map((scoreItem) => (
                               <td key={scoreItem.subjectId} className="px-3 py-3 text-center font-mono text-gray-300">
@@ -1003,8 +1003,8 @@ export default function AcademicHubPage() {
                               <span
                                 className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                                   row.isGoodStanding
-                                    ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
-                                    : 'bg-rose-950/60 text-rose-400 border border-rose-800'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold'
+                                    : 'bg-rose-50 text-rose-700 border border-rose-200 font-bold'
                                 }`}
                               >
                                 {row.count > 0 ? (row.isGoodStanding ? 'Good Standing' : 'At Risk') : 'No Scores'}

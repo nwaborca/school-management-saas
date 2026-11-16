@@ -213,7 +213,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [receipts, setReceipts] = useState<PaymentReceipt[]>(INITIAL_RECEIPTS);
   const [transactions, setTransactions] = useState<PaymentTransaction[]>(INITIAL_TRANSACTIONS);
   const [teachers, setTeachers] = useState<TeacherProfile[]>(INITIAL_TEACHERS);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [resultsPublished, setResultsPublished] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -228,23 +228,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Avoid unnecessary re-fetch loops
   const isFetchingRef = useRef(false);
 
-  // Permanently locked to rich matte dark theme
+  // Default to clean high-contrast light enterprise theme
   useEffect(() => {
     try {
-      setTheme('dark');
-      localStorage.setItem('apex_theme', 'dark');
-      document.documentElement.classList.remove('light');
-      document.documentElement.classList.add('dark');
+      setTheme('light');
+      localStorage.setItem('apex_theme', 'light');
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
     } catch {}
   }, []);
 
   const toggleTheme = () => {
-    // Theme is permanently locked to matte dark mode
-    setTheme('dark');
-    document.documentElement.classList.remove('light');
-    document.documentElement.classList.add('dark');
+    setTheme('light');
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
     try {
-      localStorage.setItem('apex_theme', 'dark');
+      localStorage.setItem('apex_theme', 'light');
     } catch {}
   };
 

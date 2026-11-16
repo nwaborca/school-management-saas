@@ -3,105 +3,41 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #0B0F19;
-  --foreground: #F9FAFB;
-}
-
-.dark {
-  --background: #0B0F19;
-  --foreground: #F9FAFB;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), "Inter", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
 }
 
 body {
-  background: #0B0F19;
-  color: #F9FAFB;
+  background: #F8FAFC;
+  color: #0F172A;
   min-height: 100vh;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* 
- * Permanent Matte Dark Theme:
- * - Solid deep matte background: #0B0F19
- * - Card surfaces & elevated panels: #111827 / #1F2937
- * - Crisp low-profile borders: #1F2937 (border-gray-800)
- * - Typography: High-contrast headings (white), muted body (text-gray-300 / text-gray-400)
- * - Accents: Academic Burgundy (#881337) and Gold (#D97706)
- */
-
-.bg-gray-800,
-.dark .bg-gray-800 {
-  background-color: #1F2937 !important;
+/* Linear & Stripe Style Enterprise Data Table & Surface System */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
-.bg-gray-900,
-.dark .bg-gray-900 {
-  background-color: #111827 !important;
+/* Crisp Clean Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-
-.bg-gray-950,
-.dark .bg-gray-950 {
-  background-color: #0B0F19 !important;
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
 }
-
-/* Borders */
-.border-gray-700,
-.border-gray-800,
-.dark .border-gray-700,
-.dark .border-gray-800 {
-  border-color: rgba(31, 41, 55, 0.85) !important;
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
 }
-
-.divide-gray-700 > :not([hidden]) ~ :not([hidden]),
-.divide-gray-800 > :not([hidden]) ~ :not([hidden]) {
-  border-color: rgba(31, 41, 55, 0.85) !important;
-}
-
-/* Form Controls */
-input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea {
-  background-color: #111827 !important;
-  color: #F9FAFB !important;
-  border-color: #1F2937 !important;
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: #6B7280 !important;
-}
-
-/* Table Headers */
-thead th {
-  background-color: #111827 !important;
-  color: #9CA3AF !important;
-  border-color: #1F2937 !important;
-}
-
-/* Hover States */
-.hover\:bg-gray-700:hover,
-.hover\:bg-gray-750:hover,
-.hover\:bg-gray-800:hover {
-  background-color: #242E42 !important;
-}
-
-/* Sticky Columns */
-td.sticky,
-th.sticky {
-  background-color: #111827 !important;
-}
-
-/* Interactive Buttons */
-button.bg-rose-900 {
-  background-color: #881337 !important;
-  border-color: #9f1239 !important;
-}
-
-button.bg-rose-900:hover {
-  background-color: #9f1239 !important;
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }

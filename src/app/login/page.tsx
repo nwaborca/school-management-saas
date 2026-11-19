@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import Link from 'next/link';
 import {
   GraduationCap,
   ArrowRight,
@@ -13,13 +14,16 @@ import {
   FileSpreadsheet,
   Users,
   CreditCard,
+  Building2,
+  Sparkles,
 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { loginStudent, loginStaff, schoolInfo } = useApp();
+  const { loginStudent, loginStaff, schoolInfo, currentSchool } = useApp();
 
   const [activeTab, setActiveTab] = useState<'student' | 'staff'>('student');
+  const [inviteCode, setInviteCode] = useState('');
   const [regNumber, setRegNumber] = useState('');
   const [pin, setPin] = useState('');
   const [username, setUsername] = useState('');
@@ -33,7 +37,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await loginStudent(regNumber, pin);
+      const res = await loginStudent(regNumber, pin, inviteCode);
       if (res.success) {
         router.replace('/student-hub');
       } else {
@@ -52,7 +56,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await loginStaff(username, password);
+      const res = await loginStaff(username, password, inviteCode);
       if (res.success) {
         const targetRoute = res.role === 'admin' ? '/admin-hub' : '/academic-hub';
         router.replace(targetRoute);
@@ -122,6 +126,24 @@ export default function LoginPage() {
               <span>{error}</span>
             </div>
           )}
+
+          {/* Optional Multi-Tenant School Invite Code Identifier */}
+          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+            <label className="flex items-center justify-between text-xs font-semibold text-[#0F172A]">
+              <span className="flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                <span>School Invite Code (Optional)</span>
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">Default: AEGIS-2026</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. AEGIS-XXXX (leave empty for default campus)"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs font-mono tracking-wider text-[#0F172A] uppercase placeholder:text-slate-400 placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+            />
+          </div>
 
           {activeTab === 'student' ? (
             <form onSubmit={handleStudentLogin} className="space-y-4">
@@ -209,6 +231,18 @@ export default function LoginPage() {
               </button>
             </form>
           )}
+
+          {/* Register New School Prompt */}
+          <div className="pt-2 text-center">
+            <span className="text-xs text-slate-500">New institution? </span>
+            <Link
+              href="/register-school"
+              className="text-xs font-bold text-[#1D4ED8] hover:underline inline-flex items-center gap-1"
+            >
+              <span>Register Your School</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
 
           {/* Subdued Security Notice */}
           <div className="pt-4 border-t border-slate-200 text-center">

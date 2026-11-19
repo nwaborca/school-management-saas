@@ -19,9 +19,22 @@ export interface School {
   created_at: string;
 }
 
+export interface RegisterSchoolPayload {
+  schoolName: string;
+  adminFullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 export interface AuthUser {
   id: string;
   school_id?: string;
+  school_name?: string;
+  invite_code?: string;
   reg_number?: string;
   username?: string;
   full_name: string;

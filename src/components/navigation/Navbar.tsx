@@ -15,12 +15,14 @@ import {
   KeyRound,
   CheckCircle2,
   AlertCircle,
+  Building2,
+  PlusCircle,
 } from 'lucide-react';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { schoolInfo, currentUser, isAuthenticated, logout, updateAdminPassword } = useApp();
+  const { schoolInfo, currentSchool, currentUser, isAuthenticated, logout, updateAdminPassword } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
@@ -73,9 +75,16 @@ export function Navbar() {
               <GraduationCap className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-base font-bold tracking-tight text-[#0F172A] flex items-center gap-1.5">
-                {schoolInfo.name}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold tracking-tight text-[#0F172A]">
+                  {currentSchool?.name || schoolInfo.name}
+                </span>
+                {currentSchool?.invite_code && (
+                  <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    {currentSchool.invite_code}
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-slate-500 font-medium">
                 {schoolInfo.motto}
               </p>
@@ -141,13 +150,22 @@ export function Navbar() {
               </button>
             </div>
           ) : (
-            <Link
-              href="/login"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Sign In</span>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/register-school"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-700 hover:text-slate-900 hover:bg-slate-50 text-xs font-semibold transition cursor-pointer border border-slate-200"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-blue-600" />
+                <span>Register School</span>
+              </Link>
+              <Link
+                href="/login"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </Link>
+            </div>
           )}
         </div>
 

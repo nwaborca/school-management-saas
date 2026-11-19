@@ -5,6 +5,7 @@ import {
   AuthUser,
   UserRole,
   School,
+  RegisterSchoolPayload,
   StaffAttendance,
   PickupPass,
   AcademicClass,
@@ -59,9 +60,18 @@ interface AppContextType {
   staffAttendance: StaffAttendance[];
   pickupPasses: PickupPass[];
 
+  // Multi-Tenant School Registration & Management
+  registerSchool: (payload: RegisterSchoolPayload) => Promise<{
+    success: boolean;
+    school?: School;
+    inviteCode?: string;
+    error?: string;
+  }>;
+  setCurrentSchoolById: (schoolId: string) => void;
+
   // Auth
-  loginStudent: (regNumber: string, pin: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
-  loginStaff: (username: string, pass: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
+  loginStudent: (regNumber: string, pin: string, inviteCode?: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
+  loginStaff: (username: string, pass: string, inviteCode?: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
   logout: () => void;
 
   // Teacher Score Entry Portal
@@ -434,16 +444,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Live Cloud Fetch from Supabase with granular per-query error isolation
-  const fetchLiveData = useCallback(async () => {
+  const fetchLiveData = useCallback(async (targetSchoolId?: string) => {
     if (!isSupabaseConfigured() || isFetchingRef.current) return;
     isFetchingRef.current = true;
     try {
-      // 1. Ensure core classes exist in Supabase so foreign keys and dropdowns never fail
+      const activeSchoolId = targetSchoolId || currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+
+      // 1. Ensure core classes exist in Supabase for default school so foreign keys never fail
       try {
-        const { data: existingClasses, error: classSelectErr } = await supabase.from('classes').select('id');
+        const { data: existingClasses, error: classSelectErr } = await supabase
+          .from('classes')
+          .select('id')
+          .eq('school_id', activeSchoolId);
         if (!classSelectErr && (!existingClasses || existingClasses.length === 0)) {
           const classesPayload = INITIAL_CLASSES.map((c) => ({
-            id: c.id,
+            id: activeSchoolId === DEFAULT_SCHOOL.id ? c.id : `${activeSchoolId}-${c.id}`,
+            school_id: activeSchoolId,
             name: c.name,
             session: c.session,
             level: c.level,
@@ -457,10 +473,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.warn('Initial classes cloud check note:', classInitErr);
       }
 
-      // 2. Fetch each table with dedicated try/catch guards so partial failures (e.g. 401 or network drop) never trigger error boundaries
+      // 2. Fetch each table with dedicated try/catch guards scoped by school_id
       const fetchStudentsPromise = (async () => {
         try {
-          const { data, error } = await supabase.from('students').select('*').order('created_at', { ascending: false });
+          const { data, error } = await supabase
+            .from('students')
+            .select('*')
+            .eq('school_id', activeSchoolId)
+            .order('created_at', { ascending: false });
           if (error) {
             console.warn('Supabase students query returned error (falling back to cached/default state):', error.message || error);
             return null;
@@ -474,7 +494,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const fetchStaffPromise = (async () => {
         try {
-          const { data, error } = await supabase.from('staff').select('*').order('created_at', { ascending: false });
+          const { data, error } = await supabase
+            .from('staff')
+            .select('*')
+            .eq('school_id', activeSchoolId)
+            .order('created_at', { ascending: false });
           if (error) {
             console.warn('Supabase staff query returned error (falling back to cached/default state):', error.message || error);
             return null;
@@ -488,7 +512,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const fetchResultsPromise = (async () => {
         try {
-          const { data, error } = await supabase.from('term_results').select('*').order('created_at', { ascending: false });
+          const { data, error } = await supabase
+            .from('term_results')
+            .select('*')
+            .eq('school_id', activeSchoolId)
+            .order('created_at', { ascending: false });
           if (error) {
             console.warn('Supabase term_results query note:', error.message || error);
             return null;
@@ -502,7 +530,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const fetchClassesPromise = (async () => {
         try {
-          const { data, error } = await supabase.from('classes').select('*');
+          const { data, error } = await supabase
+            .from('classes')
+            .select('*')
+            .eq('school_id', activeSchoolId);
           if (error) {
             console.warn('Supabase classes query note:', error.message || error);
             return null;
@@ -516,7 +547,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const fetchFeesPromise = (async () => {
         try {
-          const { data, error } = await supabase.from('fee_structures').select('*');
+          const { data, error } = await supabase
+            .from('fee_structures')
+            .select('*')
+            .eq('school_id', activeSchoolId);
           if (error) {
             console.warn('Supabase fee_structures query note:', error.message || error);
             return null;
@@ -530,7 +564,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const fetchReceiptsPromise = (async () => {
         try {
-          const { data, error } = await supabase.from('receipts').select('*').order('created_at', { ascending: false });
+          const { data, error } = await supabase
+            .from('receipts')
+            .select('*')
+            .eq('school_id', activeSchoolId)
+            .order('created_at', { ascending: false });
           if (error) {
             console.warn('Supabase receipts query note:', error.message || error);
             return null;
@@ -558,7 +596,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const fetchAttendancePromise = (async () => {
         try {
-          const { data, error } = await supabase.from('staff_attendance').select('*').order('check_in_time', { ascending: false });
+          const { data, error } = await supabase
+            .from('staff_attendance')
+            .select('*')
+            .eq('school_id', activeSchoolId)
+            .order('check_in_time', { ascending: false });
           if (error) {
             console.warn('Supabase staff_attendance query note:', error.message || error);
             return null;
@@ -572,7 +614,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const fetchPickupPassesPromise = (async () => {
         try {
-          const { data, error } = await supabase.from('pickup_passes').select('*').order('created_at', { ascending: false });
+          const { data, error } = await supabase
+            .from('pickup_passes')
+            .select('*')
+            .eq('school_id', activeSchoolId)
+            .order('created_at', { ascending: false });
           if (error) {
             console.warn('Supabase pickup_passes query note:', error.message || error);
             return null;
@@ -693,13 +739,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 2. Real-Time Supabase Cloud Subscriptions (`supabase.channel`) across all clients
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
+    const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
 
     // Realtime listener for 'staff' (Teachers, HODs, Faculty)
     const staffChannel = supabase
-      .channel('public:staff_realtime')
+      .channel(`public:staff_realtime:${activeSchoolId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'staff' },
+        { event: '*', schema: 'public', table: 'staff', filter: `school_id=eq.${activeSchoolId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const inserted = normalizeTeacher(payload.new);
@@ -722,10 +769,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Realtime listener for 'students'
     const studentChannel = supabase
-      .channel('public:students_realtime')
+      .channel(`public:students_realtime:${activeSchoolId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'students' },
+        { event: '*', schema: 'public', table: 'students', filter: `school_id=eq.${activeSchoolId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const inserted = normalizeStudent(payload.new);
@@ -748,10 +795,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Realtime listener for 'term_results' (Grading & Continuous Assessment)
     const resultsChannel = supabase
-      .channel('public:term_results_realtime')
+      .channel(`public:term_results_realtime:${activeSchoolId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'term_results' },
+        { event: '*', schema: 'public', table: 'term_results', filter: `school_id=eq.${activeSchoolId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const inserted = normalizeResult(payload.new);
@@ -783,10 +830,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Realtime listener for 'receipts' (Fees & Bursar Verification)
     const receiptsChannel = supabase
-      .channel('public:receipts_realtime')
+      .channel(`public:receipts_realtime:${activeSchoolId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'receipts' },
+        { event: '*', schema: 'public', table: 'receipts', filter: `school_id=eq.${activeSchoolId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const inserted = payload.new as PaymentReceipt;
@@ -809,10 +856,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Realtime listener for 'fee_structures' (Tuition & Fee Schedules)
     const feesChannel = supabase
-      .channel('public:fee_structures_realtime')
+      .channel(`public:fee_structures_realtime:${activeSchoolId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'fee_structures' },
+        { event: '*', schema: 'public', table: 'fee_structures', filter: `school_id=eq.${activeSchoolId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const inserted = payload.new as FeeStructure;
@@ -855,7 +902,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       supabase.removeChannel(receiptsChannel);
       supabase.removeChannel(feesChannel);
     };
-  }, []);
+  }, [currentSchool?.id, currentUser?.school_id]);
+
+  // Set current school and re-fetch tenant data
+  const setCurrentSchoolById = useCallback((schoolId: string) => {
+    const matched = schools.find((s) => s.id === schoolId);
+    if (matched) {
+      setCurrentSchool(matched);
+      fetchLiveData(matched.id);
+    }
+  }, [schools, fetchLiveData]);
 
   // Student Fee Status Toggle (Admin can toggle "Mark School Fees as Paid" / "Pending")
   const toggleStudentFeeStatus = async (studentId: string, forceStatus?: boolean) => {
@@ -909,24 +965,216 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Student Login (Reg Number + PIN)
-  const loginStudent = async (regNumber: string, pin: string): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
+  // Self-Service Register School Implementation
+  const registerSchool = async (payload: RegisterSchoolPayload): Promise<{
+    success: boolean;
+    school?: School;
+    inviteCode?: string;
+    error?: string;
+  }> => {
+    try {
+      const schoolId = generateUUID();
+
+      // Generate unique collision-checked invite code: AEGIS-XXXX
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let inviteCode = '';
+      let isUnique = false;
+      let attempts = 0;
+
+      while (!isUnique && attempts < 10) {
+        attempts++;
+        let randomSuffix = '';
+        for (let i = 0; i < 4; i++) {
+          randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        inviteCode = `AEGIS-${randomSuffix}`;
+
+        // Check if collision in local state or in cloud
+        const localCollision = schools.some((s) => s.invite_code === inviteCode);
+        if (!localCollision && isSupabaseConfigured()) {
+          const { data } = await supabase.from('schools').select('id').eq('invite_code', inviteCode).maybeSingle();
+          if (!data) isUnique = true;
+        } else if (!localCollision) {
+          isUnique = true;
+        }
+      }
+
+      if (!isUnique) {
+        inviteCode = `AEGIS-${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+
+      const newSchool: School = {
+        id: schoolId,
+        name: payload.schoolName.trim(),
+        invite_code: inviteCode,
+        latitude: payload.latitude ?? 6.5244,
+        longitude: payload.longitude ?? 3.3792,
+        geofence_radius_meters: 75,
+        created_at: new Date().toISOString(),
+      };
+
+      // 1. Seed unique 33 class tiers for this school
+      const schoolClasses: AcademicClass[] = INITIAL_CLASSES.map((c) => ({
+        ...c,
+        id: `${schoolId}-${c.id}`,
+        school_id: schoolId,
+        student_count: 0,
+      }));
+
+      // 2. Provision the registering user as primary School Admin in staff table
+      const adminStaffId = generateUUID();
+      const adminUsername = (payload.email ? payload.email.split('@')[0] : payload.adminFullName.toLowerCase().replace(/\s+/g, '_')).replace(/[^a-zA-Z0-9_]/g, '');
+      const adminStaff: TeacherProfile = {
+        id: adminStaffId,
+        school_id: schoolId,
+        teacher_id_code: `ADM/${new Date().getFullYear()}/001`,
+        full_name: payload.adminFullName.trim(),
+        phone: payload.phone.trim(),
+        email: payload.email.trim(),
+        username: adminUsername || 'admin',
+        password_hash: payload.password,
+        assigned_subject_ids: [],
+        assigned_subjects: [],
+        is_part_time: false,
+        status: 'active',
+        session_token: generateUUID(),
+        created_at: new Date().toISOString(),
+      };
+
+      // Update React State immediately
+      setSchools((prev) => [newSchool, ...prev]);
+      setCurrentSchool(newSchool);
+      setClasses(schoolClasses);
+      setStudents([]);
+      setTeachers([adminStaff]);
+      setResults([]);
+      setReceipts([]);
+      setFeeStructures([]);
+
+      // Auto-login registering admin into new school session
+      const authUser: AuthUser = {
+        id: adminStaff.id,
+        school_id: schoolId,
+        school_name: newSchool.name,
+        invite_code: newSchool.invite_code,
+        username: adminStaff.username,
+        full_name: adminStaff.full_name,
+        role: 'admin',
+      };
+      setCurrentUser(authUser);
+      setSessionCookie(authUser);
+
+      // Persist to Supabase if connected
+      if (isSupabaseConfigured()) {
+        try {
+          // A. Insert school
+          const { error: schoolError } = await supabase.from('schools').insert({
+            id: newSchool.id,
+            name: newSchool.name,
+            invite_code: newSchool.invite_code,
+            latitude: newSchool.latitude,
+            longitude: newSchool.longitude,
+            geofence_radius_meters: newSchool.geofence_radius_meters,
+            created_at: newSchool.created_at,
+          });
+
+          if (schoolError) {
+            console.error('Supabase school insertion error:', schoolError);
+            return { success: false, error: schoolError.message };
+          }
+
+          // B. Seed classes scoped to school_id
+          const classesPayload = schoolClasses.map((c) => ({
+            id: c.id,
+            school_id: schoolId,
+            name: c.name,
+            session: c.session,
+            level: c.level,
+            arm: c.arm || null,
+            stage: c.stage,
+            student_count: 0,
+          }));
+          await supabase.from('classes').insert(classesPayload);
+
+          // C. Insert primary Admin staff member
+          await supabase.from('staff').insert({
+            id: adminStaff.id,
+            school_id: schoolId,
+            staff_id_code: adminStaff.teacher_id_code,
+            full_name: adminStaff.full_name,
+            phone: adminStaff.phone,
+            email: adminStaff.email,
+            username: adminStaff.username,
+            password_hash: adminStaff.password_hash,
+            role: 'admin',
+            status: adminStaff.status,
+            assigned_subject_ids: [],
+            session_token: adminStaff.session_token,
+          });
+        } catch (dbErr: any) {
+          console.warn('Note on cloud multi-tenant persistence:', dbErr);
+        }
+      }
+
+      return {
+        success: true,
+        school: newSchool,
+        inviteCode: newSchool.invite_code,
+      };
+    } catch (err: any) {
+      console.error('Registration exception:', err);
+      return { success: false, error: err?.message || 'Failed to register school' };
+    }
+  };
+
+  // Student Login (Reg Number + PIN + Optional School Invite Code)
+  const loginStudent = async (
+    regNumber: string,
+    pin: string,
+    inviteCode?: string
+  ): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
     const cleanReg = regNumber.trim().toUpperCase();
     const cleanPin = pin.trim();
+    const cleanInvite = inviteCode?.trim().toUpperCase();
 
-    let student = students.find(
-      (s) => s.reg_number.toUpperCase() === cleanReg && s.access_pin === cleanPin
-    );
+    let targetSchool = currentSchool;
+    if (cleanInvite) {
+      targetSchool = schools.find((s) => s.invite_code.toUpperCase() === cleanInvite) || null;
+      if (!targetSchool && isSupabaseConfigured()) {
+        try {
+          const { data } = await supabase.from('schools').select('*').ilike('invite_code', cleanInvite).maybeSingle();
+          if (data) {
+            targetSchool = data as School;
+            setSchools((prev) => (prev.some((s) => s.id === data.id) ? prev : [data as School, ...prev]));
+          }
+        } catch {}
+      }
+      if (!targetSchool) {
+        return { success: false, message: `School invite code "${cleanInvite}" not found.` };
+      }
+    }
+
+    let student = students.find((s) => {
+      const matchReg = s.reg_number.toUpperCase() === cleanReg;
+      const matchPin = s.access_pin === cleanPin;
+      const matchSchool = targetSchool ? (s.school_id === targetSchool.id || !s.school_id) : true;
+      return matchReg && matchPin && matchSchool;
+    });
 
     // Fallback: If in-memory state is still loading from cloud, fetch directly from Supabase
     if (!student && isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('students')
           .select('*')
           .ilike('reg_number', cleanReg)
-          .eq('access_pin', cleanPin)
-          .maybeSingle();
+          .eq('access_pin', cleanPin);
+
+        if (targetSchool) {
+          query = query.eq('school_id', targetSchool.id);
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (!error && data) {
           student = normalizeStudent(data);
@@ -938,11 +1186,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!student) {
-      return { success: false, message: 'Invalid registration number or PIN.' };
+      return { success: false, message: 'Invalid registration number or PIN for this school.' };
     }
+
+    const resolvedSchool = targetSchool || schools.find((s) => s.id === student?.school_id) || DEFAULT_SCHOOL;
+    setCurrentSchool(resolvedSchool);
 
     const authUser: AuthUser = {
       id: student.id,
+      school_id: resolvedSchool.id,
+      school_name: resolvedSchool.name,
+      invite_code: resolvedSchool.invite_code,
       reg_number: student.reg_number,
       full_name: student.full_name,
       role: 'student',
@@ -958,26 +1212,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true, role: 'student' as UserRole };
   };
 
-  // Staff Login
-  const loginStaff = async (username: string, pass: string): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
+  // Staff Login (Username + Password + Optional School Invite Code)
+  const loginStaff = async (
+    username: string,
+    pass: string,
+    inviteCode?: string
+  ): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = pass.trim();
+    const cleanInvite = inviteCode?.trim().toUpperCase();
 
+    let targetSchool = currentSchool;
+    if (cleanInvite) {
+      targetSchool = schools.find((s) => s.invite_code.toUpperCase() === cleanInvite) || null;
+      if (!targetSchool && isSupabaseConfigured()) {
+        try {
+          const { data } = await supabase.from('schools').select('*').ilike('invite_code', cleanInvite).maybeSingle();
+          if (data) {
+            targetSchool = data as School;
+            setSchools((prev) => (prev.some((s) => s.id === data.id) ? prev : [data as School, ...prev]));
+          }
+        } catch {}
+      }
+      if (!targetSchool) {
+        return { success: false, message: `School invite code "${cleanInvite}" not found.` };
+      }
+    }
+
+    // Master Super-Admin fallback for Aegis default tenant
     if (cleanUser === 'admin' && (cleanPass === adminPassword || cleanPass === 'admin123' || cleanPass === 'admin')) {
+      const defaultSchool = targetSchool || DEFAULT_SCHOOL;
       const authUser: AuthUser = {
         id: 'usr-admin-1',
+        school_id: defaultSchool.id,
+        school_name: defaultSchool.name,
+        invite_code: defaultSchool.invite_code,
         username: 'admin',
         full_name: 'School Administrator',
         role: 'admin',
       };
+      setCurrentSchool(defaultSchool);
       setCurrentUser(authUser);
       setSessionCookie(authUser);
       return { success: true, role: 'admin' as UserRole };
     }
 
-    // Dynamic match against live Supabase-synchronized teacher records
+    // Dynamic match against live Supabase-synchronized teacher / staff records
     const normalizedCleanUser = cleanUser.replace(/\s+/g, '');
     let matchedTeacher = teachers.find((t) => {
+      const matchSchool = targetSchool ? (t.school_id === targetSchool.id || !t.school_id) : true;
+      if (!matchSchool) return false;
+
       const matchUsername = (t.username || '').toLowerCase().replace(/\s+/g, '');
       const matchIdCode = (t.teacher_id_code || '').toLowerCase().replace(/\s+/g, '');
       const matchUnderscored = matchIdCode.replace(/\//g, '_');
@@ -992,15 +1277,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return matchesIdentifier && t.password_hash === cleanPass;
     });
 
-    // Fallback: If in-memory state is still loading from cloud, query Supabase staff table directly
+    // Fallback: Query Supabase staff table directly scoped to school
     if (!matchedTeacher && isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('staff')
           .select('*')
           .or(`username.ilike.${cleanUser},staff_id_code.ilike.${cleanUser}`)
-          .eq('password_hash', cleanPass)
-          .maybeSingle();
+          .eq('password_hash', cleanPass);
+
+        if (targetSchool) {
+          query = query.eq('school_id', targetSchool.id);
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (!error && data) {
           matchedTeacher = normalizeTeacher(data);
@@ -1016,11 +1306,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: 'Invalid username or password.' };
       }
 
+      const resolvedSchool = targetSchool || schools.find((s) => s.id === matchedTeacher?.school_id) || DEFAULT_SCHOOL;
+      setCurrentSchool(resolvedSchool);
+
+      // Determine role: staff row may have role 'admin' or 'teacher'
+      const assignedRole: UserRole = (matchedTeacher as any).role === 'admin' ? 'admin' : 'teacher';
+
       const authUser: AuthUser = {
         id: matchedTeacher.id,
+        school_id: resolvedSchool.id,
+        school_name: resolvedSchool.name,
+        invite_code: resolvedSchool.invite_code,
         username: matchedTeacher.username,
         full_name: matchedTeacher.full_name,
-        role: 'teacher',
+        role: assignedRole,
         teacher_id: matchedTeacher.id,
         form_class_id: matchedTeacher.is_part_time ? undefined : matchedTeacher.form_class_id,
         assigned_class_id: matchedTeacher.assigned_class_id ?? (matchedTeacher.is_part_time ? null : (matchedTeacher.form_class_id ?? null)),
@@ -1032,14 +1331,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setCurrentUser(authUser);
       setSessionCookie(authUser);
-      return { success: true, role: 'teacher' as UserRole };
+      return { success: true, role: assignedRole };
     }
 
     if (cleanUser === 'teacher' && (cleanPass === 'teacher123' || cleanPass === 'teacher')) {
       const defaultT = teachers[0];
       if (defaultT) {
+        const defaultSchool = targetSchool || DEFAULT_SCHOOL;
         const authUser: AuthUser = {
           id: defaultT.id,
+          school_id: defaultSchool.id,
+          school_name: defaultSchool.name,
+          invite_code: defaultSchool.invite_code,
           username: defaultT.username || 'teacher',
           full_name: defaultT.full_name,
           role: 'teacher',
@@ -1052,13 +1355,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           is_part_time: Boolean(defaultT.is_part_time),
           session_token: defaultT.session_token,
         };
+        setCurrentSchool(defaultSchool);
         setCurrentUser(authUser);
         setSessionCookie(authUser);
         return { success: true, role: 'teacher' as UserRole };
       }
     }
 
-    return { success: false, message: 'Invalid username or password.' };
+    return { success: false, message: 'Invalid username or password for this school.' };
   };
 
   const logout = () => {
@@ -1137,10 +1441,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (isSupabaseConfigured()) {
       try {
         const dbSubjectId = toDbSubjectId(updatedResultRecord.subject_id);
+        const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
         const payload = {
           student_id: updatedResultRecord.student_id,
           class_id: updatedResultRecord.class_id,
           subject_id: dbSubjectId,
+          school_id: activeSchoolId,
           term: updatedResultRecord.term,
           session: updatedResultRecord.session,
           ca1: updatedResultRecord.ca1,
@@ -1288,8 +1594,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const validClassId = matchedClass?.id || data.classId;
     const validClassGrade = matchedClass?.name || data.classGrade;
 
+    const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+
     const newStudent: StudentProfile = {
       id: generateUUID(),
+      school_id: activeSchoolId,
       reg_number: regNumber,
       access_pin: accessPin,
       full_name: data.fullName,
@@ -1343,6 +1652,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (isSupabaseConfigured()) {
       const studentPayload = {
         id: newStudent.id,
+        school_id: activeSchoolId,
         reg_number: newStudent.reg_number,
         access_pin: newStudent.access_pin,
         full_name: newStudent.full_name,
@@ -1453,9 +1763,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ? existing.id
       : generateUUID();
 
+    const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+
     const newStructure: FeeStructure = {
       ...data,
       id: targetId,
+      school_id: activeSchoolId,
       published: true,
       published_at: new Date().toISOString().split('T')[0],
     };
@@ -1471,6 +1784,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const payload = {
           id: newStructure.id,
+          school_id: activeSchoolId,
           class_id: newStructure.class_id,
           class_name: newStructure.class_name,
           term: newStructure.term,
@@ -1606,9 +1920,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const receiptTerm = data.term || '1st Term';
     const receiptSession = data.session || SCHOOL_INFO.session || '2025/2026';
     const receiptUUID = generateUUID();
+    const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
 
     const newReceipt: PaymentReceipt = {
       id: receiptUUID,
+      school_id: activeSchoolId,
       student_id: studentId,
       student_name: student.full_name,
       reg_number: student.reg_number,
@@ -1657,6 +1973,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const payload = {
           id: newReceipt.id,
+          school_id: activeSchoolId,
           student_id: newReceipt.student_id,
           class_id: newReceipt.class_id,
           fee_structure_id: newReceipt.fee_structure_id || null,
@@ -1990,9 +2307,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const assignedClassId = isPartTime ? null : (data.assignedClassId ?? data.formClassId ?? null);
     const formClass = !isPartTime && assignedClassId ? classes.find((c) => c.id === assignedClassId) : undefined;
     const newStaffUuid = generateUUID();
+    const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
 
     const newTeacher: TeacherProfile = {
       id: newStaffUuid,
+      school_id: activeSchoolId,
       teacher_id_code: teacherIdCode,
       full_name: data.fullName,
       phone: data.phone,
@@ -2022,6 +2341,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (isSupabaseConfigured()) {
       const staffPayload = {
         id: newTeacher.id,
+        school_id: activeSchoolId,
         staff_id_code: newTeacher.teacher_id_code,
         full_name: newTeacher.full_name,
         phone: newTeacher.phone,
@@ -2175,6 +2495,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       announcements,
       staffAttendance,
       pickupPasses,
+      registerSchool,
+      setCurrentSchoolById,
       loginStudent,
       loginStaff,
       logout,
@@ -2226,6 +2548,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       theme,
       resultsPublished,
       adminPassword,
+      registerSchool,
+      setCurrentSchoolById,
     ]
   );
 

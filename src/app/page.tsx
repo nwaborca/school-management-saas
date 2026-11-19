@@ -54,19 +54,19 @@ export default function HomePage() {
                 {/* Call to Action */}
                 <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 pt-2">
                   <Link
-                    href="/login"
+                    href="/register-school"
                     className="w-full sm:w-auto px-6 py-3.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-xs"
                   >
-                    <span>Sign In to Portal</span>
+                    <span>Register Your School</span>
                     <ArrowRight className="w-4 h-4" />
                   </Link>
 
-                  <a
-                    href="#features"
+                  <Link
+                    href="/login"
                     className="w-full sm:w-auto px-6 py-3.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm border border-slate-300 flex items-center justify-center gap-2 transition"
                   >
-                    <span>Explore Features</span>
-                  </a>
+                    <span>Sign In to Portal</span>
+                  </Link>
                 </div>
 
                 {/* Key Verification Badges */}

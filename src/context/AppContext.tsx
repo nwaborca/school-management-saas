@@ -456,6 +456,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  // Helper to normalize payment receipt from Supabase or storage
+  const normalizeReceipt = (r: any): PaymentReceipt => {
+    const rawUrl =
+      r.file_data_url ||
+      r.fileDataUrl ||
+      r.proofUrl ||
+      r.proof_url ||
+      r.receiptUrl ||
+      r.receipt_url ||
+      r.imageUrl ||
+      r.image_url ||
+      '';
+
+    const rawFileName =
+      r.file_name ||
+      r.fileName ||
+      r.name ||
+      'receipt_document';
+
+    return {
+      id: r.id,
+      school_id: r.school_id || DEFAULT_SCHOOL.id,
+      student_id: r.student_id || r.studentId,
+      student_name: r.student_name || r.studentName || 'Student',
+      reg_number: r.reg_number || r.regNumber || 'N/A',
+      class_grade: r.class_grade || r.classGrade || 'Class',
+      class_id: r.class_id || r.classId,
+      term: r.term || '1st Term',
+      session: r.session || SCHOOL_INFO.session || '2025/2026',
+      fee_structure_id: r.fee_structure_id || r.feeStructureId,
+      amount_claimed: Number(r.amount_claimed ?? r.amountClaimed ?? 0),
+      payment_mode: r.payment_mode || r.paymentMode || 'full',
+      amount_approved: r.amount_approved !== undefined ? Number(r.amount_approved) : (r.amountApproved !== undefined ? Number(r.amountApproved) : undefined),
+      file_name: rawFileName,
+      file_data_url: typeof rawUrl === 'string' ? rawUrl : '',
+      file_type: r.file_type || r.fileType || 'application/pdf',
+      storage_path: r.storage_path || r.storagePath || undefined,
+      uploaded_at: r.uploaded_at || r.uploadedAt || r.created_at || new Date().toISOString(),
+      status: r.status || 'pending_verification',
+      reviewed_by: r.reviewed_by || r.reviewedBy,
+      reviewed_at: r.reviewed_at || r.reviewedAt,
+      admin_note: r.admin_note || r.adminNote,
+    };
+  };
+
   // Helper to normalize staff attendance from Supabase
   const normalizeAttendance = (a: any): StaffAttendance => {
     return {
@@ -737,7 +782,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (recData && Array.isArray(recData) && recData.length > 0) {
-        setReceipts(recData as PaymentReceipt[]);
+        setReceipts(recData.map(normalizeReceipt));
       }
 
       if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
@@ -884,13 +929,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { event: '*', schema: 'public', table: 'receipts', filter: `school_id=eq.${activeSchoolId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            const inserted = payload.new as PaymentReceipt;
+            const inserted = normalizeReceipt(payload.new);
             setReceipts((prev) => {
               if (prev.some((rc) => rc.id === inserted.id)) return prev;
               return [inserted, ...prev];
             });
           } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as PaymentReceipt;
+            const updated = normalizeReceipt(payload.new);
             setReceipts((prev) => prev.map((rc) => (rc.id === updated.id ? updated : rc)));
           } else if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as any)?.id;

@@ -45,10 +45,17 @@ export default function StaffAttendanceQROverlay({
 
         {/* Printable Poster Canvas */}
         <div className="p-8 text-center space-y-6 print:p-12 print:m-0" id="printable-qr-poster">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold uppercase tracking-wider">
-              <Building2 className="w-3.5 h-3.5 text-blue-600" />
-              <span>Official Check-In Station</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-2">
+              <img
+                src="/aegis-logo.png"
+                alt="Aegis Logo"
+                className="h-12 w-12 object-contain"
+              />
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold uppercase tracking-wider">
+                <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                <span>Official Check-In Station</span>
+              </div>
             </div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
               {school.name}

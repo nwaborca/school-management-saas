@@ -26,6 +26,11 @@ export const metadata: Metadata = {
   title: 'Aegis — School Operations, Grading & Fee Management',
   description:
     'Complete school management SaaS for Nigerian Nursery, Primary, and Secondary schools. Manage CA1/CA2/Exam broadsheets, generate WAEC/NECO-aligned report cards, and verify school fee payments in one unified portal.',
+  icons: {
+    icon: '/aegis-logo.png',
+    shortcut: '/aegis-logo.png',
+    apple: '/aegis-logo.png',
+  },
 };
 
 export default function RootLayout({

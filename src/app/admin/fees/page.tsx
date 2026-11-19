@@ -741,39 +741,70 @@ export default function AdminFeesPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0 overflow-y-auto">
               <div className="lg:col-span-7 flex flex-col bg-slate-50 rounded-xl border border-slate-200 overflow-hidden min-h-[380px] h-[480px]">
-                {activeReceipt.file_data_url.startsWith('data:image') || /\.(png|jpe?g|webp|gif|svg)$/i.test(activeReceipt.file_name) ? (
-                  <div className="w-full h-full flex items-center justify-center p-4">
-                    <img
-                      src={activeReceipt.file_data_url}
-                      alt="Receipt"
-                      className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col">
-                    <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-blue-600" />
-                        <span className="font-semibold text-slate-800 truncate max-w-[200px] sm:max-w-xs">{activeReceipt.file_name}</span>
+                {(() => {
+                  const proofSource =
+                    (typeof (activeReceipt as any)?.proofUrl === 'string' && (activeReceipt as any).proofUrl) ||
+                    (typeof (activeReceipt as any)?.proof_url === 'string' && (activeReceipt as any).proof_url) ||
+                    (typeof (activeReceipt as any)?.receiptUrl === 'string' && (activeReceipt as any).receiptUrl) ||
+                    (typeof (activeReceipt as any)?.receipt_url === 'string' && (activeReceipt as any).receipt_url) ||
+                    (typeof (activeReceipt as any)?.imageUrl === 'string' && (activeReceipt as any).imageUrl) ||
+                    (typeof (activeReceipt as any)?.image_url === 'string' && (activeReceipt as any).image_url) ||
+                    (typeof activeReceipt.file_data_url === 'string' && activeReceipt.file_data_url) ||
+                    '';
+
+                  const fileName = activeReceipt.file_name || 'payment_receipt';
+                  const isImage = proofSource.startsWith('data:image') || /\.(png|jpe?g|webp|gif|svg)$/i.test(fileName) || /\.(png|jpe?g|webp|gif|svg)/i.test(proofSource);
+
+                  if (!proofSource) {
+                    return (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-3 bg-slate-50">
+                        <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
+                        <p className="text-sm font-bold text-slate-800">No Receipt Image Attached</p>
+                        <p className="text-xs text-slate-500 max-w-xs">
+                          No physical receipt document or image data was provided for this payment record.
+                        </p>
                       </div>
-                      <a
-                        href={activeReceipt.file_data_url}
-                        download={activeReceipt.file_name || 'payment_receipt.pdf'}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-gray-950 font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download PDF</span>
-                      </a>
+                    );
+                  }
+
+                  if (isImage) {
+                    return (
+                      <div className="w-full h-full flex items-center justify-center p-4">
+                        <img
+                          src={proofSource}
+                          alt="Receipt"
+                          className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+                        />
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="w-full h-full flex flex-col">
+                      <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          <span className="font-semibold text-slate-800 truncate max-w-[200px] sm:max-w-xs">{fileName}</span>
+                        </div>
+                        <a
+                          href={proofSource}
+                          download={fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-gray-950 font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download Document</span>
+                        </a>
+                      </div>
+                      <iframe
+                        src={proofSource}
+                        className="w-full flex-1 border-none rounded-b-2xl bg-white"
+                        title={fileName}
+                      />
                     </div>
-                    <iframe
-                      src={activeReceipt.file_data_url}
-                      className="w-full flex-1 border-none rounded-b-2xl bg-white"
-                      title={activeReceipt.file_name || 'Payment Receipt PDF'}
-                    />
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">

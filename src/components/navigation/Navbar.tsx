@@ -71,9 +71,11 @@ export function Navbar() {
         {/* School Logo & Title */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-lg bg-[#0F172A] flex items-center justify-center text-white font-bold shadow-xs">
-              <GraduationCap className="w-5 h-5" />
-            </div>
+            <img
+              src="/aegis-logo.png"
+              alt="Aegis Logo"
+              className="h-10 w-10 object-contain shrink-0"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-base font-bold tracking-tight text-[#0F172A]">

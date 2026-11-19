@@ -90,9 +90,16 @@ export default function LoginPage() {
       <div className="w-full md:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-16 bg-white border-r border-[#E2E8F0]">
         <div className="w-full max-w-md space-y-8">
           <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold mb-4 border border-slate-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>Aegis Institutional Portal</span>
+            <div className="flex items-center gap-3 mb-4">
+              <img
+                src="/aegis-logo.png"
+                alt="Aegis Logo"
+                className="h-10 w-10 object-contain shrink-0"
+              />
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Aegis Institutional Portal</span>
+              </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight">
               Sign In to Your Account

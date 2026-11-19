@@ -92,9 +92,16 @@ export default function RegisterSchoolPage() {
           {!registeredInviteCode ? (
             <>
               <div>
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold mb-3 border border-blue-200">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Self-Service School Provisioning</span>
+                <div className="flex items-center gap-3 mb-3">
+                  <img
+                    src="/aegis-logo.png"
+                    alt="Aegis Logo"
+                    className="h-10 w-10 object-contain shrink-0"
+                  />
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Self-Service School Provisioning</span>
+                  </div>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0F172A] tracking-tight">
                   Register Your School

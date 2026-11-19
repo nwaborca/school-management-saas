@@ -167,13 +167,22 @@ function PublicPickupPassContent() {
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
         {/* Top Institutional Header */}
-        <div className="bg-[#0F172A] text-white p-6 text-center space-y-1 relative">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider border border-blue-400/30">
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-            <span>Digital Dismissal Gate Pass</span>
+        <div className="bg-[#0F172A] text-white p-6 text-center space-y-2 relative">
+          <div className="flex items-center justify-center gap-2">
+            <img
+              src="/aegis-logo.png"
+              alt="Aegis Logo"
+              className="h-10 w-10 object-contain shrink-0"
+            />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider border border-blue-400/30">
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+              <span>Digital Dismissal Gate Pass</span>
+            </div>
           </div>
-          <h2 className="text-base font-bold tracking-tight text-white">{passData.school_name}</h2>
-          <p className="text-[11px] text-slate-400">Child Safe Pick-Up Verification Voucher</p>
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-white">{passData.school_name}</h2>
+            <p className="text-[11px] text-slate-400">Child Safe Pick-Up Verification Voucher</p>
+          </div>
         </div>
 
         {/* Status Banner */}

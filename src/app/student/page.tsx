@@ -1618,15 +1618,21 @@ export default function StudentDashboardPage() {
               {/* Printable Result Slip Content */}
               <div className="space-y-6">
                 {/* Header Banner */}
-                <div className="text-center space-y-1 border-b pb-4">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-rose-950 text-blue-600 font-black text-xl mb-1">
-                    A
+                <div className="text-center space-y-2 border-b pb-4">
+                  <div className="flex items-center justify-center">
+                    <img
+                      src="/aegis-logo.png"
+                      alt="Aegis Logo"
+                      className="h-14 w-14 object-contain"
+                    />
                   </div>
-                  <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">{schoolInfo.name}</h2>
-                  <p className="text-xs text-gray-600 italic">{schoolInfo.motto} • {schoolInfo.address}</p>
-                  <p className="text-xs font-bold text-rose-900 uppercase pt-1">
-                    OFFICIAL STUDENT TERMINAL PERFORMANCE REPORT — {selectedTerm.toUpperCase()} ({activeStudent.session})
-                  </p>
+                  <div>
+                    <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">{schoolInfo.name}</h2>
+                    <p className="text-xs text-gray-600 italic">{schoolInfo.motto} • {schoolInfo.address}</p>
+                    <p className="text-xs font-bold text-rose-900 uppercase pt-1">
+                      OFFICIAL STUDENT TERMINAL PERFORMANCE REPORT — {selectedTerm.toUpperCase()} ({activeStudent.session})
+                    </p>
+                  </div>
                 </div>
 
                 {/* Student Info Grid */}

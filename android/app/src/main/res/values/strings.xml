@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Aegis School OS</string>
+    <string name="title_activity_main">Aegis School OS</string>
+    <string name="package_name">com.caldun.aegis</string>
+    <string name="custom_url_scheme">com.caldun.aegis</string>
+</resources>

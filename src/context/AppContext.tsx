@@ -25,6 +25,7 @@ import {
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { generateUUID } from '@/lib/uuid';
+import { calculateHaversineDistance, isLateCheckIn } from '@/lib/geofence';
 import {
   SCHOOL_INFO,
   INITIAL_CLASSES,
@@ -177,6 +178,20 @@ interface AppContextType {
 
   // Admin Self-Service Password Reset
   updateAdminPassword: (currentPass: string, newPass: string) => { success: boolean; message?: string };
+
+  // Phase 3: Geofence & Staff Attendance
+  updateSchoolGeofence: (params: {
+    latitude: number;
+    longitude: number;
+    geofenceRadiusMeters?: number;
+    resumptionCutoffTime?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  clockInStaff: (params: {
+    scannedPayload: string;
+    latitude?: number;
+    longitude?: number;
+  }) => Promise<{ success: boolean; record?: StaffAttendance; message?: string; distanceMeters?: number }>;
+  clockOutStaff: (attendanceId: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -895,12 +910,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
 
+    // Realtime listener for 'staff_attendance' (Geofenced Attendance)
+    const attendanceChannel = supabase
+      .channel(`public:staff_attendance_realtime:${activeSchoolId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'staff_attendance', filter: `school_id=eq.${activeSchoolId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const inserted = normalizeAttendance(payload.new);
+            setStaffAttendance((prev) => {
+              if (prev.some((a) => a.id === inserted.id)) return prev;
+              return [inserted, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = normalizeAttendance(payload.new);
+            setStaffAttendance((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              setStaffAttendance((prev) => prev.filter((a) => a.id !== deletedId));
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(staffChannel);
       supabase.removeChannel(studentChannel);
       supabase.removeChannel(resultsChannel);
       supabase.removeChannel(receiptsChannel);
       supabase.removeChannel(feesChannel);
+      supabase.removeChannel(attendanceChannel);
     };
   }, [currentSchool?.id, currentUser?.school_id]);
 
@@ -2473,6 +2515,193 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Phase 3: School Geofence Update (Admin)
+  const updateSchoolGeofence = async (params: {
+    latitude: number;
+    longitude: number;
+    geofenceRadiusMeters?: number;
+    resumptionCutoffTime?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!currentSchool) {
+      return { success: false, error: 'No active school selected' };
+    }
+
+    const updatedSchool: School = {
+      ...currentSchool,
+      latitude: Number(params.latitude),
+      longitude: Number(params.longitude),
+      geofence_radius_meters: params.geofenceRadiusMeters ?? currentSchool.geofence_radius_meters ?? 75,
+      resumption_cutoff_time: params.resumptionCutoffTime ?? currentSchool.resumption_cutoff_time ?? '08:00',
+    };
+
+    setCurrentSchool(updatedSchool);
+    setSchools((prev) => prev.map((s) => (s.id === updatedSchool.id ? updatedSchool : s)));
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase
+          .from('schools')
+          .update({
+            latitude: updatedSchool.latitude,
+            longitude: updatedSchool.longitude,
+            geofence_radius_meters: updatedSchool.geofence_radius_meters,
+          })
+          .eq('id', updatedSchool.id);
+
+        if (error) {
+          console.warn('Supabase geofence update warning:', error.message);
+        }
+      } catch (err: any) {
+        console.warn('Supabase geofence update caught note:', err);
+      }
+    }
+
+    return { success: true };
+  };
+
+  // Phase 3: Geofenced Staff Clock-In
+  const clockInStaff = async (params: {
+    scannedPayload: string;
+    latitude?: number;
+    longitude?: number;
+  }): Promise<{ success: boolean; record?: StaffAttendance; message?: string; distanceMeters?: number }> => {
+    if (!currentUser || currentUser.role !== 'teacher') {
+      return { success: false, message: 'Only authenticated faculty/teachers can clock in.' };
+    }
+
+    const activeSchoolId = currentSchool?.id || currentUser.school_id || DEFAULT_SCHOOL.id;
+    const expectedPayload = `AEGIS_ATTENDANCE:${activeSchoolId}`;
+
+    // 1. Validate Scanned QR Code
+    if (params.scannedPayload.trim() !== expectedPayload) {
+      return {
+        success: false,
+        message: 'Invalid Gate QR Code. Please scan the official QR poster for your school.',
+      };
+    }
+
+    // 2. Prevent duplicate clock-in on same calendar day
+    const todayIsoDate = new Date().toISOString().split('T')[0];
+    const existingToday = staffAttendance.find((att) => {
+      const isSameTeacher = att.teacher_id === (currentUser.teacher_id || currentUser.id);
+      const isSameDay = att.check_in_time.startsWith(todayIsoDate);
+      return isSameTeacher && isSameDay;
+    });
+
+    if (existingToday) {
+      return {
+        success: false,
+        message: `You have already clocked in today at ${new Date(existingToday.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
+        record: existingToday,
+      };
+    }
+
+    // 3. Geofence Verification using Haversine formula
+    let distanceMeters: number | null = null;
+    const schoolLat = currentSchool?.latitude;
+    const schoolLon = currentSchool?.longitude;
+    const radiusMeters = currentSchool?.geofence_radius_meters || 75;
+
+    if (schoolLat !== null && schoolLat !== undefined && schoolLon !== null && schoolLon !== undefined) {
+      if (params.latitude === undefined || params.longitude === undefined) {
+        return {
+          success: false,
+          message: 'Location access is required to verify your attendance within the school geofence.',
+        };
+      }
+
+      distanceMeters = calculateHaversineDistance(
+        schoolLat,
+        schoolLon,
+        params.latitude,
+        params.longitude
+      );
+
+      if (distanceMeters > radiusMeters) {
+        return {
+          success: false,
+          message: `You are ${distanceMeters}m away from school. Move within ${radiusMeters}m of the school gate/staffroom to clock in.`,
+          distanceMeters,
+        };
+      }
+    }
+
+    // 4. Punctuality Evaluation
+    const now = new Date();
+    const cutoffTime = currentSchool?.resumption_cutoff_time || '08:00';
+    const isLate = isLateCheckIn(now, cutoffTime);
+    const status = isLate ? 'LATE' : 'PRESENT';
+
+    const newRecord: StaffAttendance = {
+      id: generateUUID(),
+      school_id: activeSchoolId,
+      teacher_id: currentUser.teacher_id || currentUser.id,
+      teacher_name: currentUser.full_name || 'Teacher',
+      check_in_time: now.toISOString(),
+      clock_out_time: null,
+      status,
+      latitude: params.latitude ?? null,
+      longitude: params.longitude ?? null,
+      distance_meters: distanceMeters,
+      created_at: now.toISOString(),
+    };
+
+    setStaffAttendance((prev) => [newRecord, ...prev]);
+
+    // Persist to Supabase staff_attendance
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase.from('staff_attendance').insert({
+          id: newRecord.id,
+          school_id: newRecord.school_id,
+          teacher_id: newRecord.teacher_id,
+          teacher_name: newRecord.teacher_name,
+          check_in_time: newRecord.check_in_time,
+          status: newRecord.status,
+          latitude: newRecord.latitude,
+          longitude: newRecord.longitude,
+          distance_meters: newRecord.distance_meters,
+          created_at: newRecord.created_at,
+        });
+
+        if (error) {
+          console.warn('Supabase staff attendance insert note:', error.message);
+        }
+      } catch (err: any) {
+        console.warn('Supabase staff attendance caught note:', err);
+      }
+    }
+
+    return {
+      success: true,
+      record: newRecord,
+      message: `Clock-in recorded (${status === 'LATE' ? 'Late Arrival' : 'Present - On Time'}). Distance: ${distanceMeters !== null ? `${distanceMeters}m` : 'Verified'}.`,
+      distanceMeters: distanceMeters ?? undefined,
+    };
+  };
+
+  // Phase 3: Staff Clock-Out Action
+  const clockOutStaff = async (attendanceId: string): Promise<{ success: boolean; message?: string }> => {
+    const nowIso = new Date().toISOString();
+
+    setStaffAttendance((prev) =>
+      prev.map((a) => (a.id === attendanceId ? { ...a, clock_out_time: nowIso } : a))
+    );
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('staff_attendance')
+          .update({ clock_out_time: nowIso })
+          .eq('id', attendanceId);
+      } catch (err: any) {
+        console.warn('Supabase clock-out update note:', err);
+      }
+    }
+
+    return { success: true, message: 'Clock-out time saved successfully.' };
+  };
+
   const contextValue = React.useMemo(
     () => ({
       schoolInfo: SCHOOL_INFO,
@@ -2522,6 +2751,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       resultsPublished,
       toggleResultsPublished,
       updateAdminPassword,
+      updateSchoolGeofence,
+      clockInStaff,
+      clockOutStaff,
     }),
     [
       currentSchool,
@@ -2546,6 +2778,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       adminPassword,
       registerSchool,
       setCurrentSchoolById,
+      updateSchoolGeofence,
+      clockInStaff,
+      clockOutStaff,
     ]
   );
 

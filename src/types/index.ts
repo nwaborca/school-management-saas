@@ -16,6 +16,7 @@ export interface School {
   latitude: number | null;
   longitude: number | null;
   geofence_radius_meters: number;
+  resumption_cutoff_time?: string; // e.g. "08:00"
   created_at: string;
 }
 

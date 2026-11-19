@@ -10,6 +10,7 @@ import { StudentProfile, formatNaira } from '@/types';
 import { supabase } from '@/lib/supabase';
 import TeacherRegistry from '@/components/TeacherRegistry';
 import EnrollStudentForm from '@/components/EnrollStudentForm';
+import StaffAttendanceQROverlay from '@/components/StaffAttendanceQROverlay';
 import {
   Shield,
   TrendingUp,
@@ -40,6 +41,9 @@ import {
   Printer,
   Download,
   FileText,
+  QrCode,
+  MapPin,
+  Calendar,
 } from 'lucide-react';
 
 export default function AdminHubPage() {
@@ -65,6 +69,8 @@ export default function AdminHubPage() {
     toggleResultsPublished,
     results = [],
     updateAdminPassword,
+    staffAttendance = [],
+    updateSchoolGeofence,
     currentUser,
     isAuthReady,
   } = useApp();
@@ -99,7 +105,7 @@ export default function AdminHubPage() {
     };
   }, [router]);
 
-  const [activeTab, setActiveTab] = useState<'roster' | 'receipts' | 'ledger' | 'teachers' | 'enroll' | 'notices' | 'admin-security'>('roster');
+  const [activeTab, setActiveTab] = useState<'roster' | 'receipts' | 'ledger' | 'teachers' | 'enroll' | 'notices' | 'attendance' | 'admin-security'>('roster');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Admin Self-Service Password Security Form State
@@ -171,6 +177,24 @@ export default function AdminHubPage() {
   // Class Filter for Roster
   const [filterClassId, setFilterClassId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Phase 3: Staff Attendance & Geofence State
+  const [isQrPosterModalOpen, setIsQrPosterModalOpen] = useState(false);
+  const [geofenceLat, setGeofenceLat] = useState<string>(currentSchool?.latitude?.toString() || '6.5244');
+  const [geofenceLon, setGeofenceLon] = useState<string>(currentSchool?.longitude?.toString() || '3.3792');
+  const [geofenceRadius, setGeofenceRadius] = useState<number>(currentSchool?.geofence_radius_meters || 75);
+  const [resumptionCutoff, setResumptionCutoff] = useState<string>(currentSchool?.resumption_cutoff_time || '08:00');
+  const [isCapturingGps, setIsCapturingGps] = useState(false);
+  const [geofenceSaveNotice, setGeofenceSaveNotice] = useState<string | null>(null);
+
+  // Attendance Log Filters
+  const [attendancePeriodFilter, setAttendancePeriodFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+  const [attendanceTeacherFilter, setAttendanceTeacherFilter] = useState<string>('all');
+  const [todayIsoDate, setTodayIsoDate] = useState<string>('');
+
+  useEffect(() => {
+    setTodayIsoDate(new Date().toISOString().split('T')[0]);
+  }, []);
 
   const pendingReceiptsCount = receipts?.filter((r) => r.status === 'pending_verification').length || 0;
   const studentsInSourceClass = students.filter((s) => s.class_id === fromClassId);
@@ -551,6 +575,23 @@ export default function AdminHubPage() {
               >
                 <Send className="w-4 h-4 shrink-0 text-slate-500" />
                 <span className="truncate">Announcements</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('attendance')}
+                className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium flex items-center justify-between transition cursor-pointer ${
+                  activeTab === 'attendance'
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <QrCode className="w-4 h-4 shrink-0 text-slate-500" />
+                  <span className="truncate">Staff Attendance</span>
+                </div>
+                <span className="text-[11px] tabular-nums font-semibold text-slate-400">
+                  {todayIsoDate ? staffAttendance.filter((a) => a.check_in_time.startsWith(todayIsoDate)).length : staffAttendance.length} Today
+                </span>
               </button>
 
               <button
@@ -1273,6 +1314,356 @@ export default function AdminHubPage() {
               </form>
             )}
           </div>
+        )}
+
+        {/* TAB 7: Staff Attendance & Geofence Audit */}
+        {activeTab === 'attendance' && (
+          <div className="space-y-6">
+            {/* Header + Actions */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2 text-blue-600 text-xs font-semibold uppercase tracking-wider mb-1">
+                    <QrCode className="w-4 h-4" />
+                    <span>Geofenced Staff Attendance System</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Faculty Clock-In & Punctuality Audit
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    School-level geofencing (Haversine formula), printable QR gate posters, and live arrival audits.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsQrPosterModalOpen(true)}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>Print QR Gate Poster</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Geofence GPS & Cutoff Configuration */}
+              <div className="pt-5 space-y-4">
+                <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                  <span>Campus Geofence & Resumption Settings</span>
+                </div>
+
+                {geofenceSaveNotice && (
+                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{geofenceSaveNotice}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">School Latitude</label>
+                    <input
+                      type="text"
+                      value={geofenceLat}
+                      onChange={(e) => setGeofenceLat(e.target.value)}
+                      placeholder="e.g. 6.5244"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">School Longitude</label>
+                    <input
+                      type="text"
+                      value={geofenceLon}
+                      onChange={(e) => setGeofenceLon(e.target.value)}
+                      placeholder="e.g. 3.3792"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Radius (Meters: 50m – 150m)</label>
+                    <input
+                      type="number"
+                      min={50}
+                      max={150}
+                      value={geofenceRadius}
+                      onChange={(e) => setGeofenceRadius(Number(e.target.value))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Resumption Cutoff Time</label>
+                    <input
+                      type="time"
+                      value={resumptionCutoff}
+                      onChange={(e) => setResumptionCutoff(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    disabled={isCapturingGps}
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        alert('Geolocation is not supported by your browser.');
+                        return;
+                      }
+                      setIsCapturingGps(true);
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          setGeofenceLat(pos.coords.latitude.toFixed(6));
+                          setGeofenceLon(pos.coords.longitude.toFixed(6));
+                          setIsCapturingGps(false);
+                          setGeofenceSaveNotice('Current GPS coordinates captured! Click "Save Campus Geofence" to apply.');
+                          setTimeout(() => setGeofenceSaveNotice(null), 4000);
+                        },
+                        (err) => {
+                          setIsCapturingGps(false);
+                          alert(`GPS capture failed: ${err.message}`);
+                        },
+                        { enableHighAccuracy: true, timeout: 15000 }
+                      );
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition cursor-pointer border border-slate-300 flex items-center gap-1.5"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                    <span>{isCapturingGps ? 'Capturing GPS...' : 'Capture Current School GPS Location'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const latNum = parseFloat(geofenceLat);
+                      const lonNum = parseFloat(geofenceLon);
+                      if (isNaN(latNum) || isNaN(lonNum)) {
+                        alert('Please enter valid numeric latitude and longitude coordinates.');
+                        return;
+                      }
+                      const res = await updateSchoolGeofence({
+                        latitude: latNum,
+                        longitude: lonNum,
+                        geofenceRadiusMeters: geofenceRadius,
+                        resumptionCutoffTime: resumptionCutoff,
+                      });
+                      if (res.success) {
+                        setGeofenceSaveNotice('Campus Geofence & Resumption Cutoff saved successfully.');
+                        setTimeout(() => setGeofenceSaveNotice(null), 4000);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+                  >
+                    Save Campus Geofence
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Today's Live Roll Call KPI Cards */}
+            {(() => {
+              const todayStr = todayIsoDate;
+              const todayRecords = todayStr ? staffAttendance.filter((a) => a.check_in_time.startsWith(todayStr)) : staffAttendance;
+              const presentCount = todayRecords.filter((a) => a.status === 'PRESENT').length;
+              const lateCount = todayRecords.filter((a) => a.status === 'LATE').length;
+              const clockedInTeacherIds = new Set(todayRecords.map((a) => a.teacher_id));
+              const notClockedCount = Math.max(0, teachers.length - clockedInTeacherIds.size);
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase">Total Faculty</span>
+                    <div className="text-2xl font-black text-slate-900 mt-1 tabular-nums">{teachers.length}</div>
+                    <span className="text-[10px] text-slate-400">Assigned teachers</span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+                    <span className="text-[11px] font-bold text-emerald-600 uppercase">On-Time (Present)</span>
+                    <div className="text-2xl font-black text-emerald-600 mt-1 tabular-nums">{presentCount}</div>
+                    <span className="text-[10px] text-slate-400">Before {resumptionCutoff}</span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+                    <span className="text-[11px] font-bold text-amber-600 uppercase">Late Arrivals</span>
+                    <div className="text-2xl font-black text-amber-600 mt-1 tabular-nums">{lateCount}</div>
+                    <span className="text-[10px] text-slate-400">After {resumptionCutoff}</span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+                    <span className="text-[11px] font-bold text-rose-600 uppercase">Not Clocked In</span>
+                    <div className="text-2xl font-black text-rose-600 mt-1 tabular-nums">{notClockedCount}</div>
+                    <span className="text-[10px] text-slate-400">Awaiting check-in</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Attendance Audit Log & Period Filtering */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-slate-500" />
+                  <h3 className="text-sm font-bold text-slate-900">Punctuality Audit Log</h3>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Period Filter Buttons */}
+                  <div className="flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-xs">
+                    {(['today', 'week', 'month', 'all'] as const).map((period) => (
+                      <button
+                        key={period}
+                        onClick={() => setAttendancePeriodFilter(period)}
+                        className={`px-3 py-1 rounded-md capitalize font-semibold transition cursor-pointer ${
+                          attendancePeriodFilter === period
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                      >
+                        {period === 'today' ? 'Today' : period === 'week' ? 'This Week' : period === 'month' ? 'This Month' : 'All Logs'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Teacher Selector Filter */}
+                  <select
+                    value={attendanceTeacherFilter}
+                    onChange={(e) => setAttendanceTeacherFilter(e.target.value)}
+                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  >
+                    <option value="all">All Teachers ({teachers.length})</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.full_name} ({t.teacher_id_code})
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Export CSV Button */}
+                  <button
+                    onClick={() => {
+                      const csvHeader = 'Teacher Name,Date,Check-In Time,Clock-Out Time,Status,Recorded Distance\n';
+                      const csvRows = staffAttendance.map((a) => {
+                        const date = new Date(a.check_in_time).toLocaleDateString();
+                        const checkIn = new Date(a.check_in_time).toLocaleTimeString();
+                        const clockOut = a.clock_out_time ? new Date(a.clock_out_time).toLocaleTimeString() : 'N/A';
+                        const dist = a.distance_meters !== null && a.distance_meters !== undefined ? `${a.distance_meters}m` : 'N/A';
+                        return `"${a.teacher_name}","${date}","${checkIn}","${clockOut}","${a.status}","${dist}"`;
+                      }).join('\n');
+
+                      const blob = new Blob([csvHeader + csvRows], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `staff_attendance_${new Date().toISOString().split('T')[0]}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-300 transition cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Attendance Table */}
+              {(() => {
+                const filteredAttendance = staffAttendance.filter((att) => {
+                  const attDate = new Date(att.check_in_time);
+
+                  // Filter by teacher
+                  if (attendanceTeacherFilter !== 'all' && att.teacher_id !== attendanceTeacherFilter) {
+                    return false;
+                  }
+
+                  // Filter by period
+                  if (attendancePeriodFilter === 'today') {
+                    return todayIsoDate ? att.check_in_time.startsWith(todayIsoDate) : true;
+                  } else if (attendancePeriodFilter === 'week') {
+                    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+                    return attDate >= oneWeekAgo;
+                  } else if (attendancePeriodFilter === 'month') {
+                    const oneMonthAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+                    return attDate >= oneMonthAgo;
+                  }
+                  return true;
+                });
+
+                if (filteredAttendance.length === 0) {
+                  return (
+                    <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl">
+                      <QrCode className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-slate-600">No attendance clock-in records found for this period.</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Teachers can scan the QR code poster in their staffroom to clock in.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-left text-xs divide-y divide-slate-200">
+                      <thead className="bg-slate-50 text-slate-500 font-semibold">
+                        <tr>
+                          <th className="px-4 py-3">Faculty / Teacher</th>
+                          <th className="px-4 py-3">Date</th>
+                          <th className="px-4 py-3">Check-In</th>
+                          <th className="px-4 py-3">Clock-Out</th>
+                          <th className="px-4 py-3">Punctuality Status</th>
+                          <th className="px-4 py-3">Distance Recorded</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {filteredAttendance.map((rec) => (
+                          <tr key={rec.id} className="hover:bg-slate-50/80 transition">
+                            <td className="px-4 py-3 font-semibold text-slate-900">{rec.teacher_name}</td>
+                            <td className="px-4 py-3 text-slate-600">{new Date(rec.check_in_time).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 font-mono tabular-nums text-slate-800">
+                              {new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </td>
+                            <td className="px-4 py-3 font-mono tabular-nums text-slate-600">
+                              {rec.clock_out_time ? (
+                                new Date(rec.clock_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">Active</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {rec.status === 'PRESENT' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Present • On Time
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  Late Arrival
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 font-mono text-[11px] text-slate-600">
+                              {rec.distance_meters !== null && rec.distance_meters !== undefined ? `${rec.distance_meters}m` : 'In Geofence'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* Staff Attendance QR Printable Poster Overlay Modal */}
+        {currentSchool && (
+          <StaffAttendanceQROverlay
+            school={currentSchool}
+            isOpen={isQrPosterModalOpen}
+            onClose={() => setIsQrPosterModalOpen(false)}
+          />
         )}
 
           </main>

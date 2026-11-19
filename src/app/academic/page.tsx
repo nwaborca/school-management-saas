@@ -3,6 +3,7 @@
 import { AnimatedContent } from '@/components/AnimatedContent';
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { formatNaira, calculateGradeAndRemark } from '@/types';
@@ -24,21 +25,45 @@ import {
   WifiOff,
   CloudUpload,
   RefreshCw,
+  QrCode,
+  MapPin,
+  Clock,
+  AlertCircle,
+  LogOut,
+  Camera,
 } from 'lucide-react';
+
+const StaffAttendanceScannerModal = dynamic(
+  () => import('@/components/StaffAttendanceScannerModal'),
+  { ssr: false }
+);
 
 export default function AcademicHubPage() {
   const router = useRouter();
   const {
     schoolInfo,
+    currentSchool,
     classes = [],
     subjects = [],
     teachers = [],
     students = [],
     results = [],
+    staffAttendance = [],
     updateStudentScore,
+    clockInStaff,
+    clockOutStaff,
     currentUser,
     isAuthReady,
   } = useApp();
+
+  // Phase 3: Teacher Geofenced QR Attendance State
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isClockingIn, setIsClockingIn] = useState(false);
+  const [isClockingOut, setIsClockingOut] = useState(false);
+  const [attendanceNotice, setAttendanceNotice] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   // Route Guard: Strictly require teacher role (Admins have Admin & Bursar Hubs)
   useEffect(() => {
@@ -445,6 +470,116 @@ export default function AcademicHubPage() {
     };
   }, [formClass, formClassStudents, formClassSubjects, results, selectedTerm, session]);
 
+  // Phase 3: Today's Attendance Record for Current Teacher (client-hydrated date)
+  const [clientTodayStr, setClientTodayStr] = useState<string>('');
+  const [clientDateFormatted, setClientDateFormatted] = useState<string>('Today');
+
+  useEffect(() => {
+    const now = new Date();
+    setClientTodayStr(now.toISOString().split('T')[0]);
+    setClientDateFormatted(
+      now.toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    );
+  }, []);
+
+  const teacherId = currentUser?.teacher_id || loggedTeacher?.id || currentUser?.id || '';
+
+  const todayAttendance = useMemo(() => {
+    if (!clientTodayStr) return null;
+    return staffAttendance.find(
+      (a) =>
+        (a.teacher_id === teacherId || a.teacher_name === teacherName) &&
+        a.created_at.startsWith(clientTodayStr)
+    ) || null;
+  }, [staffAttendance, teacherId, teacherName, clientTodayStr]);
+
+  const handleScanSuccess = async (scannedPayload: string) => {
+    setIsScannerOpen(false);
+    setIsClockingIn(true);
+    setAttendanceNotice(null);
+
+    const executeClockIn = async (coords?: { latitude: number; longitude: number }) => {
+      try {
+        const res = await clockInStaff({
+          scannedPayload,
+          latitude: coords?.latitude,
+          longitude: coords?.longitude,
+        });
+
+        if (res.success) {
+          setAttendanceNotice({
+            type: 'success',
+            message: res.message || 'Clock-in recorded successfully!',
+          });
+        } else {
+          setAttendanceNotice({
+            type: 'error',
+            message: res.message || 'Clock-in failed. Please scan the valid school gate QR.',
+          });
+        }
+      } catch (err: any) {
+        setAttendanceNotice({
+          type: 'error',
+          message: err?.message || 'Error clocking in. Check network connection.',
+        });
+      } finally {
+        setIsClockingIn(false);
+      }
+    };
+
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          executeClockIn({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        },
+        (geoErr) => {
+          console.warn('Geolocation lookup notice in staff clock-in:', geoErr);
+          // Still proceed to validate school ID match even if device GPS is denied/offline
+          executeClockIn();
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    } else {
+      executeClockIn();
+    }
+  };
+
+  const handleClockOut = async () => {
+    if (!todayAttendance) return;
+    setIsClockingOut(true);
+    setAttendanceNotice(null);
+
+    try {
+      const res = await clockOutStaff(todayAttendance.id);
+      if (res.success) {
+        setAttendanceNotice({
+          type: 'success',
+          message: res.message || 'Clocked out successfully.',
+        });
+      } else {
+        setAttendanceNotice({
+          type: 'error',
+          message: res.message || 'Failed to record clock-out.',
+        });
+      }
+    } catch (err: any) {
+      setAttendanceNotice({
+        type: 'error',
+        message: err?.message || 'Failed to record clock-out.',
+      });
+    } finally {
+      setIsClockingOut(false);
+    }
+  };
+
   if (!isAuthReady) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] text-slate-700 flex flex-col items-center justify-center p-4">
@@ -512,6 +647,100 @@ export default function AcademicHubPage() {
               </span>
             )}
           </div>
+        </div>
+
+        {/* Phase 3: Daily Geofenced QR Clock-In / Out Card */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Daily Faculty Attendance & Campus Clock-In
+                  </h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                    {clientDateFormatted}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Scan the printable campus gate/staffroom QR poster with your camera. GPS geofence ({currentSchool?.geofence_radius_meters || 75}m) verifies your physical arrival.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {!todayAttendance ? (
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  disabled={isClockingIn}
+                  className="px-4 py-2 rounded-lg bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>{isClockingIn ? 'Verifying Coordinates...' : 'Clock In via Gate QR'}</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                        todayAttendance.status === 'PRESENT'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}
+                    >
+                      {todayAttendance.status === 'PRESENT' ? 'Present (On Time)' : 'Late Arrival'}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-800">
+                      In: {new Date(todayAttendance.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {todayAttendance.distance_meters !== null && todayAttendance.distance_meters !== undefined && (
+                      <span className="text-[11px] font-mono text-slate-500 flex items-center gap-0.5">
+                        <MapPin className="w-3 h-3 text-slate-400" />
+                        {todayAttendance.distance_meters}m
+                      </span>
+                    )}
+                  </div>
+
+                  {!todayAttendance.clock_out_time ? (
+                    <button
+                      type="button"
+                      onClick={handleClockOut}
+                      disabled={isClockingOut}
+                      className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>{isClockingOut ? 'Recording...' : 'Clock Out'}</span>
+                    </button>
+                  ) : (
+                    <div className="px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700">
+                      Out: {new Date(todayAttendance.clock_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {attendanceNotice && (
+            <div
+              className={`mt-3 p-3 rounded-lg text-xs flex items-center gap-2 border ${
+                attendanceNotice.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border-rose-200 text-rose-800'
+              }`}
+            >
+              {attendanceNotice.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              )}
+              <span>{attendanceNotice.message}</span>
+            </div>
+          )}
         </div>
 
         {/* Tab Navigation */}
@@ -1033,6 +1262,13 @@ export default function AcademicHubPage() {
             />
           </div>
         )}
+
+        {/* Phase 3: Staff Attendance Scanner Modal */}
+        <StaffAttendanceScannerModal
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScanSuccess={handleScanSuccess}
+        />
       </div>
           </AnimatedContent>
     </div>

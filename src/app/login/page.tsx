@@ -34,10 +34,17 @@ export default function LoginPage() {
   const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    const cleanInvite = inviteCode.trim().toUpperCase();
+    if (!cleanInvite) {
+      setError('Please enter your School Invite Code (provided by your school administrator).');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await loginStudent(regNumber, pin, inviteCode);
+      const res = await loginStudent(regNumber, pin, cleanInvite);
       if (res.success) {
         router.replace('/student-hub');
       } else {
@@ -53,10 +60,17 @@ export default function LoginPage() {
   const handleStaffLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    const cleanInvite = inviteCode.trim().toUpperCase();
+    if (!cleanInvite) {
+      setError('Please enter your School Invite Code (provided by your school administrator).');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await loginStaff(username, password, inviteCode);
+      const res = await loginStaff(username, password, cleanInvite);
       if (res.success) {
         const targetRoute = res.role === 'admin' ? '/admin-hub' : '/academic-hub';
         router.replace(targetRoute);
@@ -127,18 +141,19 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Optional Multi-Tenant School Invite Code Identifier */}
+          {/* Mandatory Multi-Tenant School Invite Code Identifier */}
           <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
             <label className="flex items-center justify-between text-xs font-semibold text-[#0F172A]">
               <span className="flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>School Invite Code (Optional)</span>
+                <span>School Invite Code</span>
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Default: AEGIS-2026</span>
+              <span className="text-[10px] font-semibold text-rose-500">Required</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. AEGIS-XXXX (leave empty for default campus)"
+              required
+              placeholder="e.g. AEGIS-XXXX"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
               className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs font-mono tracking-wider text-[#0F172A] uppercase placeholder:text-slate-400 placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"

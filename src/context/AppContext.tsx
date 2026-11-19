@@ -69,9 +69,9 @@ interface AppContextType {
   }>;
   setCurrentSchoolById: (schoolId: string) => void;
 
-  // Auth
-  loginStudent: (regNumber: string, pin: string, inviteCode?: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
-  loginStaff: (username: string, pass: string, inviteCode?: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
+  // Auth (Strict Mandatory School Invite Code)
+  loginStudent: (regNumber: string, pin: string, inviteCode: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
+  loginStaff: (username: string, pass: string, inviteCode: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
   logout: () => void;
 
   // Teacher Score Entry Portal
@@ -1127,54 +1127,70 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Student Login (Reg Number + PIN + Optional School Invite Code)
+  // Student Login (Reg Number + PIN + Mandatory School Invite Code)
   const loginStudent = async (
     regNumber: string,
     pin: string,
-    inviteCode?: string
+    inviteCode: string
   ): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
     const cleanReg = regNumber.trim().toUpperCase();
     const cleanPin = pin.trim();
-    const cleanInvite = inviteCode?.trim().toUpperCase();
+    const cleanInvite = (inviteCode || '').trim().toUpperCase();
 
-    let targetSchool = currentSchool;
-    if (cleanInvite) {
-      targetSchool = schools.find((s) => s.invite_code.toUpperCase() === cleanInvite) || null;
-      if (!targetSchool && isSupabaseConfigured()) {
-        try {
-          const { data } = await supabase.from('schools').select('*').ilike('invite_code', cleanInvite).maybeSingle();
-          if (data) {
-            targetSchool = data as School;
-            setSchools((prev) => (prev.some((s) => s.id === data.id) ? prev : [data as School, ...prev]));
-          }
-        } catch {}
-      }
-      if (!targetSchool) {
-        return { success: false, message: `School invite code "${cleanInvite}" not found.` };
+    if (!cleanInvite) {
+      return {
+        success: false,
+        message: 'Please enter your School Invite Code (provided by your school administrator).',
+      };
+    }
+
+    // Step 1: Strict Tenant Lookup First in public.schools
+    let targetSchool = schools.find((s) => s.invite_code.toUpperCase() === cleanInvite) || null;
+    if (!targetSchool && isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('schools')
+          .select('*')
+          .ilike('invite_code', cleanInvite)
+          .maybeSingle();
+
+        if (!error && data) {
+          targetSchool = data as School;
+          setSchools((prev) => (prev.some((s) => s.id === data.id) ? prev : [data as School, ...prev]));
+        }
+      } catch (schoolLookupErr) {
+        console.warn('Error querying schools table for invite code:', schoolLookupErr);
       }
     }
+
+    // If no matching school row is found, immediately abort before validating student
+    if (!targetSchool) {
+      return {
+        success: false,
+        message: 'Invalid School Invite Code. Check with your school administrator.',
+      };
+    }
+
+    // Step 2: Set active tenant context and scope subsequent queries by that resolved school_id
+    setCurrentSchool(targetSchool);
 
     let student = students.find((s) => {
       const matchReg = s.reg_number.toUpperCase() === cleanReg;
       const matchPin = s.access_pin === cleanPin;
-      const matchSchool = targetSchool ? (s.school_id === targetSchool.id || !s.school_id) : true;
+      const matchSchool = s.school_id === targetSchool!.id;
       return matchReg && matchPin && matchSchool;
     });
 
-    // Fallback: If in-memory state is still loading from cloud, fetch directly from Supabase
+    // Fallback: Query Supabase students table strictly scoped by school_id
     if (!student && isSupabaseConfigured()) {
       try {
-        let query = supabase
+        const { data, error } = await supabase
           .from('students')
           .select('*')
+          .eq('school_id', targetSchool.id)
           .ilike('reg_number', cleanReg)
-          .eq('access_pin', cleanPin);
-
-        if (targetSchool) {
-          query = query.eq('school_id', targetSchool.id);
-        }
-
-        const { data, error } = await query.maybeSingle();
+          .eq('access_pin', cleanPin)
+          .maybeSingle();
 
         if (!error && data) {
           student = normalizeStudent(data);
@@ -1189,14 +1205,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: 'Invalid registration number or PIN for this school.' };
     }
 
-    const resolvedSchool = targetSchool || schools.find((s) => s.id === student?.school_id) || DEFAULT_SCHOOL;
-    setCurrentSchool(resolvedSchool);
-
     const authUser: AuthUser = {
       id: student.id,
-      school_id: resolvedSchool.id,
-      school_name: resolvedSchool.name,
-      invite_code: resolvedSchool.invite_code,
+      school_id: targetSchool.id,
+      school_name: targetSchool.name,
+      invite_code: targetSchool.invite_code,
       reg_number: student.reg_number,
       full_name: student.full_name,
       role: 'student',
@@ -1212,55 +1225,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true, role: 'student' as UserRole };
   };
 
-  // Staff Login (Username + Password + Optional School Invite Code)
+  // Staff Login (Username + Password + Mandatory School Invite Code)
   const loginStaff = async (
     username: string,
     pass: string,
-    inviteCode?: string
+    inviteCode: string
   ): Promise<{ success: boolean; message?: string; role?: UserRole }> => {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = pass.trim();
-    const cleanInvite = inviteCode?.trim().toUpperCase();
+    const cleanInvite = (inviteCode || '').trim().toUpperCase();
 
-    let targetSchool = currentSchool;
-    if (cleanInvite) {
-      targetSchool = schools.find((s) => s.invite_code.toUpperCase() === cleanInvite) || null;
-      if (!targetSchool && isSupabaseConfigured()) {
-        try {
-          const { data } = await supabase.from('schools').select('*').ilike('invite_code', cleanInvite).maybeSingle();
-          if (data) {
-            targetSchool = data as School;
-            setSchools((prev) => (prev.some((s) => s.id === data.id) ? prev : [data as School, ...prev]));
-          }
-        } catch {}
-      }
-      if (!targetSchool) {
-        return { success: false, message: `School invite code "${cleanInvite}" not found.` };
+    if (!cleanInvite) {
+      return {
+        success: false,
+        message: 'Please enter your School Invite Code (provided by your school administrator).',
+      };
+    }
+
+    // Step 1: Strict Tenant Lookup First in public.schools
+    let targetSchool = schools.find((s) => s.invite_code.toUpperCase() === cleanInvite) || null;
+    if (!targetSchool && isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('schools')
+          .select('*')
+          .ilike('invite_code', cleanInvite)
+          .maybeSingle();
+
+        if (!error && data) {
+          targetSchool = data as School;
+          setSchools((prev) => (prev.some((s) => s.id === data.id) ? prev : [data as School, ...prev]));
+        }
+      } catch (schoolLookupErr) {
+        console.warn('Error querying schools table for invite code:', schoolLookupErr);
       }
     }
 
-    // Master Super-Admin fallback for Aegis default tenant
+    // If no matching school row is found, immediately abort before validating staff
+    if (!targetSchool) {
+      return {
+        success: false,
+        message: 'Invalid School Invite Code. Check with your school administrator.',
+      };
+    }
+
+    // Step 2: Set active tenant context and scope subsequent queries by that resolved school_id
+    setCurrentSchool(targetSchool);
+
+    // Master Super-Admin check: valid only when paired with a verified registered school invite code
     if (cleanUser === 'admin' && (cleanPass === adminPassword || cleanPass === 'admin123' || cleanPass === 'admin')) {
-      const defaultSchool = targetSchool || DEFAULT_SCHOOL;
       const authUser: AuthUser = {
-        id: 'usr-admin-1',
-        school_id: defaultSchool.id,
-        school_name: defaultSchool.name,
-        invite_code: defaultSchool.invite_code,
+        id: `usr-admin-${targetSchool.id.slice(0, 8)}`,
+        school_id: targetSchool.id,
+        school_name: targetSchool.name,
+        invite_code: targetSchool.invite_code,
         username: 'admin',
         full_name: 'School Administrator',
         role: 'admin',
       };
-      setCurrentSchool(defaultSchool);
       setCurrentUser(authUser);
       setSessionCookie(authUser);
       return { success: true, role: 'admin' as UserRole };
     }
 
-    // Dynamic match against live Supabase-synchronized teacher / staff records
+    // Dynamic match against live Supabase-synchronized teacher / staff records scoped to targetSchool
     const normalizedCleanUser = cleanUser.replace(/\s+/g, '');
     let matchedTeacher = teachers.find((t) => {
-      const matchSchool = targetSchool ? (t.school_id === targetSchool.id || !t.school_id) : true;
+      const matchSchool = t.school_id === targetSchool!.id;
       if (!matchSchool) return false;
 
       const matchUsername = (t.username || '').toLowerCase().replace(/\s+/g, '');
@@ -1277,20 +1308,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return matchesIdentifier && t.password_hash === cleanPass;
     });
 
-    // Fallback: Query Supabase staff table directly scoped to school
+    // Fallback: Query Supabase staff table directly scoped strictly to resolved school_id
     if (!matchedTeacher && isSupabaseConfigured()) {
       try {
-        let query = supabase
+        const { data, error } = await supabase
           .from('staff')
           .select('*')
+          .eq('school_id', targetSchool.id)
           .or(`username.ilike.${cleanUser},staff_id_code.ilike.${cleanUser}`)
-          .eq('password_hash', cleanPass);
-
-        if (targetSchool) {
-          query = query.eq('school_id', targetSchool.id);
-        }
-
-        const { data, error } = await query.maybeSingle();
+          .eq('password_hash', cleanPass)
+          .maybeSingle();
 
         if (!error && data) {
           matchedTeacher = normalizeTeacher(data);
@@ -1306,17 +1333,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: 'Invalid username or password.' };
       }
 
-      const resolvedSchool = targetSchool || schools.find((s) => s.id === matchedTeacher?.school_id) || DEFAULT_SCHOOL;
-      setCurrentSchool(resolvedSchool);
-
       // Determine role: staff row may have role 'admin' or 'teacher'
       const assignedRole: UserRole = (matchedTeacher as any).role === 'admin' ? 'admin' : 'teacher';
 
       const authUser: AuthUser = {
         id: matchedTeacher.id,
-        school_id: resolvedSchool.id,
-        school_name: resolvedSchool.name,
-        invite_code: resolvedSchool.invite_code,
+        school_id: targetSchool.id,
+        school_name: targetSchool.name,
+        invite_code: targetSchool.invite_code,
         username: matchedTeacher.username,
         full_name: matchedTeacher.full_name,
         role: assignedRole,
@@ -1332,34 +1356,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(authUser);
       setSessionCookie(authUser);
       return { success: true, role: assignedRole };
-    }
-
-    if (cleanUser === 'teacher' && (cleanPass === 'teacher123' || cleanPass === 'teacher')) {
-      const defaultT = teachers[0];
-      if (defaultT) {
-        const defaultSchool = targetSchool || DEFAULT_SCHOOL;
-        const authUser: AuthUser = {
-          id: defaultT.id,
-          school_id: defaultSchool.id,
-          school_name: defaultSchool.name,
-          invite_code: defaultSchool.invite_code,
-          username: defaultT.username || 'teacher',
-          full_name: defaultT.full_name,
-          role: 'teacher',
-          teacher_id: defaultT.id,
-          form_class_id: defaultT.is_part_time ? undefined : defaultT.form_class_id,
-          assigned_class_id: defaultT.assigned_class_id ?? (defaultT.is_part_time ? null : (defaultT.form_class_id ?? null)),
-          form_class_name: defaultT.is_part_time ? undefined : defaultT.form_class_name,
-          assigned_subject_ids: defaultT.assigned_subject_ids,
-          assigned_subjects: defaultT.assigned_subjects || defaultT.assigned_subject_ids,
-          is_part_time: Boolean(defaultT.is_part_time),
-          session_token: defaultT.session_token,
-        };
-        setCurrentSchool(defaultSchool);
-        setCurrentUser(authUser);
-        setSessionCookie(authUser);
-        return { success: true, role: 'teacher' as UserRole };
-      }
     }
 
     return { success: false, message: 'Invalid username or password for this school.' };

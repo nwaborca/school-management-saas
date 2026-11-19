@@ -22,6 +22,7 @@ import {
   PaymentTransaction,
   ReceiptStatus,
   calculateGradeAndRemark,
+  EarlyYearsCommentary,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { generateUUID } from '@/lib/uuid';
@@ -84,6 +85,13 @@ interface AppContextType {
     session: string,
     scores: { ca1: number; ca2: number; exam: number }
   ) => void;
+  updateEarlyYearsCommentary: (
+    studentId: string,
+    classId: string,
+    term: string,
+    session: string,
+    commentary: EarlyYearsCommentary
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // Admin Class Management
   promoteClass: (
@@ -388,6 +396,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const ca2 = Number(r.ca2) || 0;
     const exam = Number(r.exam) || 0;
     const total_score = Number(r.total_score) || (ca1 + ca2 + exam);
+
+    // Extract Early Years commentary data if packed in r.early_years_data or parsed from r.remarks JSON
+    let earlyYearsData = r.early_years_data || null;
+    if (!earlyYearsData && typeof r.remarks === 'string' && r.remarks.startsWith('EY_DATA:')) {
+      try {
+        earlyYearsData = JSON.parse(r.remarks.replace('EY_DATA:', ''));
+      } catch {}
+    }
+
     return {
       id: r.id,
       school_id: r.school_id || DEFAULT_SCHOOL.id,
@@ -405,6 +422,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       total_score,
       grade: r.grade,
       remarks: r.remarks,
+      early_years_data: earlyYearsData,
       audited_by: r.audited_by,
       graded_at: r.graded_at || new Date().toISOString().split('T')[0],
       audit_timestamp: r.audit_timestamp,
@@ -1551,6 +1569,108 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error('Error saving score to Supabase term_results:', err);
       }
+    }
+  };
+
+  // Early Years Developmental Commentary Update
+  const updateEarlyYearsCommentary = async (
+    studentId: string,
+    classId: string,
+    term: string,
+    session: string,
+    commentary: EarlyYearsCommentary
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      // Find or create default Early Years subject
+      const eySubjectId = 'subj-ec-lang';
+      const student = students.find((s) => s.id === studentId);
+      const subject = subjects.find((sb) => sb.id === eySubjectId) || subjects[0];
+      const encodedRemarks = `EY_DATA:${JSON.stringify(commentary)}`;
+
+      const existingIndex = results.findIndex(
+        (r) =>
+          r.student_id === studentId &&
+          r.subject_id === eySubjectId &&
+          r.term === term &&
+          r.session === session
+      );
+
+      let updatedResult: StudentResult;
+      const staffName = currentUser?.full_name || currentUser?.username || 'Form Teacher';
+      const nowIso = new Date().toISOString();
+
+      const commentaryWithMeta: EarlyYearsCommentary = {
+        ...commentary,
+        updated_at: nowIso,
+        teacher_name: staffName,
+      };
+
+      if (existingIndex >= 0) {
+        updatedResult = {
+          ...results[existingIndex],
+          remarks: encodedRemarks,
+          early_years_data: commentaryWithMeta,
+          audited_by: staffName,
+          audit_timestamp: nowIso,
+        };
+        setResults((prev) => prev.map((r, i) => (i === existingIndex ? updatedResult : r)));
+      } else {
+        updatedResult = {
+          id: `res-ey-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          student_id: studentId,
+          student_name: student?.full_name || 'Pupil',
+          reg_number: student?.reg_number || 'N/A',
+          class_id: classId,
+          subject_id: eySubjectId,
+          subject_name: subject?.name || 'Early Years Development',
+          term,
+          session,
+          ca1: 0,
+          ca2: 0,
+          exam: 0,
+          total_score: 100, // Non-numeric rubric representation
+          grade: 'A',
+          remarks: encodedRemarks,
+          early_years_data: commentaryWithMeta,
+          graded_at: nowIso.split('T')[0],
+          audited_by: staffName,
+          audit_timestamp: nowIso,
+        };
+        setResults((prev) => [...prev, updatedResult]);
+      }
+
+      if (isSupabaseConfigured()) {
+        try {
+          const dbSubjectId = toDbSubjectId(updatedResult.subject_id);
+          const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+          const payload = {
+            student_id: updatedResult.student_id,
+            class_id: updatedResult.class_id,
+            subject_id: dbSubjectId,
+            school_id: activeSchoolId,
+            term: updatedResult.term,
+            session: updatedResult.session,
+            ca1: 0,
+            ca2: 0,
+            exam: 0,
+            grade: 'A',
+            remarks: encodedRemarks,
+            audited_by: updatedResult.audited_by,
+            graded_at: updatedResult.graded_at,
+            audit_timestamp: updatedResult.audit_timestamp,
+          };
+
+          await supabase.from('term_results').upsert(payload, {
+            onConflict: 'student_id, subject_id, term, session',
+          });
+        } catch (dbErr) {
+          console.warn('Supabase early years save note:', dbErr);
+        }
+      }
+
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed saving early years commentary.' };
     }
   };
 
@@ -3122,6 +3242,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateSchoolGeofence,
       clockInStaff,
       clockOutStaff,
+      updateEarlyYearsCommentary,
       generateDailyParentPass,
       generateDelegatePass,
       revokePickupPass,
@@ -3153,6 +3274,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateSchoolGeofence,
       clockInStaff,
       clockOutStaff,
+      updateEarlyYearsCommentary,
       generateDailyParentPass,
       generateDelegatePass,
       revokePickupPass,

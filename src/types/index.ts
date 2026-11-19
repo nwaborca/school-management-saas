@@ -118,6 +118,24 @@ export interface TeacherSubjectAllocation {
 // 4. Results/Grades: CA1 (20) + CA2 (20) + Exam (60) = 100
 export type LetterGrade = 'A' | 'B' | 'C' | 'D' | 'F';
 
+// Early Years Developmental Mastery Levels & Domains
+export type EarlyYearsMastery = 'Emerging' | 'Developing' | 'Proficient' | 'Mastered';
+
+export interface EarlyYearsDomainRatings {
+  language_phonics: EarlyYearsMastery;
+  early_numeracy: EarlyYearsMastery;
+  motor_skills: EarlyYearsMastery;
+  social_emotional: EarlyYearsMastery;
+  hygiene_health: EarlyYearsMastery;
+}
+
+export interface EarlyYearsCommentary {
+  ratings: EarlyYearsDomainRatings;
+  narrative_observation: string;
+  updated_at?: string;
+  teacher_name?: string;
+}
+
 export interface StudentResult {
   id: string;
   school_id?: string;
@@ -135,6 +153,7 @@ export interface StudentResult {
   total_score: number;  // ca1 + ca2 + exam (Max 100)
   grade: LetterGrade;   // A, B, C, D, F
   remarks?: string;
+  early_years_data?: EarlyYearsCommentary | null; // Structured Early Years developmental commentary
   graded_at: string;
   // Audit trace provenance
   audited_by?: string;
@@ -324,7 +343,14 @@ export function resolveClassStage(cls?: Partial<AcademicClass> | null): Educatio
   if (cls.stage) return cls.stage;
 
   const name = (cls.name || cls.level || '').toUpperCase();
-  if (name.includes('CRECHE') || name.includes('NURSERY') || name.includes('PRE-NURSERY')) {
+  if (
+    name.includes('CRECHE') ||
+    name.includes('PLAYGROUP') ||
+    name.includes('KG') ||
+    name.includes('KINDERGARTEN') ||
+    name.includes('NURSERY') ||
+    name.includes('PRE-NURSERY')
+  ) {
     return 'early_childhood';
   }
   if (name.includes('PRIMARY 1') || name.includes('PRIMARY 2') || name.includes('PRIMARY 3') || name.includes('PRI 1') || name.includes('PRI 2') || name.includes('PRI 3')) {
@@ -337,6 +363,23 @@ export function resolveClassStage(cls?: Partial<AcademicClass> | null): Educatio
     return 'junior_secondary';
   }
   return 'senior_secondary';
+}
+
+// Helper: Check if a class or stage belongs to Nigerian Early Years
+export function isEarlyYearsClass(clsOrName?: Partial<AcademicClass> | string | null): boolean {
+  if (!clsOrName) return false;
+  if (typeof clsOrName === 'string') {
+    const upper = clsOrName.toUpperCase();
+    return (
+      upper.includes('CRECHE') ||
+      upper.includes('PLAYGROUP') ||
+      upper.includes('KG') ||
+      upper.includes('KINDERGARTEN') ||
+      upper.includes('NURSERY') ||
+      upper.includes('PRE-NURSERY')
+    );
+  }
+  return resolveClassStage(clsOrName) === 'early_childhood';
 }
 
 // Utility: Format currency to Nigerian Naira

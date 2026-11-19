@@ -6,7 +6,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { formatNaira, calculateGradeAndRemark } from '@/types';
+import { formatNaira, calculateGradeAndRemark, isEarlyYearsClass, EarlyYearsMastery, EarlyYearsDomainRatings, EarlyYearsCommentary } from '@/types';
 import { filterSubjectsForClassAndStream, getSeniorStreamForClass } from '@/lib/streamSpecialization';
 import EnrollStudentForm from '@/components/EnrollStudentForm';
 import {
@@ -57,6 +57,7 @@ export default function AcademicHubPage() {
     staffAttendance = [],
     pickupPasses = [],
     updateStudentScore,
+    updateEarlyYearsCommentary,
     clockInStaff,
     clockOutStaff,
     verifyAndHandoverPass,
@@ -87,6 +88,10 @@ export default function AcademicHubPage() {
     message: string;
     reason?: string;
   } | null>(null);
+
+  // Early Years Grading State (Creche, KG, Nursery)
+  const [eyPupilComments, setEyPupilComments] = useState<Record<string, EarlyYearsCommentary>>({});
+  const [eySavingNotice, setEySavingNotice] = useState<string | null>(null);
 
   // Route Guard: Strictly require teacher role (Admins have Admin & Bursar Hubs)
   useEffect(() => {
@@ -723,6 +728,128 @@ export default function AcademicHubPage() {
     );
   }, [pickupPasses, clientTodayStr]);
 
+  // Phase: Detect if current scope is Early Years (Creche, Playgroup, KG, Nursery)
+  const isTargetEarlyYears = useMemo(() => {
+    if (selectedClassId !== 'all') {
+      return isEarlyYearsClass(currentClass);
+    }
+    // If all classes selected, check if all classes offering subject are early years
+    return classesOfferingSubject.length > 0 && classesOfferingSubject.every((c) => isEarlyYearsClass(c));
+  }, [selectedClassId, currentClass, classesOfferingSubject]);
+
+  // Initialize and read existing early years commentary from results
+  useEffect(() => {
+    const map: Record<string, EarlyYearsCommentary> = {};
+    classStudents.forEach((std) => {
+      const match = results.find(
+        (r) =>
+          r.student_id === std.id &&
+          r.term === selectedTerm &&
+          r.session === session &&
+          r.early_years_data
+      );
+      if (match?.early_years_data) {
+        map[std.id] = match.early_years_data;
+      } else {
+        map[std.id] = {
+          ratings: {
+            language_phonics: 'Developing',
+            early_numeracy: 'Developing',
+            motor_skills: 'Proficient',
+            social_emotional: 'Proficient',
+            hygiene_health: 'Proficient',
+          },
+          narrative_observation: '',
+        };
+      }
+    });
+    setEyPupilComments(map);
+  }, [classStudents, results, selectedTerm, session]);
+
+  const handleEyRatingChange = (
+    studentId: string,
+    domain: keyof EarlyYearsDomainRatings,
+    level: EarlyYearsMastery
+  ) => {
+    setEyPupilComments((prev) => {
+      const curr = prev[studentId] || {
+        ratings: {
+          language_phonics: 'Developing',
+          early_numeracy: 'Developing',
+          motor_skills: 'Proficient',
+          social_emotional: 'Proficient',
+          hygiene_health: 'Proficient',
+        },
+        narrative_observation: '',
+      };
+      return {
+        ...prev,
+        [studentId]: {
+          ...curr,
+          ratings: {
+            ...curr.ratings,
+            [domain]: level,
+          },
+        },
+      };
+    });
+  };
+
+  const handleEyCommentChange = (studentId: string, text: string) => {
+    setEyPupilComments((prev) => {
+      const curr = prev[studentId] || {
+        ratings: {
+          language_phonics: 'Developing',
+          early_numeracy: 'Developing',
+          motor_skills: 'Proficient',
+          social_emotional: 'Proficient',
+          hygiene_health: 'Proficient',
+        },
+        narrative_observation: '',
+      };
+      return {
+        ...prev,
+        [studentId]: {
+          ...curr,
+          narrative_observation: text,
+        },
+      };
+    });
+  };
+
+  const applyEyTemplateComment = (studentId: string, pupilName: string, template: string) => {
+    const firstName = pupilName.split(' ')[0] || 'Pupil';
+    const customized = template.replace(/\[Name\]/g, firstName);
+    handleEyCommentChange(studentId, customized);
+  };
+
+  const handleSaveEarlyYearsCommentary = async (studentId: string, studentClassId: string) => {
+    const commentData = eyPupilComments[studentId];
+    if (!commentData) return;
+
+    setEySavingNotice('Saving developmental observation...');
+    try {
+      const res = await updateEarlyYearsCommentary(
+        studentId,
+        studentClassId,
+        selectedTerm,
+        session,
+        commentData
+      );
+
+      if (res.success) {
+        setEySavingNotice(`Saved observation for ${students.find((s) => s.id === studentId)?.full_name || 'pupil'}!`);
+        setTimeout(() => setEySavingNotice(null), 3000);
+      } else {
+        setEySavingNotice(`Save error: ${res.error || 'Failed'}`);
+        setTimeout(() => setEySavingNotice(null), 3000);
+      }
+    } catch {
+      setEySavingNotice('Error saving developmental report.');
+      setTimeout(() => setEySavingNotice(null), 3000);
+    }
+  };
+
   if (!isAuthReady) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] text-slate-700 flex flex-col items-center justify-center p-4">
@@ -1005,6 +1132,209 @@ export default function AcademicHubPage() {
               </div>
             </div>
 
+            {/* Early Years Developmental Rubric (Creche, Playgroup, KG, Nursery) vs Numeric Grid */}
+            {isTargetEarlyYears ? (
+              <div className="space-y-6">
+                <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                  <div>
+                    <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      <span>Early Childhood Developmental Rubric Active</span>
+                    </div>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      Numeric CA1/CA2/Exam (100) scoring is disabled for Early Years ({selectedClassId === 'all' ? 'Creche / KG / Nursery' : currentClass?.name}). Assess developmental milestones across 5 standard early-learning domains with descriptive narrative feedback.
+                    </p>
+                  </div>
+                  {eySavingNotice && (
+                    <span className="text-xs font-semibold text-emerald-700 bg-white px-3 py-1.5 rounded-lg border border-emerald-300 shadow-xs flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 animate-pulse" />
+                      {eySavingNotice}
+                    </span>
+                  )}
+                </div>
+
+                {classStudents.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs italic bg-white border border-slate-200 rounded-xl">
+                    No pupils currently enrolled in {currentClass?.name || 'this Early Years class'}.
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {classStudents.map((std) => {
+                      const studentClass = classes.find((c) => c.id === std.class_id);
+                      const pupilData = eyPupilComments[std.id] || {
+                        ratings: {
+                          language_phonics: 'Developing',
+                          early_numeracy: 'Developing',
+                          motor_skills: 'Proficient',
+                          social_emotional: 'Proficient',
+                          hygiene_health: 'Proficient',
+                        },
+                        narrative_observation: '',
+                      };
+
+                      const domains: { key: keyof EarlyYearsDomainRatings; label: string; desc: string }[] = [
+                        { key: 'language_phonics', label: 'Language, Phonics & Communication', desc: 'Letter sounds, oral expression & circle-time speech' },
+                        { key: 'early_numeracy', label: 'Early Numeracy & Cognitive Recognition', desc: 'Number identification, counting, shapes & colors' },
+                        { key: 'motor_skills', label: 'Fine & Gross Motor Skills', desc: 'Pencil grip, scissors, coloring, running & physical balance' },
+                        { key: 'social_emotional', label: 'Social, Emotional & Play Interaction', desc: 'Sharing, peer cooperation, self-regulation & empathy' },
+                        { key: 'hygiene_health', label: 'Personal Hygiene & Health Habits', desc: 'Handwashing, eating manners & classroom tidiness' },
+                      ];
+
+                      const levels: EarlyYearsMastery[] = ['Emerging', 'Developing', 'Proficient', 'Mastered'];
+
+                      return (
+                        <div
+                          key={std.id}
+                          className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs transition hover:border-slate-300 space-y-4"
+                        >
+                          {/* Pupil Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-sm border border-amber-200">
+                                {std.full_name.charAt(0)}
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900 text-sm">{std.full_name}</h4>
+                                <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
+                                  <span>{std.reg_number}</span>
+                                  <span>•</span>
+                                  <span className="text-amber-700 font-medium">
+                                    {studentClass?.name || std.class_grade || 'Early Years'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEarlyYearsCommentary(std.id, std.class_id)}
+                              className="self-start sm:self-auto px-3.5 py-1.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                            >
+                              <Save className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Save Observation</span>
+                            </button>
+                          </div>
+
+                          {/* 5 Developmental Domains */}
+                          <div className="space-y-3 pt-1">
+                            <div className="text-xs font-bold text-slate-700 tracking-wide uppercase">
+                              Developmental Milestones & Rubric
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {domains.map((dom) => {
+                                const currentLevel = pupilData.ratings[dom.key];
+                                return (
+                                  <div
+                                    key={dom.key}
+                                    className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between"
+                                  >
+                                    <div>
+                                      <p className="text-xs font-bold text-slate-900 leading-snug">{dom.label}</p>
+                                      <p className="text-[11px] text-slate-500 mt-0.5 leading-tight">{dom.desc}</p>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-1 mt-3">
+                                      {levels.map((lvl) => {
+                                        const isSelected = currentLevel === lvl;
+                                        return (
+                                          <button
+                                            key={lvl}
+                                            type="button"
+                                            onClick={() => handleEyRatingChange(std.id, dom.key, lvl)}
+                                            className={`py-1 text-[10px] font-bold rounded transition text-center cursor-pointer ${
+                                              isSelected
+                                                ? lvl === 'Mastered'
+                                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                                  : lvl === 'Proficient'
+                                                  ? 'bg-blue-600 text-white shadow-xs'
+                                                  : lvl === 'Developing'
+                                                  ? 'bg-amber-500 text-white shadow-xs'
+                                                  : 'bg-purple-600 text-white shadow-xs'
+                                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                                            }`}
+                                          >
+                                            {lvl}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Form Teacher Narrative Observation */}
+                          <div className="space-y-2 pt-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                <span>Form Teacher Narrative Observation</span>
+                                <span className="text-[10px] text-slate-400 font-normal">(Printed on Report Card)</span>
+                              </label>
+
+                              {/* Quick Nigerian Comment Templates */}
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[10px] text-slate-500 font-semibold mr-1">Quick Templates:</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    applyEyTemplateComment(
+                                      std.id,
+                                      std.full_name,
+                                      '[Name] has shown remarkable enthusiasm in phonics and early numeracy. Demonstrates excellent fine motor control and interacts warmly with peers during circle play.'
+                                    )
+                                  }
+                                  className="text-[10px] px-2 py-0.5 rounded bg-slate-100 hover:bg-amber-100 text-slate-700 border border-slate-200 transition cursor-pointer"
+                                  title="Phonics & Circle Play"
+                                >
+                                  ✨ Phonics & Play
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    applyEyTemplateComment(
+                                      std.id,
+                                      std.full_name,
+                                      '[Name] is steadily developing letter-sound recognition and number concepts. Active and enthusiastic in outdoor activities; encourages cooperative play.'
+                                    )
+                                  }
+                                  className="text-[10px] px-2 py-0.5 rounded bg-slate-100 hover:bg-amber-100 text-slate-700 border border-slate-200 transition cursor-pointer"
+                                  title="Sound Recognition & Outdoor"
+                                >
+                                  🌱 Sound & Outdoor
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    applyEyTemplateComment(
+                                      std.id,
+                                      std.full_name,
+                                      '[Name] displays outstanding social manners and personal hygiene. Shows creative flair in coloring and storytelling sessions.'
+                                    )
+                                  }
+                                  className="text-[10px] px-2 py-0.5 rounded bg-slate-100 hover:bg-amber-100 text-slate-700 border border-slate-200 transition cursor-pointer"
+                                  title="Manners & Creativity"
+                                >
+                                  🎨 Manners & Art
+                                </button>
+                              </div>
+                            </div>
+
+                            <textarea
+                              rows={3}
+                              value={pupilData.narrative_observation}
+                              onChange={(e) => handleEyCommentChange(std.id, e.target.value)}
+                              placeholder={`Enter detailed teacher remarks for ${std.full_name} (e.g. phonics progress, circle time engagement, motor milestones)...`}
+                              className="w-full bg-slate-50 focus:bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-transparent transition"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
             {/* Quick Metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
@@ -1285,6 +1615,8 @@ export default function AcademicHubPage() {
                 <span><strong className="text-rose-500">F9</strong> (0 - 39%): Fail</span>
               </div>
             </div>
+              </>
+            )}
           </div>
         )}
 

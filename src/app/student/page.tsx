@@ -6,7 +6,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { Trophy3DCanvas } from '@/components/3d/Trophy3DCanvas';
-import { formatNaira, StudentProfile } from '@/types';
+import { formatNaira, StudentProfile, isEarlyYearsClass, EarlyYearsDomainRatings, EarlyYearsMastery, EarlyYearsCommentary } from '@/types';
 import { filterSubjectsForClassAndStream } from '@/lib/streamSpecialization';
 import { uploadReceiptToStorage } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
@@ -159,6 +159,24 @@ export default function StudentDashboardPage() {
   const averageScore =
     studentResults.length > 0 ? (totalScoreObtained / studentResults.length).toFixed(1) : '0.0';
   const subjectsPassed = studentResults.filter((r) => r.total_score >= 50).length;
+
+  const isEarlyYearsPupil = useMemo(() => {
+    if (!activeStudent) return false;
+    return isEarlyYearsClass(studentClass || activeStudent.class_grade || activeStudent.class_id);
+  }, [activeStudent, studentClass]);
+
+  // Extract Early Years commentary and ratings if early years pupil
+  const earlyYearsData: EarlyYearsCommentary | null = useMemo(() => {
+    if (!activeStudent) return null;
+    const match = results.find(
+      (r) =>
+        r.student_id === activeStudent.id &&
+        r.term === selectedTerm &&
+        r.session === (activeStudent.session || schoolInfo.session) &&
+        r.early_years_data
+    );
+    return match?.early_years_data || null;
+  }, [activeStudent, results, selectedTerm, schoolInfo.session]);
 
   const classFeeStructure = activeStudent
     ? feeStructures.find(
@@ -674,6 +692,100 @@ export default function StudentDashboardPage() {
                     <CreditCard className="w-4 h-4" />
                     <span>Go to School Fees Hub</span>
                   </button>
+                </div>
+              ) : isEarlyYearsPupil ? (
+                /* Early Years Developmental Assessment View (Creche, KG, Nursery) */
+                <div className="p-6 space-y-6">
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
+                    <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      <span>Early Childhood Developmental Evaluation ({selectedTerm})</span>
+                    </div>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      Progress in early years is tracked through developmental milestones across foundational cognitive, motor, and socio-emotional domains.
+                    </p>
+                  </div>
+
+                  {/* 5 Milestone Domain Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {[
+                      {
+                        key: 'language_phonics' as const,
+                        title: 'Language, Phonics & Communication',
+                        desc: 'Letter sounds, circle-time speech & oral vocabulary',
+                        rating: earlyYearsData?.ratings?.language_phonics || 'Developing',
+                      },
+                      {
+                        key: 'early_numeracy' as const,
+                        title: 'Early Numeracy & Recognition',
+                        desc: 'Number identification, counting, shapes & color sorting',
+                        rating: earlyYearsData?.ratings?.early_numeracy || 'Developing',
+                      },
+                      {
+                        key: 'motor_skills' as const,
+                        title: 'Fine & Gross Motor Skills',
+                        desc: 'Pencil control, scissor grip, running & spatial coordination',
+                        rating: earlyYearsData?.ratings?.motor_skills || 'Proficient',
+                      },
+                      {
+                        key: 'social_emotional' as const,
+                        title: 'Social, Emotional & Play Interaction',
+                        desc: 'Sharing, peer empathy, cooperative play & self-control',
+                        rating: earlyYearsData?.ratings?.social_emotional || 'Proficient',
+                      },
+                      {
+                        key: 'hygiene_health' as const,
+                        title: 'Personal Hygiene & Health Habits',
+                        desc: 'Handwashing routine, tidiness & healthy eating manners',
+                        rating: earlyYearsData?.ratings?.hygiene_health || 'Proficient',
+                      },
+                    ].map((dom) => (
+                      <div
+                        key={dom.key}
+                        className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3"
+                      >
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 leading-snug">{dom.title}</h4>
+                          <p className="text-[11px] text-slate-500 mt-1 leading-tight">{dom.desc}</p>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                          <span className="text-[10px] uppercase font-semibold text-slate-500">Mastery Level:</span>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                              dom.rating === 'Mastered'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : dom.rating === 'Proficient'
+                                ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                : dom.rating === 'Developing'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : 'bg-purple-100 text-purple-800 border border-purple-300'
+                            }`}
+                          >
+                            {dom.rating}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Form Teacher Narrative Observation */}
+                  <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-amber-600" />
+                        <span>Form Teacher Narrative Observation</span>
+                      </span>
+                      {earlyYearsData?.teacher_name && (
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          Assessed by {earlyYearsData.teacher_name}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200 italic">
+                      {earlyYearsData?.narrative_observation ||
+                        `${activeStudent.full_name} is actively engaged in classroom activities, demonstrating positive social development, curiosity during circle-time phonics, and steady fine-motor progression.`}
+                    </p>
+                  </div>
                 </div>
               ) : studentResults.length === 0 ? (
                 <div className="p-8 text-center text-slate-500 text-xs italic">
@@ -1537,51 +1649,146 @@ export default function StudentDashboardPage() {
                   </div>
                 </div>
 
-                {/* Grades Table */}
-                <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-100 uppercase text-[10px] tracking-wider text-gray-700 border-b">
-                      <tr>
-                        <th className="px-4 py-2.5">Subject</th>
-                        <th className="px-3 py-2.5 text-center">CA 1 (20)</th>
-                        <th className="px-3 py-2.5 text-center">CA 2 (20)</th>
-                        <th className="px-3 py-2.5 text-center">Exam (60)</th>
-                        <th className="px-3 py-2.5 text-center font-bold">Total (100)</th>
-                        <th className="px-3 py-2.5 text-center">Grade</th>
-                        <th className="px-4 py-2.5">Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {studentResults.map((r) => (
-                        <tr key={r.id}>
-                          <td className="px-4 py-2 font-semibold text-gray-900">{r.subject_name}</td>
-                          <td className="px-3 py-2 text-center font-mono">{r.ca1}</td>
-                          <td className="px-3 py-2 text-center font-mono">{r.ca2}</td>
-                          <td className="px-3 py-2 text-center font-mono">{r.exam}</td>
-                          <td className="px-3 py-2 text-center font-mono font-bold text-gray-900">{r.total_score}</td>
-                          <td className="px-3 py-2 text-center font-bold font-mono text-rose-900">{r.grade}</td>
-                          <td className="px-4 py-2 text-gray-600 italic text-[11px]">{r.remarks}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {/* Performance Evaluation: Early Years Rubric vs Standard Score Table */}
+                {isEarlyYearsPupil ? (
+                  <div className="space-y-4">
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <span className="text-xs font-bold text-amber-900 uppercase tracking-wide block">
+                        Early Childhood Developmental Milestones & Rubric
+                      </span>
+                      <p className="text-[11px] text-amber-800 mt-0.5">
+                        Performance is benchmarked against Nigerian Early Years milestones across 5 fundamental learning areas.
+                      </p>
+                    </div>
 
-                {/* Score Summary */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-gray-50 border border-gray-200 text-xs">
-                  <div>
-                    <span className="text-slate-600">Term Average Score:</span>
-                    <strong className="text-rose-900 font-bold ml-1 text-base">{averageScore}%</strong>
+                    <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-100 uppercase text-[10px] tracking-wider text-gray-700 border-b">
+                          <tr>
+                            <th className="px-4 py-2.5">Developmental Domain</th>
+                            <th className="px-4 py-2.5">Core Competencies Observed</th>
+                            <th className="px-4 py-2.5 text-center font-bold">Mastery Level</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {[
+                            {
+                              domain: '1. Language, Phonics & Communication',
+                              competencies: 'Letter sounds, oral storytelling, speech clarity & circle-time sharing',
+                              level: earlyYearsData?.ratings?.language_phonics || 'Developing',
+                            },
+                            {
+                              domain: '2. Early Numeracy & Recognition',
+                              competencies: 'Number identification, counting items, basic shapes & color recognition',
+                              level: earlyYearsData?.ratings?.early_numeracy || 'Developing',
+                            },
+                            {
+                              domain: '3. Fine & Gross Motor Skills',
+                              competencies: 'Pencil control, crayon coloring, scissor grip & physical balance',
+                              level: earlyYearsData?.ratings?.motor_skills || 'Proficient',
+                            },
+                            {
+                              domain: '4. Social, Emotional & Play Interaction',
+                              competencies: 'Cooperation with peers, empathy, following rules & self-regulation',
+                              level: earlyYearsData?.ratings?.social_emotional || 'Proficient',
+                            },
+                            {
+                              domain: '5. Personal Hygiene & Health Habits',
+                              competencies: 'Handwashing routine, tidiness, eating manners & personal care',
+                              level: earlyYearsData?.ratings?.hygiene_health || 'Proficient',
+                            },
+                          ].map((item, idx) => (
+                            <tr key={idx}>
+                              <td className="px-4 py-3 font-semibold text-gray-900">{item.domain}</td>
+                              <td className="px-4 py-3 text-gray-600 text-[11px]">{item.competencies}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span
+                                  className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-[11px] ${
+                                    item.level === 'Mastered'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : item.level === 'Proficient'
+                                      ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                      : item.level === 'Developing'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                      : 'bg-purple-100 text-purple-800 border border-purple-300'
+                                  }`}
+                                >
+                                  {item.level}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Teacher Narrative Observation */}
+                    <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 text-xs space-y-1.5">
+                      <span className="text-[10px] text-slate-600 uppercase font-bold block">
+                        Form Teacher Narrative Observation:
+                      </span>
+                      <p className="text-gray-800 italic leading-relaxed">
+                        &ldquo;
+                        {earlyYearsData?.narrative_observation ||
+                          `${activeStudent.full_name} has shown steady growth in language and phonics. Participates warmly during group play and displays good fine-motor control.`}
+                        &rdquo;
+                      </p>
+                      {earlyYearsData?.teacher_name && (
+                        <p className="text-[10px] text-gray-500 text-right pt-1">
+                          — {earlyYearsData.teacher_name} (Form Teacher)
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-slate-600">Subjects Passed:</span>
-                    <strong className="text-gray-900 font-bold ml-1">{subjectsPassed} of {studentResults.length}</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-600">Principal Sign-off:</span>
-                    <strong className="text-gray-900 font-bold ml-1">{schoolInfo.principal_name}</strong>
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Grades Table */}
+                    <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-100 uppercase text-[10px] tracking-wider text-gray-700 border-b">
+                          <tr>
+                            <th className="px-4 py-2.5">Subject</th>
+                            <th className="px-3 py-2.5 text-center">CA 1 (20)</th>
+                            <th className="px-3 py-2.5 text-center">CA 2 (20)</th>
+                            <th className="px-3 py-2.5 text-center">Exam (60)</th>
+                            <th className="px-3 py-2.5 text-center font-bold">Total (100)</th>
+                            <th className="px-3 py-2.5 text-center">Grade</th>
+                            <th className="px-4 py-2.5">Remarks</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {studentResults.map((r) => (
+                            <tr key={r.id}>
+                              <td className="px-4 py-2 font-semibold text-gray-900">{r.subject_name}</td>
+                              <td className="px-3 py-2 text-center font-mono">{r.ca1}</td>
+                              <td className="px-3 py-2 text-center font-mono">{r.ca2}</td>
+                              <td className="px-3 py-2 text-center font-mono">{r.exam}</td>
+                              <td className="px-3 py-2 text-center font-mono font-bold text-gray-900">{r.total_score}</td>
+                              <td className="px-3 py-2 text-center font-bold font-mono text-rose-900">{r.grade}</td>
+                              <td className="px-4 py-2 text-gray-600 italic text-[11px]">{r.remarks}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Score Summary */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-gray-50 border border-gray-200 text-xs">
+                      <div>
+                        <span className="text-slate-600">Term Average Score:</span>
+                        <strong className="text-rose-900 font-bold ml-1 text-base">{averageScore}%</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Subjects Passed:</span>
+                        <strong className="text-gray-900 font-bold ml-1">{subjectsPassed} of {studentResults.length}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Principal Sign-off:</span>
+                        <strong className="text-gray-900 font-bold ml-1">{schoolInfo.principal_name}</strong>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* MANDATORY NDPA 2023 STATUTORY COMPLIANCE BADGE ON RESULT SLIP */}
                 <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 flex items-center justify-between text-xs text-emerald-900">

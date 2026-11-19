@@ -182,7 +182,7 @@ export default function AdminHubPage() {
   const [isQrPosterModalOpen, setIsQrPosterModalOpen] = useState(false);
   const [geofenceLat, setGeofenceLat] = useState<string>(currentSchool?.latitude?.toString() || '6.5244');
   const [geofenceLon, setGeofenceLon] = useState<string>(currentSchool?.longitude?.toString() || '3.3792');
-  const [geofenceRadius, setGeofenceRadius] = useState<number>(currentSchool?.geofence_radius_meters || 75);
+  const [geofenceRadius, setGeofenceRadius] = useState<number>(currentSchool?.geofence_radius_meters || 150);
   const [resumptionCutoff, setResumptionCutoff] = useState<string>(currentSchool?.resumption_cutoff_time || '08:00');
   const [isCapturingGps, setIsCapturingGps] = useState(false);
   const [geofenceSaveNotice, setGeofenceSaveNotice] = useState<string | null>(null);
@@ -1384,11 +1384,11 @@ export default function AdminHubPage() {
                   </div>
 
                   <div>
-                    <label className="block text-slate-600 font-semibold mb-1">Radius (Meters: 50m – 150m)</label>
+                    <label className="block text-slate-600 font-semibold mb-1">Radius (Meters: 50m – 300m)</label>
                     <input
                       type="number"
                       min={50}
-                      max={150}
+                      max={300}
                       value={geofenceRadius}
                       onChange={(e) => setGeofenceRadius(Number(e.target.value))}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono"
@@ -1407,35 +1407,40 @@ export default function AdminHubPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    disabled={isCapturingGps}
-                    onClick={() => {
-                      if (!navigator.geolocation) {
-                        alert('Geolocation is not supported by your browser.');
-                        return;
-                      }
-                      setIsCapturingGps(true);
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                          setGeofenceLat(pos.coords.latitude.toFixed(6));
-                          setGeofenceLon(pos.coords.longitude.toFixed(6));
-                          setIsCapturingGps(false);
-                          setGeofenceSaveNotice('Current GPS coordinates captured! Click "Save Campus Geofence" to apply.');
-                          setTimeout(() => setGeofenceSaveNotice(null), 4000);
-                        },
-                        (err) => {
-                          setIsCapturingGps(false);
-                          alert(`GPS capture failed: ${err.message}`);
-                        },
-                        { enableHighAccuracy: true, timeout: 15000 }
-                      );
-                    }}
-                    className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition cursor-pointer border border-slate-300 flex items-center gap-1.5"
-                  >
-                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                    <span>{isCapturingGps ? 'Capturing GPS...' : 'Capture Current School GPS Location'}</span>
-                  </button>
+                  <div className="space-y-1.5">
+                    <button
+                      type="button"
+                      disabled={isCapturingGps}
+                      onClick={() => {
+                        if (!navigator.geolocation) {
+                          alert('Geolocation is not supported by your browser.');
+                          return;
+                        }
+                        setIsCapturingGps(true);
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            setGeofenceLat(pos.coords.latitude.toFixed(6));
+                            setGeofenceLon(pos.coords.longitude.toFixed(6));
+                            setIsCapturingGps(false);
+                            setGeofenceSaveNotice('Current GPS coordinates captured! Click "Save Campus Geofence" to apply.');
+                            setTimeout(() => setGeofenceSaveNotice(null), 4000);
+                          },
+                          (err) => {
+                            setIsCapturingGps(false);
+                            alert(`GPS capture failed: ${err.message}`);
+                          },
+                          { enableHighAccuracy: true, timeout: 15000 }
+                        );
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition cursor-pointer border border-slate-300 flex items-center gap-1.5"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                      <span>{isCapturingGps ? 'Capturing GPS...' : 'Capture Current School GPS Location'}</span>
+                    </button>
+                    <p className="text-[11px] text-slate-500">
+                      Tip: For best accuracy, capture your school&apos;s GPS coordinates using a mobile phone at the school gate/staffroom rather than a desktop/laptop.
+                    </p>
+                  </div>
 
                   <button
                     type="button"

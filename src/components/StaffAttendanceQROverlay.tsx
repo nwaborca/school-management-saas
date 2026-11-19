@@ -76,7 +76,7 @@ export default function StaffAttendanceQROverlay({
                 <span>Geofence</span>
               </div>
               <div className="text-xs font-bold text-slate-800 mt-0.5">
-                {school.geofence_radius_meters || 75}m Radius
+                {school.geofence_radius_meters || 150}m Radius
               </div>
             </div>
 

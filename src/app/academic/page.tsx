@@ -726,7 +726,7 @@ export default function AcademicHubPage() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Scan the printable campus gate/staffroom QR poster with your camera. GPS geofence ({currentSchool?.geofence_radius_meters || 75}m) verifies your physical arrival.
+                  Scan the printable campus gate/staffroom QR poster with your camera. GPS geofence ({currentSchool?.geofence_radius_meters || 150}m) verifies your physical arrival.
                 </p>
               </div>
             </div>

@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.schools (
   invite_code TEXT UNIQUE NOT NULL,
   latitude DOUBLE PRECISION NULL,
   longitude DOUBLE PRECISION NULL,
-  geofence_radius_meters INTEGER NOT NULL DEFAULT 75,
+  geofence_radius_meters INTEGER NOT NULL DEFAULT 150,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -34,7 +34,7 @@ BEGIN
     'AEGIS-2026',
     6.5244,
     3.3792,
-    75
+    150
   )
   ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,

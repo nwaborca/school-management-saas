@@ -238,7 +238,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     invite_code: 'AEGIS-2026',
     latitude: 6.5244,
     longitude: 3.3792,
-    geofence_radius_meters: 75,
+    geofence_radius_meters: 150,
     created_at: '2026-01-01T00:00:00.000Z',
   };
 
@@ -1051,7 +1051,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         invite_code: inviteCode,
         latitude: payload.latitude ?? 6.5244,
         longitude: payload.longitude ?? 3.3792,
-        geofence_radius_meters: 75,
+        geofence_radius_meters: 150,
         created_at: new Date().toISOString(),
       };
 
@@ -2530,7 +2530,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...currentSchool,
       latitude: Number(params.latitude),
       longitude: Number(params.longitude),
-      geofence_radius_meters: params.geofenceRadiusMeters ?? currentSchool.geofence_radius_meters ?? 75,
+      geofence_radius_meters: params.geofenceRadiusMeters ?? currentSchool.geofence_radius_meters ?? 150,
       resumption_cutoff_time: params.resumptionCutoffTime ?? currentSchool.resumption_cutoff_time ?? '08:00',
     };
 
@@ -2600,7 +2600,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let distanceMeters: number | null = null;
     const schoolLat = currentSchool?.latitude;
     const schoolLon = currentSchool?.longitude;
-    const radiusMeters = currentSchool?.geofence_radius_meters || 75;
+    const radiusMeters = currentSchool?.geofence_radius_meters || 150;
 
     if (schoolLat !== null && schoolLat !== undefined && schoolLon !== null && schoolLon !== undefined) {
       if (params.latitude !== undefined && params.longitude !== undefined) {

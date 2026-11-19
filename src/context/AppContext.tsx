@@ -2603,26 +2603,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const radiusMeters = currentSchool?.geofence_radius_meters || 75;
 
     if (schoolLat !== null && schoolLat !== undefined && schoolLon !== null && schoolLon !== undefined) {
-      if (params.latitude === undefined || params.longitude === undefined) {
-        return {
-          success: false,
-          message: 'Location access is required to verify your attendance within the school geofence.',
-        };
-      }
+      if (params.latitude !== undefined && params.longitude !== undefined) {
+        distanceMeters = calculateHaversineDistance(
+          schoolLat,
+          schoolLon,
+          params.latitude,
+          params.longitude
+        );
 
-      distanceMeters = calculateHaversineDistance(
-        schoolLat,
-        schoolLon,
-        params.latitude,
-        params.longitude
-      );
-
-      if (distanceMeters > radiusMeters) {
-        return {
-          success: false,
-          message: `You are ${distanceMeters}m away from school. Move within ${radiusMeters}m of the school gate/staffroom to clock in.`,
-          distanceMeters,
-        };
+        if (distanceMeters > radiusMeters) {
+          return {
+            success: false,
+            message: `You are ${distanceMeters}m away from school. Move within ${radiusMeters}m of the school gate/staffroom to clock in.`,
+            distanceMeters,
+          };
+        }
+      } else {
+        // Teacher physically scanned the authentic gate QR poster, but browser/device GPS is restricted or unavailable
+        distanceMeters = null;
       }
     }
 
@@ -2675,7 +2673,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return {
       success: true,
       record: newRecord,
-      message: `Clock-in recorded (${status === 'LATE' ? 'Late Arrival' : 'Present - On Time'}). Distance: ${distanceMeters !== null ? `${distanceMeters}m` : 'Verified'}.`,
+      message: `Clock-in recorded (${status === 'LATE' ? 'Late Arrival' : 'Present - On Time'}). ${distanceMeters !== null ? `Distance: ${distanceMeters}m.` : 'QR Verified (GPS Unavailable).'}`.trim(),
       distanceMeters: distanceMeters ?? undefined,
     };
   };

@@ -60,6 +60,7 @@ export default function AcademicHubPage() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isClockingIn, setIsClockingIn] = useState(false);
   const [isClockingOut, setIsClockingOut] = useState(false);
+  const [cachedCoords, setCachedCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [attendanceNotice, setAttendanceNotice] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -498,12 +499,55 @@ export default function AcademicHubPage() {
     ) || null;
   }, [staffAttendance, teacherId, teacherName, clientTodayStr]);
 
+  // Handle direct tap on "Clock In via Gate QR":
+  // Immediately request browser GPS permission before opening camera scanner
+  const handleStartClockInFlow = () => {
+    setAttendanceNotice(null);
+
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      // Step 1: High-accuracy GPS request
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setCachedCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+          setIsScannerOpen(true);
+        },
+        (err) => {
+          console.warn('High-accuracy GPS attempt failed/timed out, retrying with fallback:', err);
+          // Step 2: Fallback request (cell tower / Wi-Fi) with relaxed timeout & maximumAge
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPos) => {
+              setCachedCoords({
+                latitude: fallbackPos.coords.latitude,
+                longitude: fallbackPos.coords.longitude,
+              });
+              setIsScannerOpen(true);
+            },
+            (fallbackErr) => {
+              console.warn('Fallback geolocation failed/denied:', fallbackErr);
+              // Do not block the teacher: open camera anyway to scan printed gate poster
+              setCachedCoords(null);
+              setIsScannerOpen(true);
+            },
+            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+          );
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 }
+      );
+    } else {
+      setCachedCoords(null);
+      setIsScannerOpen(true);
+    }
+  };
+
   const handleScanSuccess = async (scannedPayload: string) => {
     setIsScannerOpen(false);
     setIsClockingIn(true);
     setAttendanceNotice(null);
 
-    const executeClockIn = async (coords?: { latitude: number; longitude: number }) => {
+    const executeClockIn = async (coords?: { latitude: number; longitude: number } | null) => {
       try {
         const res = await clockInStaff({
           scannedPayload,
@@ -532,23 +576,39 @@ export default function AcademicHubPage() {
       }
     };
 
+    // Use cached coordinates if already acquired during initial button tap
+    if (cachedCoords) {
+      await executeClockIn(cachedCoords);
+      return;
+    }
+
+    // Secondary attempt if not yet resolved
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          executeClockIn({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
+          const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          setCachedCoords(coords);
+          executeClockIn(coords);
         },
-        (geoErr) => {
-          console.warn('Geolocation lookup notice in staff clock-in:', geoErr);
-          // Still proceed to validate school ID match even if device GPS is denied/offline
-          executeClockIn();
+        () => {
+          // Fallback attempt
+          navigator.geolocation.getCurrentPosition(
+            (fallbackPos) => {
+              const coords = { latitude: fallbackPos.coords.latitude, longitude: fallbackPos.coords.longitude };
+              setCachedCoords(coords);
+              executeClockIn(coords);
+            },
+            () => {
+              // Proceed with scan verification even if GPS unavailable
+              executeClockIn(null);
+            },
+            { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+          );
         },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 15000 }
       );
     } else {
-      executeClockIn();
+      executeClockIn(null);
     }
   };
 
@@ -675,12 +735,12 @@ export default function AcademicHubPage() {
               {!todayAttendance ? (
                 <button
                   type="button"
-                  onClick={() => setIsScannerOpen(true)}
+                  onClick={handleStartClockInFlow}
                   disabled={isClockingIn}
                   className="px-4 py-2 rounded-lg bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <Camera className="w-4 h-4" />
-                  <span>{isClockingIn ? 'Verifying Coordinates...' : 'Clock In via Gate QR'}</span>
+                  <span>{isClockingIn ? 'Verifying Attendance...' : 'Clock In via Gate QR'}</span>
                 </button>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">

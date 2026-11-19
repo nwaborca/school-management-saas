@@ -1551,7 +1551,7 @@ export default function AdminHubPage() {
                         const date = new Date(a.check_in_time).toLocaleDateString();
                         const checkIn = new Date(a.check_in_time).toLocaleTimeString();
                         const clockOut = a.clock_out_time ? new Date(a.clock_out_time).toLocaleTimeString() : 'N/A';
-                        const dist = a.distance_meters !== null && a.distance_meters !== undefined ? `${a.distance_meters}m` : 'N/A';
+                        const dist = a.distance_meters !== null && a.distance_meters !== undefined ? `${a.distance_meters}m` : 'QR Verified (GPS Unavailable)';
                         return `"${a.teacher_name}","${date}","${checkIn}","${clockOut}","${a.status}","${dist}"`;
                       }).join('\n');
 
@@ -1644,7 +1644,13 @@ export default function AdminHubPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 font-mono text-[11px] text-slate-600">
-                              {rec.distance_meters !== null && rec.distance_meters !== undefined ? `${rec.distance_meters}m` : 'In Geofence'}
+                              {rec.distance_meters !== null && rec.distance_meters !== undefined ? (
+                                `${rec.distance_meters}m`
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-sans font-medium">
+                                  QR Verified (GPS Unavailable)
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))}

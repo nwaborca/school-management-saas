@@ -67,6 +67,11 @@ export default function StaffAttendanceScannerModal({
             Aim your camera at the printed Gate / Staffroom Attendance QR poster.
           </p>
 
+          <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/60 text-blue-800 text-[11px] flex items-center gap-2">
+            <Shield className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Tip: Tap &apos;Allow&apos; if your phone asks for location, or use Chrome for automatic GPS verification.</span>
+          </div>
+
           {errorMsg && (
             <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />

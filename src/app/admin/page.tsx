@@ -46,6 +46,7 @@ export default function AdminHubPage() {
   const router = useRouter();
   const {
     schoolInfo,
+    currentSchool,
     classes = [],
     subjects = [],
     students = [],
@@ -241,7 +242,23 @@ export default function AdminHubPage() {
               <Shield className="w-4 h-4" />
               <span>Nigerian Education Administration (33 Class Tiers: Creche – SS3 Arm F)</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Admin Command Center</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Admin Command Center</h1>
+              {currentSchool?.invite_code && (
+                <div
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentSchool.invite_code);
+                    setPublishToast(`Invite Code ${currentSchool.invite_code} copied!`);
+                    setTimeout(() => setPublishToast(null), 3000);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-mono font-bold border border-slate-300 cursor-pointer transition shadow-xs"
+                  title="Click to copy School Invite Code"
+                >
+                  <span>School Code: {currentSchool.invite_code}</span>
+                  <Copy className="w-3 h-3 text-slate-500" />
+                </div>
+              )}
+            </div>
             <p className="text-slate-500 text-sm mt-1">
               {schoolInfo.name} • Class progression across all 33 class arms, staff registry, admissions, and Naira fee oversight.
             </p>

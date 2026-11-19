@@ -79,7 +79,7 @@ export function Navbar() {
                 <span className="text-base font-bold tracking-tight text-[#0F172A]">
                   {currentSchool?.name || schoolInfo.name}
                 </span>
-                {currentSchool?.invite_code && (
+                {isAuthenticated && currentUser?.role === 'admin' && currentSchool?.invite_code && (
                   <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
                     {currentSchool.invite_code}
                   </span>

@@ -8,8 +8,20 @@ export type EducationalStage =
 
 export type UserRole = 'admin' | 'teacher' | 'student';
 
+// Multi-Tenant School Record
+export interface School {
+  id: string;
+  name: string;
+  invite_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  geofence_radius_meters: number;
+  created_at: string;
+}
+
 export interface AuthUser {
   id: string;
+  school_id?: string;
   reg_number?: string;
   username?: string;
   full_name: string;
@@ -31,6 +43,7 @@ export interface AuthUser {
 // 0. Teacher Profile & Registry Record
 export interface TeacherProfile {
   id: string;
+  school_id?: string;
   teacher_id_code: string;  // e.g. "TCH/2026/001"
   full_name: string;
   phone: string;            // Nigerian prefix +234
@@ -56,6 +69,7 @@ export type StaffProfile = TeacherProfile;
 // 1. Classes: Creche to SS3 (Arms A - F)
 export interface AcademicClass {
   id: string;
+  school_id?: string;
   name: string;           // e.g. "SS1 Arm A", "JSS 1", "Primary 4", "Creche"
   session: string;        // e.g. "2025/2026"
   level: string;          // e.g. "SS1", "JSS 1", "Primary 4", "Nursery 2"
@@ -68,6 +82,7 @@ export interface AcademicClass {
 // 2. Subjects System & Educational Level Mapping
 export interface AcademicSubject {
   id: string;
+  school_id?: string;
   name: string;           // e.g. "Basic Tech", "Chemistry", "Nigerian Language (Igbo/Hausa/Yoruba)"
   code: string;           // e.g. "BTC-101", "CHM-201"
   stages: EducationalStage[];
@@ -77,6 +92,7 @@ export interface AcademicSubject {
 // 3. Teacher_Subject_Allocations
 export interface TeacherSubjectAllocation {
   id: string;
+  school_id?: string;
   teacher_id: string;
   teacher_name: string;
   subject_id: string;
@@ -90,6 +106,7 @@ export type LetterGrade = 'A' | 'B' | 'C' | 'D' | 'F';
 
 export interface StudentResult {
   id: string;
+  school_id?: string;
   student_id: string;
   student_name: string;
   reg_number: string;
@@ -112,6 +129,7 @@ export interface StudentResult {
 
 export interface PaymentTransaction {
   id: string;
+  school_id?: string;
   receipt_id?: string;
   student_id: string;
   student_name: string;
@@ -131,6 +149,7 @@ export interface PaymentTransaction {
 // 5. Student Profile with fee_paid boolean column
 export interface StudentProfile {
   id: string;
+  school_id?: string;
   reg_number: string;     // e.g. "STU-2026-089"
   access_pin: string;     // e.g. "2026"
   full_name: string;
@@ -158,6 +177,7 @@ export interface StudentProfile {
 // 6. Tuition Fee Invoice in Nigerian Naira (₦)
 export interface TuitionInvoice {
   id: string;
+  school_id?: string;
   student_id: string;
   student_name: string;
   reg_number: string;
@@ -175,6 +195,7 @@ export interface TuitionInvoice {
 
 export interface SchoolAnnouncement {
   id: string;
+  school_id?: string;
   title: string;
   content: string;
   author_name: string;
@@ -191,6 +212,7 @@ export interface FeeLineItem {
 
 export interface FeeStructure {
   id: string;
+  school_id?: string;
   class_id: string;
   class_name: string;
   term: string;           // e.g. "1st Term"
@@ -207,6 +229,7 @@ export type ReceiptStatus = 'pending_verification' | 'approved' | 'partially_app
 
 export interface PaymentReceipt {
   id: string;
+  school_id?: string;
   student_id: string;
   student_name: string;
   reg_number: string;
@@ -227,6 +250,42 @@ export interface PaymentReceipt {
   reviewed_by?: string;
   reviewed_at?: string;
   admin_note?: string;
+}
+
+// 9. Staff Attendance (Geofence verified clock-in / clock-out)
+export type StaffAttendanceStatus = 'PRESENT' | 'LATE' | 'HALF_DAY' | 'ABSENT';
+
+export interface StaffAttendance {
+  id: string;
+  school_id: string;
+  teacher_id: string;
+  teacher_name: string;
+  check_in_time: string;
+  clock_out_time?: string | null;
+  status: StaffAttendanceStatus;
+  latitude?: number | null;
+  longitude?: number | null;
+  distance_meters?: number | null;
+  created_at: string;
+}
+
+// 10. Pickup Passes (Digital Dismissal Security)
+export type PickupPassType = 'DAILY_PARENT' | 'DELEGATE_5H';
+export type PickupPassStatus = 'ACTIVE' | 'USED' | 'EXPIRED';
+
+export interface PickupPass {
+  id: string;
+  school_id: string;
+  student_id: string;
+  pass_type: PickupPassType;
+  delegate_name?: string | null;
+  otp_code: string;
+  qr_token: string;
+  status: PickupPassStatus;
+  created_at: string;
+  expires_at: string;
+  picked_up_at?: string | null;
+  verified_by_staff_id?: string | null;
 }
 
 // Nigerian WAEC / NECO / Ministry of Education Grading Standard

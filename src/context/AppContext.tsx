@@ -4,6 +4,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import {
   AuthUser,
   UserRole,
+  School,
+  StaffAttendance,
+  PickupPass,
   AcademicClass,
   AcademicSubject,
   TeacherSubjectAllocation,
@@ -40,6 +43,8 @@ import {
 
 interface AppContextType {
   schoolInfo: typeof SCHOOL_INFO;
+  currentSchool: School | null;
+  schools: School[];
   currentUser: AuthUser | null;
   currentRole: UserRole | null;
   isAuthenticated: boolean;
@@ -51,6 +56,8 @@ interface AppContextType {
   students: StudentProfile[];
   invoices: TuitionInvoice[];
   announcements: SchoolAnnouncement[];
+  staffAttendance: StaffAttendance[];
+  pickupPasses: PickupPass[];
 
   // Auth
   loginStudent: (regNumber: string, pin: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
@@ -200,6 +207,21 @@ function getSessionCookie(): AuthUser | null {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const DEFAULT_SCHOOL: School = {
+    id: '00000000-0000-0000-0000-000000000001',
+    name: 'Aegis Academy Nigeria',
+    invite_code: 'AEGIS-2026',
+    latitude: 6.5244,
+    longitude: 3.3792,
+    geofence_radius_meters: 75,
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
+
+  const [schools, setSchools] = useState<School[]>([DEFAULT_SCHOOL]);
+  const [currentSchool, setCurrentSchool] = useState<School | null>(DEFAULT_SCHOOL);
+  const [staffAttendance, setStaffAttendance] = useState<StaffAttendance[]>([]);
+  const [pickupPasses, setPickupPasses] = useState<PickupPass[]>([]);
+
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
   const [classes, setClasses] = useState<AcademicClass[]>(INITIAL_CLASSES);
@@ -297,6 +319,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const assignedIds = t.assigned_subject_ids || t.assigned_subjects || [];
     return {
       id: t.id,
+      school_id: t.school_id || DEFAULT_SCHOOL.id,
       teacher_id_code: t.teacher_id_code || t.staff_id_code || `TCH/2026/${String(t.id).slice(-3)}`,
       full_name: t.full_name || 'Teacher',
       phone: t.phone || '+2348000000000',
@@ -327,6 +350,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const total_score = Number(r.total_score) || (ca1 + ca2 + exam);
     return {
       id: r.id,
+      school_id: r.school_id || DEFAULT_SCHOOL.id,
       student_id: r.student_id,
       student_name: r.student_name || student?.full_name || 'Student',
       reg_number: r.reg_number || student?.reg_number || 'N/A',
@@ -350,6 +374,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const normalizeStudent = (s: any): StudentProfile => {
     return {
       id: s.id,
+      school_id: s.school_id || DEFAULT_SCHOOL.id,
       reg_number: s.reg_number || 'STU-UNKNOWN',
       access_pin: s.access_pin || '2026',
       full_name: s.full_name || 'Student',
@@ -370,6 +395,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       enrollment_date: s.enrollment_date || s.created_at,
       ndpa_consent_granted: s.ndpa_consent_granted !== undefined ? Boolean(s.ndpa_consent_granted) : true,
       consent_timestamp: s.consent_timestamp || s.created_at,
+    };
+  };
+
+  // Helper to normalize staff attendance from Supabase
+  const normalizeAttendance = (a: any): StaffAttendance => {
+    return {
+      id: a.id,
+      school_id: a.school_id || DEFAULT_SCHOOL.id,
+      teacher_id: a.teacher_id,
+      teacher_name: a.teacher_name || 'Staff Member',
+      check_in_time: a.check_in_time || new Date().toISOString(),
+      clock_out_time: a.clock_out_time || null,
+      status: a.status || 'PRESENT',
+      latitude: a.latitude !== undefined ? Number(a.latitude) : null,
+      longitude: a.longitude !== undefined ? Number(a.longitude) : null,
+      distance_meters: a.distance_meters !== undefined ? Number(a.distance_meters) : null,
+      created_at: a.created_at || new Date().toISOString(),
+    };
+  };
+
+  // Helper to normalize pickup pass from Supabase
+  const normalizePickupPass = (p: any): PickupPass => {
+    return {
+      id: p.id,
+      school_id: p.school_id || DEFAULT_SCHOOL.id,
+      student_id: p.student_id,
+      pass_type: p.pass_type || 'DAILY_PARENT',
+      delegate_name: p.delegate_name || null,
+      otp_code: p.otp_code || '000000',
+      qr_token: p.qr_token || `QR-${p.id}`,
+      status: p.status || 'ACTIVE',
+      created_at: p.created_at || new Date().toISOString(),
+      expires_at: p.expires_at || new Date(Date.now() + 5 * 3600 * 1000).toISOString(),
+      picked_up_at: p.picked_up_at || null,
+      verified_by_staff_id: p.verified_by_staff_id || null,
     };
   };
 
@@ -482,13 +542,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       })();
 
-      const [stdData, staffData, resData, classData, feeData, recData] = await Promise.all([
+      const fetchSchoolsPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('schools').select('*');
+          if (error) {
+            console.warn('Supabase schools query note:', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (schoolErr) {
+          console.warn('Supabase schools fetch caught exception:', schoolErr);
+          return null;
+        }
+      })();
+
+      const fetchAttendancePromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('staff_attendance').select('*').order('check_in_time', { ascending: false });
+          if (error) {
+            console.warn('Supabase staff_attendance query note:', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (attErr) {
+          console.warn('Supabase staff_attendance fetch caught exception:', attErr);
+          return null;
+        }
+      })();
+
+      const fetchPickupPassesPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from('pickup_passes').select('*').order('created_at', { ascending: false });
+          if (error) {
+            console.warn('Supabase pickup_passes query note:', error.message || error);
+            return null;
+          }
+          return data;
+        } catch (passErr) {
+          console.warn('Supabase pickup_passes fetch caught exception:', passErr);
+          return null;
+        }
+      })();
+
+      const [stdData, staffData, resData, classData, feeData, recData, schoolData, attData, passData] = await Promise.all([
         fetchStudentsPromise,
         fetchStaffPromise,
         fetchResultsPromise,
         fetchClassesPromise,
         fetchFeesPromise,
         fetchReceiptsPromise,
+        fetchSchoolsPromise,
+        fetchAttendancePromise,
+        fetchPickupPassesPromise,
       ]);
 
       // Apply guarded updates only if data was successfully received
@@ -539,6 +644,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (recData && Array.isArray(recData) && recData.length > 0) {
         setReceipts(recData as PaymentReceipt[]);
+      }
+
+      if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
+        setSchools(schoolData as School[]);
+        const active = schoolData.find((s: any) => s.id === currentUser?.school_id) || schoolData[0];
+        if (active) setCurrentSchool(active);
+      }
+
+      if (attData && Array.isArray(attData) && attData.length > 0) {
+        setStaffAttendance(attData.map(normalizeAttendance));
+      }
+
+      if (passData && Array.isArray(passData) && passData.length > 0) {
+        setPickupPasses(passData.map(normalizePickupPass));
       }
     } catch (err) {
       console.warn('Non-fatal error in fetchLiveData (safely falling back to default/cached data):', err);
@@ -2041,6 +2160,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const contextValue = React.useMemo(
     () => ({
       schoolInfo: SCHOOL_INFO,
+      currentSchool,
+      schools,
       currentUser,
       currentRole: currentUser?.role || null,
       isAuthenticated: !!currentUser,
@@ -2052,6 +2173,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       students,
       invoices,
       announcements,
+      staffAttendance,
+      pickupPasses,
       loginStudent,
       loginStaff,
       logout,
@@ -2083,6 +2206,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateAdminPassword,
     }),
     [
+      currentSchool,
+      schools,
       currentUser,
       isAuthReady,
       classes,
@@ -2092,6 +2217,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       students,
       invoices,
       announcements,
+      staffAttendance,
+      pickupPasses,
       feeStructures,
       receipts,
       transactions,

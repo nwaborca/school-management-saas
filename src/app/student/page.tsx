@@ -9,6 +9,7 @@ import { Trophy3DCanvas } from '@/components/3d/Trophy3DCanvas';
 import { formatNaira, StudentProfile } from '@/types';
 import { filterSubjectsForClassAndStream } from '@/lib/streamSpecialization';
 import { uploadReceiptToStorage } from '@/lib/supabase';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   GraduationCap,
   Award,
@@ -36,6 +37,11 @@ import {
   BadgePercent,
   ShieldCheck,
   X,
+  UserCheck,
+  QrCode,
+  Share2,
+  Trash2,
+  KeyRound,
 } from 'lucide-react';
 
 export default function StudentDashboardPage() {
@@ -44,6 +50,7 @@ export default function StudentDashboardPage() {
     classes,
     subjects,
     currentUser,
+    currentSchool,
     students,
     results,
     invoices,
@@ -51,16 +58,27 @@ export default function StudentDashboardPage() {
     feeStructures,
     receipts,
     transactions,
+    pickupPasses = [],
     uploadReceipt,
     getStudentTermLedger,
+    generateDailyParentPass,
+    generateDelegatePass,
+    revokePickupPass,
     resultsPublished,
     logout,
     isAuthReady,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'results' | 'fees' | 'awards'>('results');
+  const [activeTab, setActiveTab] = useState<'results' | 'fees' | 'pickup' | 'awards'>('results');
   const [selectedTerm, setSelectedTerm] = useState('1st Term');
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
+  // Phase 4: Delegate Pass Generation Modal State
+  const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
+  const [delegateNameInput, setDelegateNameInput] = useState('');
+  const [isGeneratingPass, setIsGeneratingPass] = useState(false);
+  const [passActionNotice, setPassActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [copiedPassText, setCopiedPassText] = useState(false);
 
   // Partial vs Full Payment State
   const [paymentChoice, setPaymentChoice] = useState<'full' | 'partial'>('full');
@@ -276,6 +294,108 @@ export default function StudentDashboardPage() {
     setIsPrintModalOpen(true);
   };
 
+  // Phase 4: Active Pickup Passes for the Logged Student
+  const activeStudentPasses = useMemo(() => {
+    if (!activeStudent) return [];
+    return pickupPasses
+      .filter((p) => p.student_id === activeStudent.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [pickupPasses, activeStudent]);
+
+  // Today's active daily parent pass (if any)
+  const todayDailyPass = useMemo(() => {
+    return activeStudentPasses.find(
+      (p) =>
+        p.pass_type === 'DAILY_PARENT' &&
+        p.status === 'ACTIVE' &&
+        new Date(p.expires_at) > new Date()
+    ) || null;
+  }, [activeStudentPasses]);
+
+  // Active delegate passes (status ACTIVE and not expired)
+  const activeDelegatePasses = useMemo(() => {
+    return activeStudentPasses.filter(
+      (p) =>
+        p.pass_type === 'DELEGATE_5H' &&
+        p.status === 'ACTIVE' &&
+        new Date(p.expires_at) > new Date()
+    );
+  }, [activeStudentPasses]);
+
+  // Recent used or expired passes history
+  const historicalPasses = useMemo(() => {
+    return activeStudentPasses.filter(
+      (p) => p.status === 'USED' || p.status === 'EXPIRED' || new Date(p.expires_at) <= new Date()
+    ).slice(0, 5);
+  }, [activeStudentPasses]);
+
+  // Auto-generate or retrieve daily parent pass when viewing the tab
+  const handleGenerateDailyPass = async () => {
+    if (!activeStudent) return;
+    setIsGeneratingPass(true);
+    setPassActionNotice(null);
+    try {
+      const res = await generateDailyParentPass(activeStudent.id);
+      if (res.success) {
+        setPassActionNotice({ type: 'success', message: 'Today’s Parent Pick-Up Pass is active.' });
+      } else {
+        setPassActionNotice({ type: 'error', message: res.error || 'Failed generating parent pass.' });
+      }
+    } catch (e: any) {
+      setPassActionNotice({ type: 'error', message: e?.message || 'Error creating pass.' });
+    } finally {
+      setIsGeneratingPass(false);
+    }
+  };
+
+  const handleCreateDelegatePass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeStudent || !delegateNameInput.trim()) return;
+    setIsGeneratingPass(true);
+    setPassActionNotice(null);
+    try {
+      const res = await generateDelegatePass(activeStudent.id, delegateNameInput.trim());
+      if (res.success) {
+        setIsDelegateModalOpen(false);
+        setDelegateNameInput('');
+        setPassActionNotice({ type: 'success', message: `5-Hour Delegate Pass generated for ${res.pass?.delegate_name}!` });
+      } else {
+        setPassActionNotice({ type: 'error', message: res.error || 'Failed generating delegate pass.' });
+      }
+    } catch (e: any) {
+      setPassActionNotice({ type: 'error', message: e?.message || 'Error generating delegate pass.' });
+    } finally {
+      setIsGeneratingPass(false);
+    }
+  };
+
+  const handleRevokePass = async (passId: string) => {
+    if (!confirm('Are you sure you want to revoke this pick-up pass? Anyone presenting this code will be rejected at the gate.')) {
+      return;
+    }
+    setPassActionNotice(null);
+    try {
+      const res = await revokePickupPass(passId);
+      if (res.success) {
+        setPassActionNotice({ type: 'success', message: 'Pick-Up Pass has been revoked immediately.' });
+      } else {
+        setPassActionNotice({ type: 'error', message: res.error || 'Failed revoking pass.' });
+      }
+    } catch (e: any) {
+      setPassActionNotice({ type: 'error', message: 'Error revoking pass.' });
+    }
+  };
+
+  const copyWhatsAppDetails = (pass: any) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const gateLink = `${origin}/pickup-pass/${pass.qr_token}`;
+    const text = `*SAFE CHILD PICK-UP PASS* 🏫\nSchool: ${currentSchool?.name || schoolInfo.name}\nChild Name: ${activeStudent?.full_name}\nClass: ${activeStudent?.class_grade}\nAuthorized Collector: ${pass.delegate_name || 'Parent / Guardian'}\n6-Digit Gate Code: *${pass.otp_code}*\n\nOpen your mobile gate pass voucher:\n${gateLink}\n\n_Note: Single-use security token. Present this 6-digit code or QR code at the gate._`;
+
+    navigator.clipboard.writeText(text);
+    setCopiedPassText(true);
+    setTimeout(() => setCopiedPassText(false), 3000);
+  };
+
   if (!currentUser || !activeStudent) {
     return (
       <div className="min-h-screen flex items-center justify-center text-slate-600  text-xs">
@@ -421,12 +541,12 @@ export default function StudentDashboardPage() {
         </div>
 
         {/* Tab Selection */}
-        <div className="flex border-b border-slate-200 gap-4">
+        <div className="flex border-b border-slate-200 gap-4 overflow-x-auto">
           <button
             onClick={() => setActiveTab('results')}
-            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer ${
+            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'results'
-                ? 'border-amber-500 text-blue-600'
+                ? 'border-blue-600 text-blue-600 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -434,19 +554,30 @@ export default function StudentDashboardPage() {
           </button>
           <button
             onClick={() => setActiveTab('fees')}
-            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer ${
+            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'fees'
-                ? 'border-amber-500 text-blue-600'
+                ? 'border-blue-600 text-blue-600 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             School Fees & Bank Transfer Hub
           </button>
           <button
+            onClick={() => setActiveTab('pickup')}
+            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'pickup'
+                ? 'border-blue-600 text-blue-600 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Safe Pick-Up & Dismissal Pass</span>
+          </button>
+          <button
             onClick={() => setActiveTab('awards')}
-            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer ${
+            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${
               activeTab === 'awards'
-                ? 'border-amber-500 text-blue-600'
+                ? 'border-blue-600 text-blue-600 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -1054,7 +1185,285 @@ export default function StudentDashboardPage() {
           </div>
         )}
 
-        {/* TAB 3: 3D TROPHY */}
+        {/* TAB 3: SAFE PICK-UP & DISMISSAL PASS (PHASE 4) */}
+        {activeTab === 'pickup' && (
+          <div className="space-y-6">
+            {/* Header info */}
+            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-emerald-700 text-xs font-bold uppercase tracking-wider mb-1">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Jumia-Style Safe Dismissal Verification</span>
+                </div>
+                <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                  Child Safe Pick-Up & Gate Passes
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Protecting {activeStudent.full_name} ({activeStudent.class_grade}). School security verifies the 6-digit OTP or scannable QR token before student handover.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDelegateModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition cursor-pointer"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Generate Delegate Pass (5 Hours)</span>
+                </button>
+              </div>
+            </div>
+
+            {passActionNotice && (
+              <div
+                className={`p-3.5 rounded-xl text-xs flex items-center justify-between border ${
+                  passActionNotice.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {passActionNotice.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  )}
+                  <span>{passActionNotice.message}</span>
+                </div>
+                <button
+                  onClick={() => setPassActionNotice(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Passes Layout Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Card 1: Today's Daily Parent Pick-Up Pass */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Today&apos;s Parent Pick-Up Pass</h3>
+                      <p className="text-[11px] text-slate-500">Valid until 11:59 PM today for registered parent/guardian</p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Daily Active
+                  </span>
+                </div>
+
+                {!todayDailyPass ? (
+                  <div className="p-6 text-center space-y-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <QrCode className="w-10 h-10 text-slate-400 mx-auto" />
+                    <p className="text-xs text-slate-600 font-medium">No parent pass active for today yet.</p>
+                    <button
+                      type="button"
+                      onClick={handleGenerateDailyPass}
+                      disabled={isGeneratingPass}
+                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      {isGeneratingPass ? 'Generating...' : 'Activate Today’s Parent Pass'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Big OTP Display */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                        Parent Handover 6-Digit Code
+                      </span>
+                      <div className="text-3xl sm:text-4xl font-black font-mono tracking-widest text-[#0F172A] py-1">
+                        {todayDailyPass.otp_code}
+                      </div>
+                      <span className="text-[11px] text-slate-500">
+                        Expires at 23:59:59 tonight • Single use
+                      </span>
+                    </div>
+
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl space-y-2">
+                      <QRCodeSVG
+                        value={`AEGIS_PICKUP:${todayDailyPass.school_id}:${todayDailyPass.otp_code}`}
+                        size={140}
+                        level="H"
+                        includeMargin={false}
+                      />
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Scan at gate or quote 6-digit code
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => copyWhatsAppDetails(todayDailyPass)}
+                        className="flex-1 py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer border border-slate-200"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-slate-600" />
+                        <span>{copiedPassText ? 'Copied Details!' : 'Copy for WhatsApp'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Card 2: Active 5-Hour Delegate Passes */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">5-Hour Delegate Passes</h3>
+                      <p className="text-[11px] text-slate-500">For drivers, relatives, or emergency collectors</p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    {activeDelegatePasses.length} Active
+                  </span>
+                </div>
+
+                {activeDelegatePasses.length === 0 ? (
+                  <div className="p-8 text-center space-y-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <UserCheck className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-xs font-medium text-slate-600">No active delegate passes.</p>
+                    <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                      Sending a driver or family member to pick up {activeStudent.full_name}? Generate a secure 5-hour pass for them.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsDelegateModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-semibold transition shadow-xs cursor-pointer"
+                    >
+                      Create Delegate Pass
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {activeDelegatePasses.map((pass) => {
+                      const diffMs = new Date(pass.expires_at).getTime() - Date.now();
+                      const hours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+                      const minutes = Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
+
+                      return (
+                        <div key={pass.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">
+                                Delegate Collector
+                              </span>
+                              <h4 className="text-sm font-black text-slate-900">{pass.delegate_name}</h4>
+                            </div>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              Expires in {hours}h {minutes}m
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-lg border border-slate-200">
+                            <div>
+                              <span className="text-[9px] text-slate-500 uppercase font-semibold block">6-Digit Code</span>
+                              <span className="text-xl font-mono font-black text-slate-900 tracking-wider">
+                                {pass.otp_code}
+                              </span>
+                            </div>
+                            <div className="p-1 bg-white border border-slate-100 rounded">
+                              <QRCodeSVG
+                                value={`AEGIS_PICKUP:${pass.school_id}:${pass.otp_code}`}
+                                size={56}
+                                level="M"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => copyWhatsAppDetails(pass)}
+                              className="flex-1 py-1.5 px-3 rounded-md bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                              <span>Copy for WhatsApp</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRevokePass(pass.id)}
+                              className="py-1.5 px-3 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer border border-rose-200"
+                              title="Revoke pass immediately"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Revoke</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Pick-Up Handover History */}
+            {historicalPasses.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Recent Pick-Up & Dismissal Activity
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="px-3.5 py-2">Pass Type</th>
+                        <th className="px-3.5 py-2">Collector / Delegate</th>
+                        <th className="px-3.5 py-2">Code</th>
+                        <th className="px-3.5 py-2">Handover / Expiry Time</th>
+                        <th className="px-3.5 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {historicalPasses.map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2.5 font-medium text-slate-800">
+                            {p.pass_type === 'DAILY_PARENT' ? 'Daily Parent' : '5-Hour Delegate'}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-semibold text-slate-900">
+                            {p.delegate_name || 'Parent / Guardian'}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-mono text-slate-600">{p.otp_code}</td>
+                          <td className="px-3.5 py-2.5 text-slate-500">
+                            {p.picked_up_at
+                              ? `Handed over at ${new Date(p.picked_up_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                              : `Expired at ${new Date(p.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                          </td>
+                          <td className="px-3.5 py-2.5">
+                            {p.status === 'USED' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Completed Handover
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                Expired / Inactive
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: 3D TROPHY */}
         {activeTab === 'awards' && (
           <div className="p-6 rounded-xl bg-white border border-slate-200 flex flex-col items-center justify-center space-y-4">
             <h3 className="text-base font-bold text-slate-900">Academic Excellence Award</h3>
@@ -1192,6 +1601,71 @@ export default function StudentDashboardPage() {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+        {/* Delegate Pass Creation Modal */}
+        {isDelegateModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-sm font-bold text-slate-900">Generate 5-Hour Delegate Pass</h3>
+                </div>
+                <button
+                  onClick={() => setIsDelegateModalOpen(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateDelegatePass} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    Delegate Full Name (Driver / Relative) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Chukwuma Emmanuel Okafor or Driver Musa"
+                    value={delegateNameInput}
+                    onChange={(e) => setDelegateNameInput(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Security will ask for this name at the school gate before releasing {activeStudent.full_name}.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <Clock className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Strict 5-Hour Expiry Window</span>
+                  </div>
+                  <p>
+                    Pass expires in exactly 5 hours from generation. You can revoke it anytime with one tap.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsDelegateModalOpen(false)}
+                    className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isGeneratingPass}
+                    className="px-4 py-2 rounded-lg bg-[#1D4ED8] hover:bg-blue-700 text-white font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {isGeneratingPass ? 'Generating Token...' : 'Create & Share Pass'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

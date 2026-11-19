@@ -192,6 +192,21 @@ interface AppContextType {
     longitude?: number;
   }) => Promise<{ success: boolean; record?: StaffAttendance; message?: string; distanceMeters?: number }>;
   clockOutStaff: (attendanceId: string) => Promise<{ success: boolean; message?: string }>;
+
+  // Phase 4: Jumia-Style Safe Pick-Up & Dismissal Security
+  generateDailyParentPass: (studentId: string) => Promise<{ success: boolean; pass?: PickupPass; error?: string }>;
+  generateDelegatePass: (studentId: string, delegateName: string) => Promise<{ success: boolean; pass?: PickupPass; error?: string }>;
+  revokePickupPass: (passId: string) => Promise<{ success: boolean; error?: string }>;
+  verifyAndHandoverPass: (params: {
+    codeOrToken: string;
+    verifiedByStaffId?: string;
+  }) => Promise<{
+    success: boolean;
+    pass?: PickupPass;
+    student?: StudentProfile;
+    error?: string;
+    reason?: 'EXPIRED' | 'USED' | 'INVALID' | 'WRONG_SCHOOL';
+  }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -936,6 +951,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
 
+    // Realtime listener for 'pickup_passes' (Digital Pick-Up Authentication)
+    const pickupPassesChannel = supabase
+      .channel(`public:pickup_passes_realtime:${activeSchoolId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pickup_passes', filter: `school_id=eq.${activeSchoolId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const inserted = normalizePickupPass(payload.new);
+            setPickupPasses((prev) => {
+              if (prev.some((p) => p.id === inserted.id)) return prev;
+              return [inserted, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = normalizePickupPass(payload.new);
+            setPickupPasses((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id;
+            if (deletedId) {
+              setPickupPasses((prev) => prev.filter((p) => p.id !== deletedId));
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(staffChannel);
       supabase.removeChannel(studentChannel);
@@ -943,6 +984,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       supabase.removeChannel(receiptsChannel);
       supabase.removeChannel(feesChannel);
       supabase.removeChannel(attendanceChannel);
+      supabase.removeChannel(pickupPassesChannel);
     };
   }, [currentSchool?.id, currentUser?.school_id]);
 
@@ -2700,6 +2742,334 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true, message: 'Clock-out time saved successfully.' };
   };
 
+  // Helper: Generate collision-free 6-digit numeric OTP for active school
+  const generateUniqueOtpCode = (schoolId: string): string => {
+    let code = '';
+    let attempts = 0;
+    while (attempts < 50) {
+      code = Math.floor(100000 + Math.random() * 900000).toString();
+      const collision = pickupPasses.some(
+        (p) => p.school_id === schoolId && p.status === 'ACTIVE' && p.otp_code === code
+      );
+      if (!collision) break;
+      attempts++;
+    }
+    return code;
+  };
+
+  // Phase 4: Generate Daily Parent Pick-Up Pass (Expires at 23:59:59 today)
+  const generateDailyParentPass = async (studentId: string): Promise<{ success: boolean; pass?: PickupPass; error?: string }> => {
+    try {
+      const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+      const todayIso = new Date().toISOString().split('T')[0];
+
+      // Check if an ACTIVE daily parent pass already exists today for this student
+      const existing = pickupPasses.find(
+        (p) =>
+          p.school_id === activeSchoolId &&
+          p.student_id === studentId &&
+          p.pass_type === 'DAILY_PARENT' &&
+          p.status === 'ACTIVE' &&
+          new Date(p.expires_at) > new Date()
+      );
+
+      if (existing) {
+        return { success: true, pass: existing };
+      }
+
+      // Expire at today's end (23:59:59)
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      const otp = generateUniqueOtpCode(activeSchoolId);
+      const token = `pkt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+      const newPass: PickupPass = {
+        id: generateUUID(),
+        school_id: activeSchoolId,
+        student_id: studentId,
+        pass_type: 'DAILY_PARENT',
+        delegate_name: null,
+        otp_code: otp,
+        qr_token: token,
+        status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+        expires_at: endOfToday.toISOString(),
+        picked_up_at: null,
+        verified_by_staff_id: null,
+      };
+
+      setPickupPasses((prev) => [newPass, ...prev.filter((p) => !(p.student_id === studentId && p.pass_type === 'DAILY_PARENT' && p.status === 'ACTIVE'))]);
+
+      if (isSupabaseConfigured()) {
+        try {
+          const { error } = await supabase.from('pickup_passes').insert({
+            id: newPass.id,
+            school_id: newPass.school_id,
+            student_id: newPass.student_id,
+            pass_type: newPass.pass_type,
+            delegate_name: newPass.delegate_name,
+            otp_code: newPass.otp_code,
+            qr_token: newPass.qr_token,
+            status: newPass.status,
+            created_at: newPass.created_at,
+            expires_at: newPass.expires_at,
+          });
+          if (error) {
+            console.warn('Supabase pickup_passes insert note:', error.message);
+          }
+        } catch (err: any) {
+          console.warn('Supabase pickup_passes insert caught exception:', err);
+        }
+      }
+
+      return { success: true, pass: newPass };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed generating daily parent pass.' };
+    }
+  };
+
+  // Phase 4: Generate 5-Hour Expiring Delegate Pick-Up Pass
+  const generateDelegatePass = async (studentId: string, delegateName: string): Promise<{ success: boolean; pass?: PickupPass; error?: string }> => {
+    try {
+      if (!delegateName.trim()) {
+        return { success: false, error: 'Delegate full name is required.' };
+      }
+
+      const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+      const now = new Date();
+      // Strictly created_at + 5 hours
+      const expiresAt = new Date(now.getTime() + 5 * 3600 * 1000);
+
+      const otp = generateUniqueOtpCode(activeSchoolId);
+      const token = `pkt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+      const newPass: PickupPass = {
+        id: generateUUID(),
+        school_id: activeSchoolId,
+        student_id: studentId,
+        pass_type: 'DELEGATE_5H',
+        delegate_name: delegateName.trim(),
+        otp_code: otp,
+        qr_token: token,
+        status: 'ACTIVE',
+        created_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        picked_up_at: null,
+        verified_by_staff_id: null,
+      };
+
+      setPickupPasses((prev) => [newPass, ...prev]);
+
+      if (isSupabaseConfigured()) {
+        try {
+          const { error } = await supabase.from('pickup_passes').insert({
+            id: newPass.id,
+            school_id: newPass.school_id,
+            student_id: newPass.student_id,
+            pass_type: newPass.pass_type,
+            delegate_name: newPass.delegate_name,
+            otp_code: newPass.otp_code,
+            qr_token: newPass.qr_token,
+            status: newPass.status,
+            created_at: newPass.created_at,
+            expires_at: newPass.expires_at,
+          });
+          if (error) {
+            console.warn('Supabase delegate pass insert note:', error.message);
+          }
+        } catch (err: any) {
+          console.warn('Supabase delegate pass insert caught exception:', err);
+        }
+      }
+
+      return { success: true, pass: newPass };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed generating delegate pass.' };
+    }
+  };
+
+  // Phase 4: Revoke Pick-Up Pass (Parent cancellation)
+  const revokePickupPass = async (passId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setPickupPasses((prev) =>
+        prev.map((p) => (p.id === passId ? { ...p, status: 'EXPIRED' } : p))
+      );
+
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase
+            .from('pickup_passes')
+            .update({ status: 'EXPIRED' })
+            .eq('id', passId);
+        } catch (err: any) {
+          console.warn('Supabase revoke pickup pass exception:', err);
+        }
+      }
+
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed revoking pass.' };
+    }
+  };
+
+  // Phase 4: Staff Gate Verification & Handover Confirmation
+  const verifyAndHandoverPass = async (params: {
+    codeOrToken: string;
+    verifiedByStaffId?: string;
+  }): Promise<{
+    success: boolean;
+    pass?: PickupPass;
+    student?: StudentProfile;
+    error?: string;
+    reason?: 'EXPIRED' | 'USED' | 'INVALID' | 'WRONG_SCHOOL';
+  }> => {
+    try {
+      const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+      let raw = params.codeOrToken.trim();
+
+      // Normalize structured QR payload or full URL:
+      // Formats:
+      // 1. AEGIS_PICKUP:${school_id}:${otp_code}
+      // 2. /pickup-pass/[qr_token] or https://.../pickup-pass/[qr_token]
+      // 3. raw 6-digit OTP code
+      // 4. raw qr_token
+      let targetOtp: string | null = null;
+      let targetToken: string | null = null;
+
+      if (raw.startsWith('AEGIS_PICKUP:')) {
+        const parts = raw.split(':');
+        // parts[0] = AEGIS_PICKUP, parts[1] = schoolId, parts[2] = otp
+        if (parts.length >= 3) {
+          const payloadSchool = parts[1];
+          if (payloadSchool && payloadSchool !== activeSchoolId) {
+            return {
+              success: false,
+              reason: 'WRONG_SCHOOL',
+              error: 'This pass belongs to a different school.',
+            };
+          }
+          targetOtp = parts[2].trim();
+        }
+      } else if (raw.includes('/pickup-pass/')) {
+        const parts = raw.split('/pickup-pass/');
+        targetToken = parts[1]?.split(/[?#/]/)[0]?.trim() || null;
+      } else if (/^\d{6}$/.test(raw)) {
+        targetOtp = raw;
+      } else {
+        targetToken = raw;
+      }
+
+      // Try resolving pass from local state first
+      let matchedPass = pickupPasses.find((p) => {
+        if (p.school_id !== activeSchoolId) return false;
+        if (targetOtp && p.otp_code === targetOtp) return true;
+        if (targetToken && p.qr_token === targetToken) return true;
+        return false;
+      }) || null;
+
+      // If not in local memory, query Supabase directly
+      if (!matchedPass && isSupabaseConfigured()) {
+        try {
+          let query = supabase.from('pickup_passes').select('*').eq('school_id', activeSchoolId);
+          if (targetOtp) {
+            query = query.eq('otp_code', targetOtp);
+          } else if (targetToken) {
+            query = query.eq('qr_token', targetToken);
+          }
+          const { data, error } = await query.maybeSingle();
+          if (!error && data) {
+            matchedPass = normalizePickupPass(data);
+          }
+        } catch (dbErr) {
+          console.warn('Supabase verify pass query note:', dbErr);
+        }
+      }
+
+      if (!matchedPass) {
+        return {
+          success: false,
+          reason: 'INVALID',
+          error: 'Invalid Pick-Up Code or QR Token. No matching pass found for this school.',
+        };
+      }
+
+      if (matchedPass.status === 'USED') {
+        return {
+          success: false,
+          reason: 'USED',
+          pass: matchedPass,
+          error: `Code Already Used at ${matchedPass.picked_up_at ? new Date(matchedPass.picked_up_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier today'}.`,
+        };
+      }
+
+      const now = new Date();
+      if (matchedPass.status === 'EXPIRED' || now > new Date(matchedPass.expires_at)) {
+        return {
+          success: false,
+          reason: 'EXPIRED',
+          pass: matchedPass,
+          error: 'Pass Expired. This pick-up authorization has lapsed.',
+        };
+      }
+
+      // Resolve student details
+      let student = students.find((s) => s.id === matchedPass!.student_id);
+      if (!student && isSupabaseConfigured()) {
+        try {
+          const { data: stdData } = await supabase
+            .from('students')
+            .select('*')
+            .eq('id', matchedPass.student_id)
+            .maybeSingle();
+          if (stdData) {
+            student = normalizeStudent(stdData);
+          }
+        } catch {}
+      }
+
+      // Mark pass as USED
+      const nowIso = now.toISOString();
+      const staffId = params.verifiedByStaffId || currentUser?.id || null;
+
+      const updatedPass: PickupPass = {
+        ...matchedPass,
+        status: 'USED',
+        picked_up_at: nowIso,
+        verified_by_staff_id: staffId,
+      };
+
+      setPickupPasses((prev) => prev.map((p) => (p.id === updatedPass.id ? updatedPass : p)));
+
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase
+            .from('pickup_passes')
+            .update({
+              status: 'USED',
+              picked_up_at: nowIso,
+              verified_by_staff_id: staffId,
+            })
+            .eq('id', updatedPass.id);
+        } catch (err: any) {
+          console.warn('Supabase mark pass as used exception:', err);
+        }
+      }
+
+      return {
+        success: true,
+        pass: updatedPass,
+        student,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        reason: 'INVALID',
+        error: err?.message || 'Verification process encountered an error.',
+      };
+    }
+  };
+
   const contextValue = React.useMemo(
     () => ({
       schoolInfo: SCHOOL_INFO,
@@ -2752,6 +3122,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateSchoolGeofence,
       clockInStaff,
       clockOutStaff,
+      generateDailyParentPass,
+      generateDelegatePass,
+      revokePickupPass,
+      verifyAndHandoverPass,
     }),
     [
       currentSchool,
@@ -2779,6 +3153,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateSchoolGeofence,
       clockInStaff,
       clockOutStaff,
+      generateDailyParentPass,
+      generateDelegatePass,
+      revokePickupPass,
+      verifyAndHandoverPass,
     ]
   );
 

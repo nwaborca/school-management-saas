@@ -31,6 +31,12 @@ import {
   AlertCircle,
   LogOut,
   Camera,
+  ShieldCheck,
+  UserCheck,
+  KeyRound,
+  Check,
+  X,
+  ScanLine,
 } from 'lucide-react';
 
 const StaffAttendanceScannerModal = dynamic(
@@ -49,9 +55,11 @@ export default function AcademicHubPage() {
     students = [],
     results = [],
     staffAttendance = [],
+    pickupPasses = [],
     updateStudentScore,
     clockInStaff,
     clockOutStaff,
+    verifyAndHandoverPass,
     currentUser,
     isAuthReady,
   } = useApp();
@@ -64,6 +72,20 @@ export default function AcademicHubPage() {
   const [attendanceNotice, setAttendanceNotice] = useState<{
     type: 'success' | 'error';
     message: string;
+  } | null>(null);
+
+  // Phase 4: Safe Pick-Up Gate Verification State
+  const [pickupInputCode, setPickupInputCode] = useState('');
+  const [isVerifyingPass, setIsVerifyingPass] = useState(false);
+  const [isPassScannerOpen, setIsPassScannerOpen] = useState(false);
+  const [verifiedPassResult, setVerifiedPassResult] = useState<{
+    pass: any;
+    student: any;
+  } | null>(null);
+  const [gateNotice, setGateNotice] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    reason?: string;
   } | null>(null);
 
   // Route Guard: Strictly require teacher role (Admins have Admin & Bursar Hubs)
@@ -83,7 +105,7 @@ export default function AcademicHubPage() {
 
   const teacherName = currentUser?.full_name || loggedTeacher?.full_name || 'Faculty Educator';
 
-  const [activeTab, setActiveTab] = useState<'entry' | 'form_roster' | 'enroll_student'>('entry');
+  const [activeTab, setActiveTab] = useState<'entry' | 'form_roster' | 'pickup_gate' | 'enroll_student'>('entry');
 
   const assignedSubjectIds = loggedTeacher?.assigned_subjects || loggedTeacher?.assigned_subject_ids || [];
   const formClassId = loggedTeacher?.is_part_time ? undefined : (loggedTeacher?.assigned_class_id || loggedTeacher?.form_class_id);
@@ -640,6 +662,67 @@ export default function AcademicHubPage() {
     }
   };
 
+  // Phase 4: Gate Security Safe Pick-Up Verification
+  const handleVerifyPassCode = async (codeToVerify?: string) => {
+    const raw = (codeToVerify || pickupInputCode).trim();
+    if (!raw) {
+      setGateNotice({
+        type: 'error',
+        message: 'Please enter the 6-digit OTP or scan a pickup QR code.',
+      });
+      return;
+    }
+
+    setIsVerifyingPass(true);
+    setGateNotice(null);
+
+    try {
+      const res = await verifyAndHandoverPass({
+        codeOrToken: raw,
+        verifiedByStaffId: currentUser?.id,
+      });
+
+      if (res.success && res.pass) {
+        setVerifiedPassResult({
+          pass: res.pass,
+          student: res.student,
+        });
+        setGateNotice({
+          type: 'success',
+          message: `Child Handover Confirmed! Verified by ${currentUser?.full_name || 'Staff'}.`,
+        });
+        setPickupInputCode('');
+      } else {
+        setVerifiedPassResult(null);
+        setGateNotice({
+          type: 'error',
+          message: res.error || 'Invalid or expired pick-up authorization code.',
+          reason: res.reason,
+        });
+      }
+    } catch (e: any) {
+      setVerifiedPassResult(null);
+      setGateNotice({
+        type: 'error',
+        message: e?.message || 'Error occurred during verification.',
+      });
+    } finally {
+      setIsVerifyingPass(false);
+    }
+  };
+
+  const handlePassScanSuccess = (scannedPayload: string) => {
+    setIsPassScannerOpen(false);
+    handleVerifyPassCode(scannedPayload);
+  };
+
+  // Today's handovers verified in this school
+  const todayHandovers = useMemo(() => {
+    return pickupPasses.filter(
+      (p) => p.status === 'USED' && p.picked_up_at && p.picked_up_at.startsWith(clientTodayStr || new Date().toISOString().split('T')[0])
+    );
+  }, [pickupPasses, clientTodayStr]);
+
   if (!isAuthReady) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] text-slate-700 flex flex-col items-center justify-center p-4">
@@ -830,6 +913,18 @@ export default function AcademicHubPage() {
               <span>Form Class Broadsheet ({formClass.name})</span>
             </button>
           )}
+
+          <button
+            onClick={() => setActiveTab('pickup_gate')}
+            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'pickup_gate'
+                ? 'border-[#1D4ED8] text-[#1D4ED8] font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Safe Pick-Up Gate Verification</span>
+          </button>
 
           <button
             onClick={() => setActiveTab('enroll_student')}
@@ -1310,7 +1405,198 @@ export default function AcademicHubPage() {
           </div>
         )}
 
-        {/* TAB 3: DUAL ENROLLMENT */}
+        {/* TAB 3: SAFE PICK-UP GATE VERIFICATION (PHASE 4) */}
+        {activeTab === 'pickup_gate' && (
+          <div className="space-y-6">
+            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-emerald-700 text-xs font-bold uppercase tracking-wider mb-1">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Dismissal Security & Child Handover Terminal</span>
+                </div>
+                <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                  Gate Safe Pick-Up Verification
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Verify the collector&apos;s 6-digit numeric OTP or scan their QR token voucher before releasing any student.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPassScannerOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition cursor-pointer"
+                >
+                  <ScanLine className="w-4 h-4" />
+                  <span>Scan Collector QR Voucher</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Verification Keypad / Input Box */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs max-w-xl mx-auto space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 text-center">
+                Enter Collector 6-Digit Gate Pass OTP
+              </h3>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="e.g. 482910"
+                  value={pickupInputCode}
+                  onChange={(e) => setPickupInputCode(e.target.value.replace(/\D/g, ''))}
+                  className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-2xl font-mono font-black text-center tracking-widest text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleVerifyPassCode()}
+                  disabled={isVerifyingPass || pickupInputCode.length < 6}
+                  className="px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-40"
+                >
+                  {isVerifyingPass ? 'Verifying...' : 'Verify OTP'}
+                </button>
+              </div>
+
+              {gateNotice && (
+                <div
+                  className={`p-3.5 rounded-xl text-xs flex items-center gap-2.5 border ${
+                    gateNotice.type === 'success'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : 'bg-rose-50 border-rose-200 text-rose-900'
+                  }`}
+                >
+                  {gateNotice.type === 'success' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  )}
+                  <div className="flex-1">
+                    <span className="font-bold block">
+                      {gateNotice.type === 'success' ? 'Verification Passed' : 'Verification Rejected'}
+                    </span>
+                    <span>{gateNotice.message}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Verified Pass Success Confirmation Card */}
+              {verifiedPassResult && (
+                <div className="mt-4 p-5 rounded-2xl bg-emerald-50/70 border border-emerald-300 space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-emerald-200">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-700" />
+                      <span className="text-xs font-extrabold text-emerald-900 uppercase tracking-wide">
+                        Authorized Handover Match
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      Code: {verifiedPassResult.pass.otp_code}
+                    </span>
+                  </div>
+
+                  {/* Student & Collector Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 bg-white rounded-xl border border-emerald-200">
+                      <span className="text-[10px] text-slate-500 uppercase font-semibold block">Student Released:</span>
+                      <strong className="text-sm text-slate-900 block mt-0.5">
+                        {verifiedPassResult.student?.full_name || 'Enrolled Student'}
+                      </strong>
+                      <span className="text-slate-600 text-[11px]">
+                        Class: {verifiedPassResult.student?.class_grade || 'Primary / Secondary'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white rounded-xl border border-emerald-200">
+                      <span className="text-[10px] text-slate-500 uppercase font-semibold block">Authorized Collector:</span>
+                      <strong className="text-sm text-slate-900 block mt-0.5">
+                        {verifiedPassResult.pass.delegate_name || 'Registered Parent / Guardian'}
+                      </strong>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold mt-1 ${
+                        verifiedPassResult.pass.pass_type === 'DAILY_PARENT'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {verifiedPassResult.pass.pass_type === 'DAILY_PARENT' ? 'Verified Parent' : '5-Hour Delegate'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-emerald-100/70 text-emerald-900 text-[11px] text-center font-medium">
+                    Status has been marked as <strong>USED</strong>. This pass cannot be reused.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Today's Completed Gate Handovers Roll */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center justify-between">
+                <span>Today&apos;s Completed Child Handovers</span>
+                <span className="font-mono text-slate-400 font-normal">{todayHandovers.length} Completed</span>
+              </h3>
+
+              {todayHandovers.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-xl">
+                  No student handovers completed yet today.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="px-3.5 py-2">Student</th>
+                        <th className="px-3.5 py-2">Collector Full Name</th>
+                        <th className="px-3.5 py-2">Collector Type</th>
+                        <th className="px-3.5 py-2">OTP Code</th>
+                        <th className="px-3.5 py-2">Handover Time</th>
+                        <th className="px-3.5 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {todayHandovers.map((h) => {
+                        const std = students.find((s) => s.id === h.student_id);
+                        return (
+                          <tr key={h.id} className="hover:bg-slate-50/50">
+                            <td className="px-3.5 py-2.5 font-bold text-slate-900">
+                              {std?.full_name || 'Student'} ({std?.class_grade || 'Class'})
+                            </td>
+                            <td className="px-3.5 py-2.5 font-semibold text-slate-800">
+                              {h.delegate_name || 'Registered Parent'}
+                            </td>
+                            <td className="px-3.5 py-2.5">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                h.pass_type === 'DAILY_PARENT'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}>
+                                {h.pass_type === 'DAILY_PARENT' ? 'Parent' : 'Delegate'}
+                              </span>
+                            </td>
+                            <td className="px-3.5 py-2.5 font-mono text-slate-600">{h.otp_code}</td>
+                            <td className="px-3.5 py-2.5 text-slate-500 font-mono">
+                              {h.picked_up_at
+                                ? new Date(h.picked_up_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                : 'Completed'}
+                            </td>
+                            <td className="px-3.5 py-2.5">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Released & Verified
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: DUAL ENROLLMENT */}
         {activeTab === 'enroll_student' && (
           <div className="max-w-2xl mx-auto space-y-6">
             <EnrollStudentForm
@@ -1328,6 +1614,13 @@ export default function AcademicHubPage() {
           isOpen={isScannerOpen}
           onClose={() => setIsScannerOpen(false)}
           onScanSuccess={handleScanSuccess}
+        />
+
+        {/* Phase 4: Pick-Up Pass Scanner Modal */}
+        <StaffAttendanceScannerModal
+          isOpen={isPassScannerOpen}
+          onClose={() => setIsPassScannerOpen(false)}
+          onScanSuccess={handlePassScanSuccess}
         />
       </div>
           </AnimatedContent>

@@ -9,7 +9,7 @@
     "lint": "eslint",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
-    "android:apk": "cd android && ./gradlew assembleDebug"
+    "android:apk": "cd android && gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",

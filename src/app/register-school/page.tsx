@@ -37,10 +37,12 @@ export default function RegisterSchoolPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Success state with new School Invite Code
+  // Success state with new School Invite Code and Admin Credentials
   const [registeredInviteCode, setRegisteredInviteCode] = useState<string | null>(null);
   const [registeredSchoolName, setRegisteredSchoolName] = useState<string | null>(null);
+  const [registeredAdminEmail, setRegisteredAdminEmail] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +68,7 @@ export default function RegisterSchoolPage() {
       if (res.success && res.inviteCode) {
         setRegisteredInviteCode(res.inviteCode);
         setRegisteredSchoolName(schoolName);
+        setRegisteredAdminEmail(email.trim());
       } else {
         setError(res.error || 'Failed to complete school registration. Please try again.');
       }
@@ -82,6 +85,20 @@ export default function RegisterSchoolPage() {
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2500);
     }
+  };
+
+  const copyAllCredentials = () => {
+    if (!registeredInviteCode) return;
+    const summary = `*AEGIS SCHOOL OS — PROPRIETOR ADMIN CREDENTIALS*\n` +
+      `Institution: ${registeredSchoolName}\n` +
+      `School Invite Code: ${registeredInviteCode}\n` +
+      `Admin Login Email: ${registeredAdminEmail}\n` +
+      `Role: Proprietor / Super Admin\n` +
+      `Portal URL: ${window.location.origin}/login\n\n` +
+      `Keep this invite code safe. Teachers, staff, and parents use this code to access your school's dedicated portal.`;
+    navigator.clipboard.writeText(summary);
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2500);
   };
 
   return (
@@ -252,44 +269,88 @@ export default function RegisterSchoolPage() {
               </div>
 
               <div>
-                <h2 className="text-2xl font-extrabold text-[#0F172A] tracking-tight">
-                  School Registered Successfully!
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                  School Architecture Provisioned
+                </span>
+                <h2 className="text-2xl font-extrabold text-[#0F172A] tracking-tight mt-2">
+                  School Portal Ready — Save Your Admin Credentials
                 </h2>
-                <p className="text-xs text-slate-600 mt-1">
-                  <strong>{registeredSchoolName}</strong> has been provisioned with all 33 class tiers (Creche to SS3 Arm F) and continuous assessment modules.
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  <strong>{registeredSchoolName}</strong> has been provisioned with all 33 class tiers (Creche to SS3 Arm F), continuous assessment broadsheets, and gate security.
                 </p>
               </div>
 
-              {/* Shareable Invite Code Display Card */}
-              <div className="p-5 rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 space-y-3">
-                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Your Official School Invite Code
-                </div>
-                <div className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-lg">
-                  <span className="text-2xl font-mono font-extrabold text-[#0F172A] tracking-widest">
-                    {registeredInviteCode}
-                  </span>
+              {/* Comprehensive Credentials Confirmation Card */}
+              <div className="p-5 rounded-xl bg-slate-50 border-2 border-slate-200 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                  <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Proprietor Master Access Key</span>
+                  </div>
                   <button
-                    onClick={copyInviteCode}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition cursor-pointer border border-slate-300"
+                    onClick={copyAllCredentials}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
                   >
-                    {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
+                    {copiedAll ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedAll ? 'Copied to Clipboard!' : 'Copy Credentials'}</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Share this code with your teachers, parents, and students. They can enter this code on the login page to access your school’s dedicated hub.
-                </p>
+
+                {/* Details Grid */}
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200">
+                    <span className="text-slate-500 font-medium">School Invite Code:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-extrabold text-[#0F172A] text-sm tracking-wider">
+                        {registeredInviteCode}
+                      </span>
+                      <button
+                        onClick={copyInviteCode}
+                        title="Copy Invite Code"
+                        className="text-slate-400 hover:text-slate-700 p-1"
+                      >
+                        {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200">
+                    <span className="text-slate-500 font-medium">Super Admin Email:</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {registeredAdminEmail}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200">
+                    <span className="text-slate-500 font-medium">Role:</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      Proprietor / Super Admin
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber-50/80 rounded-lg border border-amber-200/80 text-[11px] text-amber-800 leading-relaxed">
+                  <strong>Important:</strong> Copy or write down your <strong>School Invite Code ({registeredInviteCode})</strong>. You, your teachers, and your parents will use it along with their email/ID to sign into your portal.
+                </div>
               </div>
 
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3 pt-1">
                 <button
                   onClick={() => router.push('/admin-hub')}
-                  className="w-full py-3 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+                  className="w-full py-3.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
                 >
-                  <span>Launch Admin Command Center</span>
+                  <span>Launch Admin Dashboard →</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
+
+                <div className="text-center">
+                  <Link
+                    href="/login"
+                    className="text-xs text-slate-500 hover:text-slate-800 font-medium"
+                  >
+                    Go to Portal Sign-In Page
+                  </Link>
+                </div>
               </div>
             </div>
           )}

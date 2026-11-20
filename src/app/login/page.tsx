@@ -206,7 +206,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full py-2.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50 shadow-xs mt-2"
               >
-                <span>{loading ? 'Verifying PIN...' : 'Sign In as Student'}</span>
+                <span>{loading ? 'Verifying PIN...' : 'Sign In as Student / Parent'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -214,16 +214,19 @@ export default function LoginPage() {
             <form onSubmit={handleStaffLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                  Staff Username / ID
+                  Admin Email Address, Username, or Staff ID
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. admin or test_1794729912505"
+                  placeholder="e.g. admin@school.ng, admin, or ADM/2026/001"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs font-mono text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8] focus:border-transparent placeholder:text-slate-400"
                 />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Proprietors: use the email address or admin username you registered with.
+                </p>
               </div>
 
               <div>
@@ -248,7 +251,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full py-2.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50 shadow-xs mt-2"
               >
-                <span>{loading ? 'Authenticating Staff...' : 'Sign In to Console'}</span>
+                <span>{loading ? 'Authenticating Staff...' : 'Sign In as Staff / Admin'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>

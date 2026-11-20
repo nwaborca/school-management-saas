@@ -1442,12 +1442,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!matchSchool) return false;
 
       const matchUsername = (t.username || '').toLowerCase().replace(/\s+/g, '');
+      const matchEmail = (t.email || '').toLowerCase().replace(/\s+/g, '');
       const matchIdCode = (t.teacher_id_code || '').toLowerCase().replace(/\s+/g, '');
       const matchUnderscored = matchIdCode.replace(/\//g, '_');
       const matchSlashed = matchUsername.replace(/_/g, '/');
 
       const matchesIdentifier =
         matchUsername === normalizedCleanUser ||
+        matchEmail === normalizedCleanUser ||
         matchIdCode === normalizedCleanUser ||
         matchUnderscored === normalizedCleanUser ||
         matchSlashed === normalizedCleanUser;
@@ -1462,7 +1464,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .from('staff')
           .select('*')
           .eq('school_id', targetSchool.id)
-          .or(`username.ilike.${cleanUser},staff_id_code.ilike.${cleanUser}`)
+          .or(`username.ilike.${cleanUser},email.ilike.${cleanUser},staff_id_code.ilike.${cleanUser}`)
           .eq('password_hash', cleanPass)
           .maybeSingle();
 

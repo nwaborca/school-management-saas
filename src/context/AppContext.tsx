@@ -456,8 +456,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // Helper to normalize payment receipt from Supabase or storage
-  const normalizeReceipt = (r: any): PaymentReceipt => {
+  // Helper to normalize payment receipt from Supabase or storage with defensive student & class mapping
+  const normalizeReceipt = (r: any, studentList?: StudentProfile[], classList?: AcademicClass[]): PaymentReceipt => {
     const rawUrl =
       r.file_data_url ||
       r.fileDataUrl ||
@@ -475,14 +475,72 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       r.name ||
       'receipt_document';
 
+    // Parse packed student & class details if stored in admin_note / remarks
+    let noteStudentName: string | undefined;
+    let noteAdmissionNo: string | undefined;
+    let noteClassName: string | undefined;
+
+    const rawNote = r.admin_note || r.adminNote || r.remarks || '';
+    if (typeof rawNote === 'string' && rawNote.includes('AEGIS_RECEIPT_META:')) {
+      try {
+        const metaStr = rawNote.split('AEGIS_RECEIPT_META:')[1];
+        if (metaStr) {
+          const parsedMeta = JSON.parse(metaStr);
+          noteStudentName = parsedMeta.student_name || parsedMeta.studentName;
+          noteAdmissionNo = parsedMeta.admission_no || parsedMeta.reg_number || parsedMeta.regNumber;
+          noteClassName = parsedMeta.class_name || parsedMeta.class_grade || parsedMeta.classGrade;
+        }
+      } catch {}
+    }
+
+    const studentId = r.student_id || r.studentId;
+    const admissionNoCandidate = r.reg_number || r.regNumber || r.admission_no || r.admissionNo || noteAdmissionNo;
+
+    // Resolve matching student from provided studentList or existing state
+    const pool = studentList && studentList.length > 0 ? studentList : students;
+    const matchedStudent = pool.find((s) => 
+      (studentId && s.id === studentId) || 
+      (admissionNoCandidate && s.reg_number.toUpperCase() === String(admissionNoCandidate).toUpperCase())
+    );
+
+    const classPool = classList && classList.length > 0 ? classList : classes;
+    const matchedClass = classPool.find((c) => c.id === (r.class_id || r.classId || matchedStudent?.class_id));
+
+    const resolvedStudentName =
+      matchedStudent?.full_name ||
+      r.student_name ||
+      r.studentName ||
+      noteStudentName ||
+      'Student';
+
+    const resolvedRegNumber =
+      matchedStudent?.reg_number ||
+      r.reg_number ||
+      r.regNumber ||
+      r.admission_no ||
+      r.admissionNo ||
+      noteAdmissionNo ||
+      'N/A';
+
+    const resolvedClassGrade =
+      matchedStudent?.class_grade ||
+      matchedClass?.name ||
+      r.class_grade ||
+      r.classGrade ||
+      r.class_name ||
+      r.className ||
+      r.class_level ||
+      noteClassName ||
+      'Class';
+
     return {
       id: r.id,
       school_id: r.school_id || DEFAULT_SCHOOL.id,
-      student_id: r.student_id || r.studentId,
-      student_name: r.student_name || r.studentName || 'Student',
-      reg_number: r.reg_number || r.regNumber || 'N/A',
-      class_grade: r.class_grade || r.classGrade || 'Class',
-      class_id: r.class_id || r.classId,
+      student_id: studentId || matchedStudent?.id || '',
+      student_name: resolvedStudentName,
+      reg_number: resolvedRegNumber,
+      class_grade: resolvedClassGrade,
+      class_id: r.class_id || r.classId || matchedStudent?.class_id || '',
       term: r.term || '1st Term',
       session: r.session || SCHOOL_INFO.session || '2025/2026',
       fee_structure_id: r.fee_structure_id || r.feeStructureId,
@@ -491,7 +549,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       amount_approved: r.amount_approved !== undefined ? Number(r.amount_approved) : (r.amountApproved !== undefined ? Number(r.amountApproved) : undefined),
       file_name: rawFileName,
       file_data_url: typeof rawUrl === 'string' ? rawUrl : '',
-      file_type: r.file_type || r.fileType || 'application/pdf',
+      file_type: r.file_type || r.fileType || (rawFileName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
       storage_path: r.storage_path || r.storagePath || undefined,
       uploaded_at: r.uploaded_at || r.uploadedAt || r.created_at || new Date().toISOString(),
       status: r.status || 'pending_verification',
@@ -735,7 +793,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchPickupPassesPromise,
       ]);
 
-      // Apply guarded updates only if data was successfully received
+      // Apply guarded updates: ensure students and classes are normalized first so receipts can link names and classes cleanly
       let activeStudentList = students;
       if (stdData && Array.isArray(stdData) && stdData.length > 0) {
         try {
@@ -745,6 +803,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         } catch (normStdErr) {
           console.warn('Error normalizing students payload:', normStdErr);
         }
+      }
+
+      let activeClassList = classes;
+      if (classData && Array.isArray(classData) && classData.length > 0) {
+        activeClassList = classData as AcademicClass[];
+        setClasses(activeClassList);
       }
 
       if (staffData && Array.isArray(staffData) && staffData.length > 0) {
@@ -766,10 +830,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      if (classData && Array.isArray(classData) && classData.length > 0) {
-        setClasses(classData as AcademicClass[]);
-      }
-
       if (feeData && Array.isArray(feeData) && feeData.length > 0) {
         setFeeStructures(feeData as FeeStructure[]);
         const gateRow = feeData.find((f: any) => f.id === '00000000-0000-0000-0000-000000000001');
@@ -782,7 +842,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (recData && Array.isArray(recData) && recData.length > 0) {
-        setReceipts(recData.map(normalizeReceipt));
+        setReceipts(recData.map((r) => normalizeReceipt(r, activeStudentList, activeClassList)));
       }
 
       if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
@@ -929,13 +989,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { event: '*', schema: 'public', table: 'receipts', filter: `school_id=eq.${activeSchoolId}` },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            const inserted = normalizeReceipt(payload.new);
+            const inserted = normalizeReceipt(payload.new, students, classes);
             setReceipts((prev) => {
               if (prev.some((rc) => rc.id === inserted.id)) return prev;
               return [inserted, ...prev];
             });
           } else if (payload.eventType === 'UPDATE') {
-            const updated = normalizeReceipt(payload.new);
+            const updated = normalizeReceipt(payload.new, students, classes);
             setReceipts((prev) => prev.map((rc) => (rc.id === updated.id ? updated : rc)));
           } else if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as any)?.id;
@@ -2215,9 +2275,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
-    // Persist receipt to Supabase
+    // Persist receipt to Supabase (packing student & class metadata safely inside admin_note so fresh sessions never show N/A)
     if (isSupabaseConfigured()) {
       try {
+        const metadataTag = `AEGIS_RECEIPT_META:${JSON.stringify({
+          student_name: student.full_name,
+          admission_no: student.reg_number,
+          class_name: student.class_grade,
+        })}`;
+
         const payload = {
           id: newReceipt.id,
           school_id: activeSchoolId,
@@ -2234,6 +2300,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           file_type: newReceipt.file_type || 'application/pdf',
           status: newReceipt.status,
           uploaded_at: newReceipt.uploaded_at,
+          admin_note: metadataTag,
         };
 
         const { error } = await supabase.from('receipts').insert(payload);

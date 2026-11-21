@@ -310,6 +310,16 @@ export default function FounderConsolePage() {
           </div>
         </div>
 
+        {/* Empty-State Helper Banner when No Pending Approvals */}
+        {schools.filter((s) => s.access_status === 'PENDING_APPROVAL').length === 0 && (
+          <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/60 text-blue-300 text-xs flex items-center gap-3">
+            <Sparkles className="w-5 h-5 shrink-0 text-blue-400" />
+            <div className="leading-relaxed">
+              <strong className="text-blue-200">No Pending Activations:</strong> Newly registered schools automatically appear here as <strong>PENDING APPROVAL</strong> until you activate their 1-Term Free Pilot.
+            </div>
+          </div>
+        )}
+
         {/* Search Bar */}
         <div className="relative">
           <input

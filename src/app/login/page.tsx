@@ -31,9 +31,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Hidden Founder Console Secret Trigger (Tap 5 times rapidly on Aegis Crest)
+  // Hidden Founder Console Secret Trigger
+  // 1. 5-tap counter with generous 3-second rolling window and visual feedback
   const [crestTaps, setCrestTaps] = useState(0);
-  const handleCrestClick = () => {
+  const crestTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const registerCrestTap = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    if (crestTimerRef.current) clearTimeout(crestTimerRef.current);
+
     setCrestTaps((prev) => {
       const next = prev + 1;
       if (next >= 5) {
@@ -42,10 +48,48 @@ export default function LoginPage() {
       }
       return next;
     });
-    // Reset counter if taps are separated by more than 2 seconds
-    setTimeout(() => {
+
+    // Reset after 3 seconds of inactivity
+    crestTimerRef.current = setTimeout(() => {
       setCrestTaps(0);
-    }, 2000);
+    }, 3000);
+  };
+
+  // 2. NDPA Footer 5-taps OR 1.5-second long-press trigger
+  const [ndpaTaps, setNdpaTaps] = useState(0);
+  const ndpaTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const pressTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleNdpaTap = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    if (ndpaTimerRef.current) clearTimeout(ndpaTimerRef.current);
+
+    setNdpaTaps((prev) => {
+      const next = prev + 1;
+      if (next >= 5) {
+        router.push('/founder');
+        return 0;
+      }
+      return next;
+    });
+
+    ndpaTimerRef.current = setTimeout(() => {
+      setNdpaTaps(0);
+    }, 3000);
+  };
+
+  const handleNdpaPressStart = () => {
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      router.push('/founder');
+    }, 1500);
+  };
+
+  const handleNdpaPressEnd = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
   };
 
   const handleStudentLogin = async (e: React.FormEvent) => {
@@ -110,15 +154,18 @@ export default function LoginPage() {
             <div className="flex items-center gap-3 mb-4">
               <button
                 type="button"
-                onClick={handleCrestClick}
-                className="focus:outline-none cursor-default active:scale-95 transition-transform"
+                onClick={registerCrestTap}
+                onPointerDown={registerCrestTap}
+                className={`focus:outline-none cursor-pointer transition-all select-none active:scale-90 ${
+                  crestTaps >= 3 ? 'ring-2 ring-blue-500/50 rounded-xl scale-105' : ''
+                }`}
                 title="Aegis Crest"
                 aria-label="Aegis Crest"
               >
                 <img
                   src="/aegis-logo.png"
                   alt="Aegis Logo"
-                  className="h-10 w-10 object-contain shrink-0 select-none pointer-events-auto"
+                  className="h-10 w-10 object-contain shrink-0 select-none pointer-events-none"
                 />
               </button>
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
@@ -307,16 +354,21 @@ export default function LoginPage() {
           </div>
 
           {/* Subdued Security Notice with Secret APK Founder Trigger */}
-          <div className="pt-4 border-t border-slate-200 text-center">
+          <div className="pt-4 border-t border-slate-200 text-center select-none">
             <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5 font-medium">
               <button
                 type="button"
-                onClick={() => router.push('/founder')}
-                className="cursor-default focus:outline-none p-0.5 rounded text-slate-400 hover:text-slate-600 transition"
-                title="Founder Access"
-                aria-label="Founder Access"
+                onClick={handleNdpaTap}
+                onPointerDown={handleNdpaPressStart}
+                onPointerUp={handleNdpaPressEnd}
+                onPointerCancel={handleNdpaPressEnd}
+                className={`focus:outline-none p-1 rounded-md transition cursor-pointer select-none active:scale-90 ${
+                  ndpaTaps >= 3 ? 'text-blue-600 bg-blue-50 ring-1 ring-blue-300' : 'text-slate-400 hover:text-slate-600'
+                }`}
+                title="NDPA Security"
+                aria-label="NDPA Security"
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
+                <ShieldCheck className="w-4 h-4" />
               </button>
               <span>NDPA 2023 Compliant • Role-based TLS 1.3 encrypted authentication</span>
             </p>

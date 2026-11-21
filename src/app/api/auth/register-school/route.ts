@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { INITIAL_CLASSES } from '@/lib/mockData';
 import { AcademicClass } from '@/types';
+import { saveSchoolAccessMeta } from '@/lib/founderAccess';
 
 function getSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -80,17 +81,46 @@ export async function POST(req: NextRequest) {
       latitude: latitude ?? 6.5244,
       longitude: longitude ?? 3.3792,
       geofence_radius_meters: 150,
+      access_status: 'PENDING_APPROVAL',
+      plan_label: 'FREE_PILOT_TERM',
+      access_expires_at: null,
       created_at: new Date().toISOString(),
     };
 
-    // 2. Insert School Record into Supabase
-    const { error: schoolError } = await supabase.from('schools').insert(newSchool);
-    if (schoolError) {
+    // 2. Insert School Record into Supabase (gracefully omitting extra columns if schema hasn't migrated)
+    const baseSchoolPayload = {
+      id: schoolId,
+      name: cleanSchoolName,
+      invite_code: inviteCode,
+      latitude: latitude ?? 6.5244,
+      longitude: longitude ?? 3.3792,
+      geofence_radius_meters: 150,
+      created_at: newSchool.created_at,
+    };
+
+    // Attempt insert with access control columns first, fallback to base payload if column does not exist
+    let schoolInsertErr: any = null;
+    const { error: fullSchoolError } = await supabase.from('schools').insert(newSchool);
+    if (fullSchoolError) {
+      const { error: baseErr } = await supabase.from('schools').insert(baseSchoolPayload);
+      if (baseErr) {
+        schoolInsertErr = baseErr;
+      }
+    }
+
+    if (schoolInsertErr) {
       return NextResponse.json(
-        { success: false, message: `Failed to create school record: ${schoolError.message}` },
+        { success: false, message: `Failed to create school record: ${schoolInsertErr.message}` },
         { status: 500 }
       );
     }
+
+    // Persist access control meta in the high-availability registry
+    await saveSchoolAccessMeta(supabase, schoolId, {
+      access_status: 'PENDING_APPROVAL',
+      plan_label: 'FREE_PILOT_TERM',
+      access_expires_at: null,
+    });
 
     // 3. Seed 33-tier classes for this school
     const classesPayload = INITIAL_CLASSES.map((c: AcademicClass) => ({

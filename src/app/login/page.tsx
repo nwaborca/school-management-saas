@@ -31,6 +31,23 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Hidden Founder Console Secret Trigger (Tap 5 times rapidly on Aegis Crest)
+  const [crestTaps, setCrestTaps] = useState(0);
+  const handleCrestClick = () => {
+    setCrestTaps((prev) => {
+      const next = prev + 1;
+      if (next >= 5) {
+        router.push('/founder');
+        return 0;
+      }
+      return next;
+    });
+    // Reset counter if taps are separated by more than 2 seconds
+    setTimeout(() => {
+      setCrestTaps(0);
+    }, 2000);
+  };
+
   const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -91,11 +108,19 @@ export default function LoginPage() {
         <div className="w-full max-w-md space-y-8">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img
-                src="/aegis-logo.png"
-                alt="Aegis Logo"
-                className="h-10 w-10 object-contain shrink-0"
-              />
+              <button
+                type="button"
+                onClick={handleCrestClick}
+                className="focus:outline-none cursor-default active:scale-95 transition-transform"
+                title="Aegis Crest"
+                aria-label="Aegis Crest"
+              >
+                <img
+                  src="/aegis-logo.png"
+                  alt="Aegis Logo"
+                  className="h-10 w-10 object-contain shrink-0 select-none pointer-events-auto"
+                />
+              </button>
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                 <span>Aegis Institutional Portal</span>
@@ -281,10 +306,18 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          {/* Subdued Security Notice */}
+          {/* Subdued Security Notice with Secret APK Founder Trigger */}
           <div className="pt-4 border-t border-slate-200 text-center">
             <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5 font-medium">
-              <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+              <button
+                type="button"
+                onClick={() => router.push('/founder')}
+                className="cursor-default focus:outline-none p-0.5 rounded text-slate-400 hover:text-slate-600 transition"
+                title="Founder Access"
+                aria-label="Founder Access"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </button>
               <span>NDPA 2023 Compliant • Role-based TLS 1.3 encrypted authentication</span>
             </p>
           </div>

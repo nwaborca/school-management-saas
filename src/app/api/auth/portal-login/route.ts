@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getSchoolAccessRegistry, resolveSchoolAccess } from '@/lib/founderAccess';
 
 // Resolve Supabase Client with service role if available, otherwise anonymous server client
 function getSupabaseServerClient() {
@@ -55,6 +56,45 @@ export async function POST(req: NextRequest) {
         { success: false, message: 'Invalid School Invite Code. Check with your school administrator.' },
         { status: 404 }
       );
+    }
+
+    // 1b. Enforce Founder Access Control & Term Expiry Checks (skip for demo school AEGIS-2026)
+    const registryMap = await getSchoolAccessRegistry(supabase);
+    const access = resolveSchoolAccess(school, registryMap);
+
+    // Attach resolved access status properties to school object
+    school.access_status = access.status;
+    school.plan_label = access.planLabel;
+    school.access_expires_at = access.expiresAt;
+
+    if (!access.canAccess) {
+      if (access.status === 'PENDING_APPROVAL') {
+        return NextResponse.json(
+          {
+            success: false,
+            accessBlocked: true,
+            accessStatus: 'PENDING_APPROVAL',
+            schoolName: school.name,
+            inviteCode: school.invite_code,
+            message: 'Awaiting Access Verification: Your institution’s 1-Term Free Pilot is awaiting Founder activation. Please verify your registration via WhatsApp.',
+          },
+          { status: 403 }
+        );
+      }
+
+      if (access.status === 'TERM_EXPIRED') {
+        return NextResponse.json(
+          {
+            success: false,
+            accessBlocked: true,
+            accessStatus: 'TERM_EXPIRED',
+            schoolName: school.name,
+            inviteCode: school.invite_code,
+            message: 'Academic Term Concluded: Portal access for this academic term has concluded. Please contact the administrator or request renewal on WhatsApp.',
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // 2. Handle STUDENT / PARENT Login

@@ -26,28 +26,63 @@ CREATE TABLE IF NOT EXISTS public.schools (
   latitude DOUBLE PRECISION NULL,
   longitude DOUBLE PRECISION NULL,
   geofence_radius_meters INTEGER NOT NULL DEFAULT 150,
+  access_status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL' CHECK (access_status IN ('PENDING_APPROVAL', 'ACTIVE', 'TERM_EXPIRED')),
+  plan_label TEXT NOT NULL DEFAULT 'FREE_PILOT_TERM' CHECK (plan_label IN ('FREE_PILOT_TERM', 'ACTIVE_TERM')),
+  access_expires_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Ensure columns exist if table was already created earlier
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'schools' AND column_name = 'access_status'
+  ) THEN
+    ALTER TABLE public.schools ADD COLUMN access_status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'schools' AND column_name = 'plan_label'
+  ) THEN
+    ALTER TABLE public.schools ADD COLUMN plan_label TEXT NOT NULL DEFAULT 'FREE_PILOT_TERM';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'schools' AND column_name = 'access_expires_at'
+  ) THEN
+    ALTER TABLE public.schools ADD COLUMN access_expires_at TIMESTAMPTZ NULL;
+  END IF;
+END $$;
+
 -- Ensure default tenant exists so existing data can be associated safely
--- Default invite code: AEGIS-2026
+-- Default invite code: AEGIS-2026 (permanently ACTIVE)
 DO $$
 DECLARE
   v_default_school_id UUID := '00000000-0000-0000-0000-000000000001'::UUID;
 BEGIN
-  INSERT INTO public.schools (id, name, invite_code, latitude, longitude, geofence_radius_meters)
+  INSERT INTO public.schools (id, name, invite_code, latitude, longitude, geofence_radius_meters, access_status, plan_label, access_expires_at)
   VALUES (
     v_default_school_id,
     'Aegis Academy Nigeria',
     'AEGIS-2026',
     6.5244,  -- Example default coords (Lagos, Nigeria)
     3.3792,
-    150
+    150,
+    'ACTIVE',
+    'ACTIVE_TERM',
+    NULL
   )
   ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     invite_code = EXCLUDED.invite_code,
     latitude = COALESCE(public.schools.latitude, EXCLUDED.latitude),
+    longitude = COALESCE(public.schools.longitude, EXCLUDED.longitude),
+    geofence_radius_meters = EXCLUDED.geofence_radius_meters,
+    access_status = 'ACTIVE',
+    plan_label = 'ACTIVE_TERM';
     longitude = COALESCE(public.schools.longitude, EXCLUDED.longitude),
     geofence_radius_meters = EXCLUDED.geofence_radius_meters;
 END $$;

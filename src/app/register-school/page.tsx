@@ -21,6 +21,8 @@ import {
   Users,
   CreditCard,
   Sparkles,
+  MessageCircle,
+  Clock,
 } from 'lucide-react';
 
 export default function RegisterSchoolPage() {
@@ -262,21 +264,21 @@ export default function RegisterSchoolPage() {
               </div>
             </>
           ) : (
-            /* Post-Registration Onboarding Card */
+            /* Post-Registration Onboarding Card - Founder Approval & Free Pilot */
             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-600">
-                <CheckCircle2 className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-600">
+                <Clock className="w-6 h-6" />
               </div>
 
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
-                  School Architecture Provisioned
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200">
+                  Registration Submitted — Awaiting Founder Activation
                 </span>
                 <h2 className="text-2xl font-extrabold text-[#0F172A] tracking-tight mt-2">
-                  School Portal Ready — Save Your Admin Credentials
+                  1-Term Free Pilot Verification
                 </h2>
                 <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  <strong>{registeredSchoolName}</strong> has been provisioned with all 33 class tiers (Creche to SS3 Arm F), continuous assessment broadsheets, and gate security.
+                  <strong>{registeredSchoolName}</strong> has been provisioned. In accordance with Founder Access Governance, your school’s 1-Term Free Pilot will be activated immediately once verified by Forvica Global Venture.
                 </p>
               </div>
 
@@ -322,33 +324,38 @@ export default function RegisterSchoolPage() {
                   </div>
 
                   <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200">
-                    <span className="text-slate-500 font-medium">Role:</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                      Proprietor / Super Admin
+                    <span className="text-slate-500 font-medium">Plan:</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                      1-Term Free Pilot (Awaiting Activation)
                     </span>
                   </div>
                 </div>
 
-                <div className="p-3 bg-amber-50/80 rounded-lg border border-amber-200/80 text-[11px] text-amber-800 leading-relaxed">
-                  <strong>Important:</strong> Copy or write down your <strong>School Invite Code ({registeredInviteCode})</strong>. You, your teachers, and your parents will use it along with their email/ID to sign into your portal.
+                <div className="p-3 bg-blue-50/80 rounded-lg border border-blue-200/80 text-[11px] text-blue-900 leading-relaxed">
+                  <strong>Activation Notice:</strong> Forward your School Invite Code <strong>({registeredInviteCode})</strong> to the Founder via WhatsApp below to instantly activate full portal access for your teachers, students, and bursary office.
                 </div>
               </div>
 
+              {/* Action Buttons */}
               <div className="space-y-3 pt-1">
-                <button
-                  onClick={() => router.push('/admin-hub')}
-                  className="w-full py-3.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+                <a
+                  href={`https://wa.me/2349034616893?text=${encodeURIComponent(
+                    `Hello Forvica Global Venture, we just registered ${registeredSchoolName} (${registeredInviteCode}) on Aegis and are awaiting access activation.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-sm"
                 >
-                  <span>Launch Admin Dashboard →</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Verify via WhatsApp (+234 903 461 6893)</span>
+                </a>
 
-                <div className="text-center">
+                <div className="text-center pt-2">
                   <Link
                     href="/login"
-                    className="text-xs text-slate-500 hover:text-slate-800 font-medium"
+                    className="text-xs text-slate-600 hover:text-slate-900 font-medium"
                   >
-                    Go to Portal Sign-In Page
+                    Return to Portal Sign-In Page →
                   </Link>
                 </div>
               </div>

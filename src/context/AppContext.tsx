@@ -24,10 +24,13 @@ import {
   calculateGradeAndRemark,
   EarlyYearsCommentary,
   ClassDismissalAudit,
+  SchoolAccessStatus,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { generateUUID } from '@/lib/uuid';
 import { calculateHaversineDistance, isLateCheckIn } from '@/lib/geofence';
+import { resolveSchoolAccess, getSchoolAccessRegistry } from '@/lib/founderAccess';
+import { AccessGateModal } from '@/components/AccessGateModal';
 import {
   SCHOOL_INFO,
   INITIAL_CLASSES,
@@ -320,10 +323,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     latitude: 6.5244,
     longitude: 3.3792,
     geofence_radius_meters: 150,
+    access_status: 'ACTIVE',
+    plan_label: 'ACTIVE_TERM',
+    access_expires_at: null,
     created_at: '2026-01-01T00:00:00.000Z',
   };
 
   const [schools, setSchools] = useState<School[]>([DEFAULT_SCHOOL]);
+  const [accessGateBlocked, setAccessGateBlocked] = useState<SchoolAccessStatus | null>(null);
   const [currentSchool, setCurrentSchool] = useState<School | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = getSavedSchool();
@@ -919,13 +926,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
-        setSchools(schoolData as School[]);
+        // Enforce access control meta from high-availability registry
+        let registryMap: Record<string, any> = {};
+        try {
+          registryMap = await getSchoolAccessRegistry(supabase);
+        } catch {}
+
+        const enrichedSchools = (schoolData as School[]).map((s) => {
+          const acc = resolveSchoolAccess(s, registryMap);
+          return {
+            ...s,
+            access_status: acc.status,
+            plan_label: acc.planLabel,
+            access_expires_at: acc.expiresAt,
+          };
+        });
+
+        setSchools(enrichedSchools);
+
         // Only set currentSchool if matching the active user or target school, never blindly overwrite an active custom tenant
-        const matchingSchool = schoolData.find((s: any) => s.id === activeSchoolId) ||
-          schoolData.find((s: any) => s.id === currentUser?.school_id);
+        const matchingSchool = enrichedSchools.find((s: any) => s.id === activeSchoolId) ||
+          enrichedSchools.find((s: any) => s.id === currentUser?.school_id);
         if (matchingSchool) {
           setCurrentSchool(matchingSchool);
           setSessionCookie(currentUser, matchingSchool);
+
+          // Check if session belongs to non-demo school with pending/expired access
+          const accessInfo = resolveSchoolAccess(matchingSchool, registryMap);
+          if (!accessInfo.canAccess) {
+            setAccessGateBlocked(accessInfo.status);
+          } else {
+            setAccessGateBlocked(null);
+          }
         }
       }
 
@@ -1317,23 +1349,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setReceipts([]);
           setFeeStructures([]);
 
-          const authUser: AuthUser = {
-            id: adminStaff.id,
-            school_id: newSchool.id,
-            school_name: newSchool.name,
-            invite_code: newSchool.invite_code,
-            username: adminStaff.username,
-            full_name: adminStaff.full_name,
-            role: 'admin',
-          };
-
-          setCurrentUser(authUser);
-          setSessionCookie(authUser, newSchool);
-
-          if (isSupabaseConfigured()) {
-            fetchLiveData(newSchool.id);
-          }
-
+          // If school is PENDING_APPROVAL, do NOT auto-login as active admin
+          // Registration completed, ready for founder activation
           return {
             success: true,
             school: newSchool,
@@ -1428,18 +1445,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setReceipts([]);
       setFeeStructures([]);
 
-      // Auto-login registering admin into new school session
-      const authUser: AuthUser = {
-        id: adminStaff.id,
-        school_id: schoolId,
-        school_name: newSchool.name,
-        invite_code: newSchool.invite_code,
-        username: adminStaff.username,
-        full_name: adminStaff.full_name,
-        role: 'admin',
-      };
-      setCurrentUser(authUser);
-      setSessionCookie(authUser, newSchool);
+      // In accordance with Founder Access Control, newly registered schools await Founder Activation
+      // Do NOT auto-login registering admin into active dashboard
+      setCurrentUser(null);
+      setSessionCookie(null);
 
       // Persist to Supabase if connected
       if (isSupabaseConfigured()) {
@@ -1618,6 +1627,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
+    // Step 1b: Verify School Access Status (Skip master demo school)
+    if (isSupabaseConfigured()) {
+      try {
+        const registryMap = await getSchoolAccessRegistry(supabase);
+        const access = resolveSchoolAccess(targetSchool, registryMap);
+        if (!access.canAccess) {
+          setAccessGateBlocked(access.status);
+          return {
+            success: false,
+            message: access.status === 'PENDING_APPROVAL'
+              ? 'Awaiting Access Verification: Your institution’s 1-Term Free Pilot is awaiting Founder activation.'
+              : 'Academic Term Concluded: Portal access for this academic term has concluded.',
+          };
+        }
+      } catch {}
+    }
+
     // Step 2: Set active tenant context and scope subsequent queries by that resolved school_id
     setCurrentSchool(targetSchool);
 
@@ -1786,6 +1812,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         success: false,
         message: 'Invalid School Invite Code. Check with your school administrator.',
       };
+    }
+
+    // Step 1b: Verify School Access Status (Skip master demo school)
+    if (isSupabaseConfigured()) {
+      try {
+        const registryMap = await getSchoolAccessRegistry(supabase);
+        const access = resolveSchoolAccess(targetSchool, registryMap);
+        if (!access.canAccess) {
+          setAccessGateBlocked(access.status);
+          return {
+            success: false,
+            message: access.status === 'PENDING_APPROVAL'
+              ? 'Awaiting Access Verification: Your institution’s 1-Term Free Pilot is awaiting Founder activation.'
+              : 'Academic Term Concluded: Portal access for this academic term has concluded.',
+          };
+        }
+      } catch {}
     }
 
     // Step 2: Set active tenant context and scope subsequent queries by that resolved school_id
@@ -3890,6 +3933,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider value={contextValue}>
       {children}
+      {accessGateBlocked && currentSchool && (
+        <AccessGateModal
+          status={accessGateBlocked}
+          schoolName={currentSchool.name}
+          inviteCode={currentSchool.invite_code}
+          onSignOut={() => {
+            setAccessGateBlocked(null);
+            logout();
+          }}
+        />
+      )}
     </AppContext.Provider>
   );
 }

@@ -8,6 +8,9 @@ export type EducationalStage =
 
 export type UserRole = 'admin' | 'teacher' | 'student';
 
+export type SchoolAccessStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'TERM_EXPIRED';
+export type SchoolPlanLabel = 'FREE_PILOT_TERM' | 'ACTIVE_TERM';
+
 // Multi-Tenant School Record
 export interface School {
   id: string;
@@ -17,6 +20,9 @@ export interface School {
   longitude: number | null;
   geofence_radius_meters: number;
   resumption_cutoff_time?: string; // e.g. "08:00"
+  access_status?: SchoolAccessStatus;
+  plan_label?: SchoolPlanLabel;
+  access_expires_at?: string | null; // ISO timestamp
   created_at: string;
 }
 

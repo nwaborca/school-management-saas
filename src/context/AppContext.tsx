@@ -1382,8 +1382,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentSchool(targetSchool);
 
     let student = students.find((s) => {
-      const matchReg = s.reg_number.toUpperCase() === cleanReg;
-      const matchPin = s.access_pin === cleanPin;
+      const matchReg = (s.reg_number || '').trim().toUpperCase() === cleanReg;
+      const matchPin = (s.access_pin || '').trim() === cleanPin;
       const matchSchool = s.school_id === targetSchool!.id;
       return matchReg && matchPin && matchSchool;
     });
@@ -1428,6 +1428,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setCurrentUser(authUser);
     setSessionCookie(authUser);
+
+    // Immediately hydrate tenant data for this school so Student Hub loads with full live data
+    if (isSupabaseConfigured()) {
+      fetchLiveData(targetSchool.id);
+    }
 
     return { success: true, role: 'student' as UserRole };
   };
@@ -1520,11 +1525,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Fallback: Query Supabase staff table directly scoped strictly to resolved school_id
     if (!matchedTeacher && isSupabaseConfigured()) {
       try {
+        const slashedUser = cleanUser.includes('_') ? cleanUser.replace(/_/g, '/') : cleanUser;
+        const underscoredUser = cleanUser.includes('/') ? cleanUser.replace(/\//g, '_') : cleanUser;
+        const orFilter = [
+          `username.ilike.${cleanUser}`,
+          `email.ilike.${cleanUser}`,
+          `staff_id_code.ilike.${cleanUser}`,
+          `teacher_id_code.ilike.${cleanUser}`,
+          slashedUser !== cleanUser ? `staff_id_code.ilike.${slashedUser}` : null,
+          slashedUser !== cleanUser ? `teacher_id_code.ilike.${slashedUser}` : null,
+          underscoredUser !== cleanUser ? `username.ilike.${underscoredUser}` : null,
+        ].filter(Boolean).join(',');
+
         const { data, error } = await supabase
           .from('staff')
           .select('*')
           .eq('school_id', targetSchool.id)
-          .or(`username.ilike.${cleanUser},email.ilike.${cleanUser},staff_id_code.ilike.${cleanUser}`)
+          .or(orFilter)
           .eq('password_hash', cleanPass)
           .maybeSingle();
 
@@ -1564,6 +1581,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       setCurrentUser(authUser);
       setSessionCookie(authUser);
+
+      // Immediately hydrate tenant data for this school so Academic Hub / Admin loads with full live data
+      if (isSupabaseConfigured()) {
+        fetchLiveData(targetSchool.id);
+      }
+
       return { success: true, role: assignedRole };
     }
 

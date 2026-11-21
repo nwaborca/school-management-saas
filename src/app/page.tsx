@@ -56,7 +56,7 @@ export default function HomePage() {
                 </h1>
 
                 <p className="text-[#475569] text-base sm:text-lg max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
-                  From Jumia-style 5-hour delegate gate security and geofenced teacher clock-ins to Early Years developmental commentary and WAEC broadsheets—Aegis automates school operations in one unified portal.
+                  From 5-hour expiring delegate gate passes and geofenced teacher clock-ins to Early Years developmental commentary and WAEC broadsheets—Aegis automates school operations in one unified portal.
                 </p>
 
                 {/* Call to Action */}
@@ -224,17 +224,17 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Capability 1: Jumia-Style Safe Pick-Up */}
+            {/* Capability 1: Safe Pick-Up */}
             <div className="p-8 rounded-xl bg-white border border-[#E2E8F0] shadow-xs flex flex-col justify-between hover:border-slate-300 hover:shadow-md transition">
               <div className="space-y-4">
                 <div className="w-11 h-11 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
                   <ShieldCheck className="w-6 h-6 text-emerald-600" />
                 </div>
                 <h3 className="text-lg font-bold text-[#0F172A]">
-                  Jumia-Style Safe Pick-Up & Child Gate Security
+                  Safe Pick-Up & Child Gate Security
                 </h3>
                 <p className="text-[#475569] text-sm leading-relaxed">
-                  Protect every child at dismissal with daily parent OTPs and <strong>5-hour expiring delegate passes</strong> for trusted family drivers or relatives. Security guards scan QR codes or type 6-digit OTPs on public unauthenticated gate vouchers.
+                  Protect every child at dismissal with daily parent OTPs and <strong>5-hour expiring delegate gate passes</strong> for trusted family drivers or relatives. Security guards scan QR codes or type 6-digit OTPs on public unauthenticated gate vouchers.
                 </p>
               </div>
               <div className="pt-6 border-t border-slate-100 mt-6 flex items-center justify-between text-xs font-semibold text-emerald-700">

@@ -160,6 +160,9 @@ export default function LoginPage() {
             <input
               type="text"
               required
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
               placeholder="e.g. AEGIS-XXXX"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
@@ -168,7 +171,7 @@ export default function LoginPage() {
           </div>
 
           {activeTab === 'student' ? (
-            <form onSubmit={handleStudentLogin} className="space-y-4">
+            <form onSubmit={handleStudentLogin} className="space-y-4" autoComplete="off">
               <div>
                 <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
                   Student Registration Number
@@ -176,6 +179,9 @@ export default function LoginPage() {
                 <input
                   type="text"
                   required
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
                   placeholder="e.g. STU-2026-841"
                   value={regNumber}
                   onChange={(e) => setRegNumber(e.target.value.toUpperCase())}
@@ -192,6 +198,8 @@ export default function LoginPage() {
                     type="password"
                     required
                     maxLength={6}
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
                     placeholder="••••"
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
@@ -211,7 +219,7 @@ export default function LoginPage() {
               </button>
             </form>
           ) : (
-            <form onSubmit={handleStaffLogin} className="space-y-4">
+            <form onSubmit={handleStaffLogin} className="space-y-4" autoComplete="off">
               <div>
                 <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
                   Admin Email Address, Username, or Staff ID
@@ -219,6 +227,9 @@ export default function LoginPage() {
                 <input
                   type="text"
                   required
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   placeholder="e.g. admin@school.ng, admin, or ADM/2026/001"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -237,6 +248,7 @@ export default function LoginPage() {
                   <input
                     type="password"
                     required
+                    autoComplete="current-password"
                     placeholder="Enter account password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

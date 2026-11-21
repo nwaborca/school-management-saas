@@ -112,6 +112,24 @@ export default function AdminHubPage() {
   }, [router]);
 
   const [activeTab, setActiveTab] = useState<'roster' | 'receipts' | 'ledger' | 'teachers' | 'enroll' | 'notices' | 'attendance' | 'pickup-log' | 'admin-security'>('roster');
+
+  // Listen for custom navigation events from mobile navbar drawer
+  useEffect(() => {
+    const handleSwitchTab = (e: CustomEvent<{ tab: any }>) => {
+      if (e.detail?.tab) {
+        setActiveTab(e.detail.tab);
+        const panelEl = document.getElementById('admin-content-panel');
+        if (panelEl) {
+          panelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    };
+
+    window.addEventListener('aegis-admin-tab-switch' as any, handleSwitchTab as any);
+    return () => {
+      window.removeEventListener('aegis-admin-tab-switch' as any, handleSwitchTab as any);
+    };
+  }, []);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Admin Self-Service Password Security Form State
@@ -729,7 +747,7 @@ export default function AdminHubPage() {
           </aside>
 
           {/* Right Main Panel */}
-          <main className="flex-1 w-full min-w-0">
+          <main id="admin-content-panel" className="flex-1 w-full min-w-0 scroll-mt-20">
 
         {/* TAB 1: STUDENT ROSTER & DUAL AUDIT TRACKING BADGES */}
         {activeTab === 'roster' && (
@@ -2741,16 +2759,16 @@ export default function AdminHubPage() {
                     </div>
                   ) : (
                     <div className="w-full h-full flex flex-col">
-                      <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-600" />
-                          <span className="font-semibold text-slate-800 truncate max-w-[180px] sm:max-w-xs">{fileName}</span>
+                      <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2 min-w-0 max-w-full sm:max-w-xs">
+                          <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                          <span className="font-semibold text-slate-800 truncate">{fileName}</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() => window.open(effectiveSource, '_blank')}
-                            className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[11px] flex items-center gap-1 border border-blue-200 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[11px] flex items-center gap-1 border border-blue-200 cursor-pointer whitespace-nowrap"
                             title="Open in native PDF viewer or external tab"
                           >
                             <ExternalLink className="w-3 h-3" />
@@ -2759,18 +2777,45 @@ export default function AdminHubPage() {
                           <a
                             href={effectiveSource}
                             download={fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`}
-                            className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-gray-950 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-gray-950 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer whitespace-nowrap"
                           >
                             <Download className="w-3.5 h-3.5" />
                             <span>Download</span>
                           </a>
                         </div>
                       </div>
-                      <iframe
-                        src={effectiveSource}
-                        className="w-full flex-1 border-none rounded-b-2xl bg-white"
-                        title={fileName}
-                      />
+
+                      {/* PDF Document Preview & Android/WebView Proof Card */}
+                      <div className="w-full flex-1 flex flex-col items-center justify-center p-4 bg-slate-100/50">
+                        <div className="w-full max-w-sm bg-white border border-slate-200 rounded-xl p-5 shadow-sm text-center space-y-4">
+                          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 mx-auto flex items-center justify-center">
+                            <FileText className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm truncate max-w-full">{fileName}</h4>
+                            <p className="text-xs text-slate-500 mt-0.5">PDF Payment Transfer Proof</p>
+                            <p className="font-mono font-bold text-blue-600 text-sm mt-1">{formatNaira(activeReceipt.amount_claimed)}</p>
+                          </div>
+                          <div className="space-y-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => window.open(effectiveSource, '_blank')}
+                              className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs transition"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              <span>Open PDF in Phone Viewer</span>
+                            </button>
+                            <a
+                              href={effectiveSource}
+                              download={fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`}
+                              className="w-full py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Download Receipt</span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

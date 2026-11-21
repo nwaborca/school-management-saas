@@ -17,6 +17,12 @@ import {
   AlertCircle,
   Building2,
   PlusCircle,
+  Receipt,
+  DollarSign,
+  UserCheck,
+  UserPlus,
+  Send,
+  QrCode,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -227,6 +233,49 @@ export function Navbar() {
               </Link>
             ))}
           </div>
+
+          {/* Admin Command Center Quick Sections (Mobile Drawer) */}
+          {isAuthenticated && currentUser?.role === 'admin' && (
+            <div className="pt-2 border-t border-slate-200 space-y-1">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3.5 py-1">
+                Admin Command Sections
+              </div>
+              {[
+                { tab: 'roster', label: 'Student Roster', icon: GraduationCap },
+                { tab: 'receipts', label: 'Receipt Verification', icon: Receipt },
+                { tab: 'ledger', label: 'Historical Debt', icon: DollarSign },
+                { tab: 'teachers', label: 'Teacher Registry', icon: UserCheck },
+                { tab: 'enroll', label: 'Dual Enrollment', icon: UserPlus },
+                { tab: 'notices', label: 'Announcements', icon: Send },
+                { tab: 'attendance', label: 'Staff Attendance', icon: QrCode },
+                { tab: 'pickup-log', label: 'Safe Pick-Up Audit', icon: Shield },
+                { tab: 'admin-security', label: 'Security & Password', icon: KeyRound },
+              ].map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <button
+                    key={item.tab}
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (pathname !== '/admin-hub' && pathname !== '/admin') {
+                        router.push('/admin-hub');
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('aegis-admin-tab-switch', { detail: { tab: item.tab } }));
+                        }, 300);
+                      } else {
+                        window.dispatchEvent(new CustomEvent('aegis-admin-tab-switch', { detail: { tab: item.tab } }));
+                      }
+                    }}
+                    className="w-full text-left px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2.5 transition cursor-pointer"
+                  >
+                    <IconComponent className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <div className="pt-2 border-t border-slate-200">
             {isAuthenticated ? (

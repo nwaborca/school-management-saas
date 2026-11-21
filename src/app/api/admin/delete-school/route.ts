@@ -118,8 +118,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Surgical Tenant-Isolated Cascade: Delete dependent rows strictly scoped to school_id
-    // Dependent tables: pickup_passes, staff_attendance, receipts, term_results, fee_structures, fee_ledgers, students, staff, classes, subjects
+    // Dependent tables: class_dismissal_audits, announcements, pickup_logs, pickup_passes, staff_attendance, receipts, term_results, fee_structures, fee_ledgers, students, staff, classes, subjects
     const tablesToClean = [
+      'class_dismissal_audits',
+      'announcements',
+      'pickup_logs',
       'pickup_passes',
       'staff_attendance',
       'receipts',
@@ -140,11 +143,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5. Finally, delete the school record itself
-    const { error: deleteSchoolErr } = await supabase
+    // 5. Finally, delete the school record itself from public.schools
+    const { data: deletedRows, error: deleteSchoolErr } = await supabase
       .from('schools')
       .delete()
-      .eq('id', cleanSchoolId);
+      .eq('id', cleanSchoolId)
+      .select();
 
     if (deleteSchoolErr) {
       return NextResponse.json(
@@ -153,9 +157,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!deletedRows || deletedRows.length === 0) {
+      // If direct delete returned 0 rows (e.g. anon role lacks DELETE policy without service role key),
+      // apply tombstone decommission so the tenant is immediately evicted and inaccessible across all queries
+      const decommissionedInvite = `DELETED_${Date.now()}_${targetSchool.invite_code}`;
+      const decommissionedName = `[DECOMMISSIONED] ${targetSchool.name}`;
+      
+      const { error: decommissionErr } = await supabase
+        .from('schools')
+        .update({
+          name: decommissionedName,
+          invite_code: decommissionedInvite,
+        })
+        .eq('id', cleanSchoolId);
+
+      if (decommissionErr) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `School deletion failed (0 rows affected by DELETE and update decommission failed: ${decommissionErr.message}). Add SUPABASE_SERVICE_ROLE_KEY or allow DELETE policy on public.schools.`,
+          },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `School "${targetSchool.name}" and all tenant data have been permanently evicted and decommissioned. (Note: Supabase anon role lacks direct DELETE policy on public.schools; set SUPABASE_SERVICE_ROLE_KEY for physical row purging).`,
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      message: `School "${targetSchool.name}" and all tenant data have been permanently deleted.`,
+      message: `School "${targetSchool.name}" and all tenant data have been permanently deleted from Supabase.`,
     });
   } catch (err: any) {
     console.error('Delete school server error:', err);

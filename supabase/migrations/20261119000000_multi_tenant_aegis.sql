@@ -357,6 +357,9 @@ CREATE POLICY "Allow public insert on schools" ON public.schools FOR INSERT TO p
 DROP POLICY IF EXISTS "Allow public update on schools" ON public.schools;
 CREATE POLICY "Allow public update on schools" ON public.schools FOR UPDATE TO public USING (true);
 
+DROP POLICY IF EXISTS "Allow public delete on schools" ON public.schools;
+CREATE POLICY "Allow public delete on schools" ON public.schools FOR DELETE TO public USING (true);
+
 -- Staff RLS
 DROP POLICY IF EXISTS "Allow full access on staff" ON public.staff;
 CREATE POLICY "Allow full access on staff" ON public.staff FOR ALL TO public USING (true) WITH CHECK (true);

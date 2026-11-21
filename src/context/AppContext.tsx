@@ -228,11 +228,13 @@ function setSessionCookie(user: AuthUser | null) {
     if (!user) {
       document.cookie = `apex_auth_user=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
       try { sessionStorage.removeItem('apex_auth_user'); } catch {}
+      try { localStorage.removeItem('apex_auth_user'); } catch {}
     } else {
       const encoded = encodeURIComponent(JSON.stringify(user));
       // 7 days expiration with explicit Lax and HTTPS Secure guard
       document.cookie = `apex_auth_user=${encoded}; path=/; max-age=604800; SameSite=Lax${secureFlag}`;
       try { sessionStorage.setItem('apex_auth_user', JSON.stringify(user)); } catch {}
+      try { localStorage.setItem('apex_auth_user', JSON.stringify(user)); } catch {}
     }
   } catch {}
 }
@@ -249,6 +251,12 @@ function getSessionCookie(): AuthUser | null {
     const sessionData = sessionStorage.getItem('apex_auth_user');
     if (sessionData) {
       return JSON.parse(sessionData);
+    }
+  } catch {}
+  try {
+    const localData = localStorage.getItem('apex_auth_user');
+    if (localData) {
+      return JSON.parse(localData);
     }
   } catch {}
   return null;
@@ -875,6 +883,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const cookieUser = getSessionCookie();
       if (cookieUser) {
         setCurrentUser(cookieUser);
+        if (isSupabaseConfigured() && cookieUser.school_id) {
+          fetchLiveData(cookieUser.school_id);
+        }
       } else {
         setCurrentUser(null);
         setSessionCookie(null);
@@ -1351,6 +1362,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
+    // Step 0: Try Server-Side Portal Login Endpoint (bypasses browser client quirks & RLS blocks)
+    try {
+      const apiRes = await fetch('/api/auth/portal-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'student',
+          schoolCode: cleanInvite,
+          regNumber: cleanReg,
+          pin: cleanPin,
+        }),
+      });
+
+      if (apiRes.ok) {
+        const payload = await apiRes.json();
+        if (payload.success && payload.student && payload.school) {
+          const rawStudent = payload.student;
+          const targetSchool: School = payload.school;
+          const normalized = normalizeStudent(rawStudent);
+
+          setCurrentSchool(targetSchool);
+          setSchools((prev) => (prev.some((s) => s.id === targetSchool.id) ? prev : [targetSchool, ...prev]));
+          setStudents((prev) => (prev.some((s) => s.id === normalized.id) ? prev : [normalized, ...prev]));
+
+          const authUser: AuthUser = {
+            id: normalized.id,
+            school_id: targetSchool.id,
+            school_name: targetSchool.name,
+            invite_code: targetSchool.invite_code,
+            reg_number: normalized.reg_number,
+            full_name: normalized.full_name,
+            role: 'student',
+            student_id: normalized.id,
+            class_id: normalized.class_id,
+            class_grade: normalized.class_grade,
+            parent_phone: normalized.parent_phone,
+          };
+
+          setCurrentUser(authUser);
+          setSessionCookie(authUser);
+
+          if (isSupabaseConfigured()) {
+            fetchLiveData(targetSchool.id);
+          }
+
+          return { success: true, role: 'student' as UserRole };
+        } else if (payload.message) {
+          return { success: false, message: payload.message };
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Server portal login fallback to client check:', apiErr);
+    }
+
+    // Client fallback
     // Step 1: Strict Tenant Lookup First in public.schools
     let targetSchool = schools.find((s) => s.invite_code.toUpperCase() === cleanInvite) || null;
     if (!targetSchool && isSupabaseConfigured()) {
@@ -1454,6 +1520,66 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
+    // Step 0: Try Server-Side Portal Login Endpoint (bypasses browser client quirks & RLS blocks)
+    try {
+      const apiRes = await fetch('/api/auth/portal-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'staff',
+          schoolCode: cleanInvite,
+          identifier: cleanUser,
+          password: cleanPass,
+        }),
+      });
+
+      if (apiRes.ok) {
+        const payload = await apiRes.json();
+        if (payload.success && payload.staff && payload.school) {
+          const rawStaff = payload.staff;
+          const targetSchool: School = payload.school;
+          const normalized = normalizeTeacher(rawStaff);
+
+          setCurrentSchool(targetSchool);
+          setSchools((prev) => (prev.some((s) => s.id === targetSchool.id) ? prev : [targetSchool, ...prev]));
+          setTeachers((prev) => (prev.some((t) => t.id === normalized.id) ? prev : [normalized, ...prev]));
+
+          const assignedRole: UserRole = payload.role || ((rawStaff as any).role === 'admin' ? 'admin' : 'teacher');
+
+          const authUser: AuthUser = {
+            id: normalized.id,
+            school_id: targetSchool.id,
+            school_name: targetSchool.name,
+            invite_code: targetSchool.invite_code,
+            username: normalized.username,
+            full_name: normalized.full_name,
+            role: assignedRole,
+            teacher_id: normalized.id,
+            form_class_id: normalized.is_part_time ? undefined : normalized.form_class_id,
+            assigned_class_id: normalized.assigned_class_id ?? (normalized.is_part_time ? null : (normalized.form_class_id ?? null)),
+            form_class_name: normalized.is_part_time ? undefined : normalized.form_class_name,
+            assigned_subject_ids: normalized.assigned_subject_ids,
+            assigned_subjects: normalized.assigned_subjects || normalized.assigned_subject_ids,
+            is_part_time: Boolean(normalized.is_part_time),
+            session_token: normalized.session_token,
+          };
+
+          setCurrentUser(authUser);
+          setSessionCookie(authUser);
+
+          if (isSupabaseConfigured()) {
+            fetchLiveData(targetSchool.id);
+          }
+
+          return { success: true, role: assignedRole };
+        } else if (payload.message) {
+          return { success: false, message: payload.message };
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Server portal login staff fallback to client check:', apiErr);
+    }
+
     // Step 1: Strict Tenant Lookup First in public.schools
     let targetSchool = schools.find((s) => s.invite_code.toUpperCase() === cleanInvite) || null;
     if (!targetSchool && isSupabaseConfigured()) {
@@ -1531,9 +1657,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           `username.ilike.${cleanUser}`,
           `email.ilike.${cleanUser}`,
           `staff_id_code.ilike.${cleanUser}`,
-          `teacher_id_code.ilike.${cleanUser}`,
           slashedUser !== cleanUser ? `staff_id_code.ilike.${slashedUser}` : null,
-          slashedUser !== cleanUser ? `teacher_id_code.ilike.${slashedUser}` : null,
           underscoredUser !== cleanUser ? `username.ilike.${underscoredUser}` : null,
         ].filter(Boolean).join(',');
 

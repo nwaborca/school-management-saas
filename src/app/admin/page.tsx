@@ -597,9 +597,9 @@ export default function AdminHubPage() {
         </div>
 
         {/* Main Content Layout with 240px Fixed Sidebar on Desktop */}
-        <div className="flex flex-col md:flex-row gap-6 items-start">
-          {/* Desktop Left-Hand Fixed Sidebar (240px width) */}
-          <aside className="w-full md:w-60 shrink-0 bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Desktop Left-Hand Fixed Sidebar (240px width, hidden on mobile/tablet) */}
+          <aside className="hidden lg:block w-60 shrink-0 bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
             <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 py-2">
               Navigation
             </div>

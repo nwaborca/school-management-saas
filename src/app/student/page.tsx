@@ -73,6 +73,21 @@ export default function StudentDashboardPage() {
   const [selectedTerm, setSelectedTerm] = useState('1st Term');
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
+  // Mobile Drawer Tab Switch Listener
+  useEffect(() => {
+    const handleSwitch = (e: CustomEvent<{ tab: 'results' | 'fees' | 'pickup' | 'awards' }>) => {
+      if (e.detail?.tab) {
+        setActiveTab(e.detail.tab);
+        const el = document.getElementById('student-content-panel');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    };
+    window.addEventListener('aegis-student-tab-switch' as any, handleSwitch as any);
+    return () => window.removeEventListener('aegis-student-tab-switch' as any, handleSwitch as any);
+  }, []);
+
   // Phase 4: Delegate Pass Generation Modal State
   const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
   const [delegateNameInput, setDelegateNameInput] = useState('');
@@ -558,8 +573,8 @@ export default function StudentDashboardPage() {
           </div>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex border-b border-slate-200 gap-4 overflow-x-auto">
+        {/* Tab Selection (Desktop / Tablet) */}
+        <div className="hidden md:flex border-b border-slate-200 gap-4 overflow-x-auto">
           <button
             onClick={() => setActiveTab('results')}
             className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer whitespace-nowrap ${
@@ -603,6 +618,8 @@ export default function StudentDashboardPage() {
           </button>
         </div>
 
+        {/* Content Container with Anchor for Mobile Drawer Navigation */}
+        <div id="student-content-panel" className="scroll-mt-20">
         {/* TAB 1: OFFICIAL RESULT SHEET */}
         {activeTab === 'results' && (
           <div className="space-y-4">
@@ -1587,6 +1604,7 @@ export default function StudentDashboardPage() {
             </div>
           </div>
         )}
+        </div>
 
         {/* PRINTABLE OFFICIAL RESULT SLIP MODAL WITH NDPA 2023 SECURITY BADGE */}
         {isPrintModalOpen && (

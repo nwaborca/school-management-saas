@@ -23,6 +23,10 @@ import {
   UserPlus,
   Send,
   QrCode,
+  FileText,
+  CreditCard,
+  ShieldCheck,
+  Award,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -265,6 +269,44 @@ export function Navbar() {
                         }, 300);
                       } else {
                         window.dispatchEvent(new CustomEvent('aegis-admin-tab-switch', { detail: { tab: item.tab } }));
+                      }
+                    }}
+                    className="w-full text-left px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2.5 transition cursor-pointer"
+                  >
+                    <IconComponent className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Student Hub Sections (Mobile Drawer) */}
+          {isAuthenticated && currentUser?.role === 'student' && (
+            <div className="pt-2 border-t border-slate-200 space-y-1">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3.5 py-1">
+                Student Hub Sections
+              </div>
+              {[
+                { tab: 'results', label: 'Term Result Sheet', icon: FileText },
+                { tab: 'fees', label: 'School Fees & Bank Transfer Hub', icon: CreditCard },
+                { tab: 'pickup', label: 'Safe Pick-Up & Dismissal Pass', icon: ShieldCheck },
+                { tab: 'awards', label: '3D Academic Trophy', icon: Award },
+              ].map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <button
+                    key={item.tab}
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (pathname !== '/student-hub' && pathname !== '/student') {
+                        router.push('/student-hub');
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('aegis-student-tab-switch', { detail: { tab: item.tab } }));
+                        }, 300);
+                      } else {
+                        window.dispatchEvent(new CustomEvent('aegis-student-tab-switch', { detail: { tab: item.tab } }));
                       }
                     }}
                     className="w-full text-left px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2.5 transition cursor-pointer"

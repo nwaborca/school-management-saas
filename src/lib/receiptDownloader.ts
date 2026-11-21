@@ -7,7 +7,7 @@ import { Share } from '@capacitor/share';
 /**
  * Download or share receipt proof file across Web and Native Capacitor Android
  */
-export async function downloadOrShareReceipt(
+export async function downloadReceipt(
   fileSource: string,
   fileName: string = 'payment_receipt.pdf'
 ): Promise<void> {
@@ -20,16 +20,19 @@ export async function downloadOrShareReceipt(
       let base64Data = '';
 
       if (fileSource.startsWith('data:')) {
-        base64Data = fileSource.split(',')[1] || '';
-      } else if (fileSource.startsWith('blob:')) {
-        // Fetch blob and convert to base64
+        // Strip out mime prefix if present: e.g. data:application/pdf;base64,
+        const parts = fileSource.split(',');
+        base64Data = (parts[1] || parts[0]).trim();
+      } else if (fileSource.startsWith('blob:') || fileSource.startsWith('http://') || fileSource.startsWith('https://')) {
+        // Fetch blob or remote file and convert to clean base64
         const resp = await fetch(fileSource);
         const blob = await resp.blob();
         base64Data = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onloadend = () => {
-            const result = reader.result as string;
-            resolve(result.split(',')[1] || '');
+            const result = (reader.result as string) || '';
+            const commaIndex = result.indexOf(',');
+            resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
           };
           reader.onerror = reject;
           reader.readAsDataURL(blob);
@@ -42,6 +45,7 @@ export async function downloadOrShareReceipt(
           path: cleanName,
           data: base64Data,
           directory: Directory.Cache,
+          recursive: true,
         });
 
         // Trigger native share sheet or open intent
@@ -77,3 +81,6 @@ export async function downloadOrShareReceipt(
     document.body.removeChild(a);
   }
 }
+
+// Keep backwards-compatible alias
+export const downloadOrShareReceipt = downloadReceipt;

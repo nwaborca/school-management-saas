@@ -10,6 +10,7 @@ export interface SchoolAccessMeta {
   access_status: SchoolAccessStatus;
   plan_label: SchoolPlanLabel;
   access_expires_at: string | null;
+  logo_url?: string | null;
   updated_at?: string;
 }
 
@@ -36,6 +37,7 @@ export async function getSchoolAccessRegistry(supabase: SupabaseClient): Promise
           access_status: (item.access_status as SchoolAccessStatus) || 'PENDING_APPROVAL',
           plan_label: (item.plan_label as SchoolPlanLabel) || 'FREE_PILOT_TERM',
           access_expires_at: item.access_expires_at || null,
+          logo_url: item.logo_url || null,
           updated_at: item.updated_at,
         };
       }
@@ -107,6 +109,7 @@ export function resolveSchoolAccess(
   status: SchoolAccessStatus;
   planLabel: SchoolPlanLabel;
   expiresAt: string | null;
+  logoUrl: string | null;
   isExpired: boolean;
   canAccess: boolean;
 } {
@@ -120,6 +123,7 @@ export function resolveSchoolAccess(
       status: 'ACTIVE',
       planLabel: 'ACTIVE_TERM',
       expiresAt: null,
+      logoUrl: school.logo_url || school.logoUrl || null,
       isExpired: false,
       canAccess: true,
     };
@@ -130,6 +134,7 @@ export function resolveSchoolAccess(
   const rawStatus = school.access_status || meta?.access_status || 'PENDING_APPROVAL';
   const planLabel = school.plan_label || meta?.plan_label || 'FREE_PILOT_TERM';
   const expiresAt = school.access_expires_at !== undefined ? school.access_expires_at : (meta?.access_expires_at || null);
+  const logoUrl = school.logo_url || school.logoUrl || meta?.logo_url || null;
 
   let isExpired = false;
   if (rawStatus === 'TERM_EXPIRED') {
@@ -149,6 +154,7 @@ export function resolveSchoolAccess(
     status: effectiveStatus,
     planLabel,
     expiresAt,
+    logoUrl,
     isExpired,
     canAccess,
   };

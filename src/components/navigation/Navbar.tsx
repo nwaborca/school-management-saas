@@ -30,6 +30,7 @@ import {
   Users,
   CheckSquare,
 } from 'lucide-react';
+import { SchoolLogo } from '@/components/SchoolLogo';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -83,9 +84,9 @@ export function Navbar() {
         {/* School Logo & Title */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <img
-              src="/aegis-logo.png"
-              alt="Aegis Logo"
+            <SchoolLogo
+              logoUrl={currentSchool?.logo_url || currentSchool?.logoUrl}
+              name={currentSchool?.name || schoolInfo.name}
               className="h-10 w-10 object-contain shrink-0"
             />
             <div>

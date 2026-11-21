@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Printer, Download, QrCode, Building2, MapPin, Clock, ShieldCheck } from 'lucide-react';
 import { School } from '@/types';
+import { SchoolLogo } from '@/components/SchoolLogo';
 
 interface StaffAttendanceQROverlayProps {
   school: School;
@@ -47,9 +48,9 @@ export default function StaffAttendanceQROverlay({
         <div className="p-8 text-center space-y-6 print:p-12 print:m-0" id="printable-qr-poster">
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-2">
-              <img
-                src="/aegis-logo.png"
-                alt="Aegis Logo"
+              <SchoolLogo
+                logoUrl={school.logo_url || school.logoUrl}
+                name={school.name}
                 className="h-12 w-12 object-contain"
               />
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold uppercase tracking-wider">

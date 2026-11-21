@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ShieldCheck, Clock, AlertTriangle, CheckCircle2, User, Building2, Calendar, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { SchoolLogo } from '@/components/SchoolLogo';
 
 interface PublicGatePassData {
   pass_type: 'DAILY_PARENT' | 'DELEGATE_5H';
@@ -169,9 +170,8 @@ function PublicPickupPassContent() {
         {/* Top Institutional Header */}
         <div className="bg-[#0F172A] text-white p-6 text-center space-y-2 relative">
           <div className="flex items-center justify-center gap-2">
-            <img
-              src="/aegis-logo.png"
-              alt="Aegis Logo"
+            <SchoolLogo
+              name={passData.school_name}
               className="h-10 w-10 object-contain shrink-0"
             />
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-wider border border-blue-400/30">

@@ -20,6 +20,8 @@ export interface School {
   longitude: number | null;
   geofence_radius_meters: number;
   resumption_cutoff_time?: string; // e.g. "08:00"
+  logo_url?: string | null;
+  logoUrl?: string | null;
   access_status?: SchoolAccessStatus;
   plan_label?: SchoolPlanLabel;
   access_expires_at?: string | null; // ISO timestamp
@@ -35,6 +37,7 @@ export interface RegisterSchoolPayload {
   address?: string;
   latitude?: number | null;
   longitude?: number | null;
+  logoUrl?: string | null;
 }
 
 export interface AuthUser {

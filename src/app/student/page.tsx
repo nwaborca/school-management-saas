@@ -10,6 +10,7 @@ import { formatNaira, StudentProfile, isEarlyYearsClass, EarlyYearsDomainRatings
 import { filterSubjectsForClassAndStream } from '@/lib/streamSpecialization';
 import { uploadReceiptToStorage } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
+import { SchoolLogo } from '@/components/SchoolLogo';
 import {
   GraduationCap,
   Award,
@@ -1638,10 +1639,10 @@ export default function StudentDashboardPage() {
                 {/* Header Banner */}
                 <div className="text-center space-y-2 border-b pb-4">
                   <div className="flex items-center justify-center">
-                    <img
-                      src="/aegis-logo.png"
-                      alt="Aegis Logo"
-                      className="h-14 w-14 object-contain"
+                    <SchoolLogo
+                      logoUrl={currentSchool?.logo_url || currentSchool?.logoUrl}
+                      name={currentSchool?.name || schoolInfo.name}
+                      className="h-16 w-16 object-contain"
                     />
                   </div>
                   <div>

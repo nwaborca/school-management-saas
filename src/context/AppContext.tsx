@@ -29,7 +29,7 @@ import {
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { generateUUID } from '@/lib/uuid';
 import { calculateHaversineDistance, isLateCheckIn } from '@/lib/geofence';
-import { resolveSchoolAccess, getSchoolAccessRegistry } from '@/lib/founderAccess';
+import { resolveSchoolAccess, getSchoolAccessRegistry, saveSchoolAccessMeta } from '@/lib/founderAccess';
 import { AccessGateModal } from '@/components/AccessGateModal';
 import {
   SCHOOL_INFO,
@@ -75,6 +75,7 @@ interface AppContextType {
     error?: string;
   }>;
   setCurrentSchoolById: (schoolId: string) => void;
+  updateSchoolLogo: (logoUrl: string | null) => Promise<{ success: boolean; error?: string }>;
 
   // Auth (Strict Mandatory School Invite Code)
   loginStudent: (regNumber: string, pin: string, inviteCode: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
@@ -934,8 +935,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         const enrichedSchools = (schoolData as School[]).map((s) => {
           const acc = resolveSchoolAccess(s, registryMap);
+          const resolvedLogo = s.logo_url || s.logoUrl || acc.logoUrl || null;
           return {
             ...s,
+            logo_url: resolvedLogo,
+            logoUrl: resolvedLogo,
             access_status: acc.status,
             plan_label: acc.planLabel,
             access_expires_at: acc.expiresAt,
@@ -3224,6 +3228,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
+  // White-Label School Crest / Logo Update (Admin)
+  const updateSchoolLogo = async (logoUrl: string | null): Promise<{ success: boolean; error?: string }> => {
+    if (!currentSchool) {
+      return { success: false, error: 'No active school selected.' };
+    }
+
+    const updatedSchool: School = {
+      ...currentSchool,
+      logo_url: logoUrl,
+      logoUrl: logoUrl,
+    };
+
+    setCurrentSchool(updatedSchool);
+    setSchools((prev) => prev.map((s) => (s.id === updatedSchool.id ? updatedSchool : s)));
+    setSessionCookie(currentUser, updatedSchool);
+
+    if (isSupabaseConfigured()) {
+      try {
+        // 1. Attempt updating logo_url column on public.schools table
+        const { error: schoolErr } = await supabase
+          .from('schools')
+          .update({ logo_url: logoUrl })
+          .eq('id', updatedSchool.id);
+
+        if (schoolErr) {
+          console.warn('Note: schools table logo_url column update note:', schoolErr.message);
+        }
+
+        // 2. Persist in high-availability access registry so logo always persists
+        await saveSchoolAccessMeta(supabase, updatedSchool.id, {
+          logo_url: logoUrl,
+        });
+      } catch (err: any) {
+        console.warn('Error updating school logo:', err);
+      }
+    }
+
+    return { success: true };
+  };
+
   // Phase 3: Geofenced Staff Clock-In
   const clockInStaff = async (params: {
     scannedPayload: string;
@@ -3882,6 +3926,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       resultsPublished,
       toggleResultsPublished,
       updateAdminPassword,
+      updateSchoolLogo,
       updateSchoolGeofence,
       clockInStaff,
       clockOutStaff,
@@ -3917,6 +3962,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       adminPassword,
       registerSchool,
       setCurrentSchoolById,
+      updateSchoolLogo,
       updateSchoolGeofence,
       clockInStaff,
       clockOutStaff,

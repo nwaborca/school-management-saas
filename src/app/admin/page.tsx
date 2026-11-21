@@ -53,6 +53,8 @@ import {
 } from 'lucide-react';
 import { PdfCanvasViewer } from '@/components/PdfCanvasViewer';
 import { downloadOrShareReceipt } from '@/lib/receiptDownloader';
+import { processSchoolLogo } from '@/lib/logoProcessor';
+import { SchoolLogo } from '@/components/SchoolLogo';
 
 export default function AdminHubPage() {
   const router = useRouter();
@@ -81,6 +83,7 @@ export default function AdminHubPage() {
     pickupPasses = [],
     classDismissals = [],
     updateSchoolGeofence,
+    updateSchoolLogo,
     currentUser,
     isAuthReady,
     logout,
@@ -143,6 +146,12 @@ export default function AdminHubPage() {
   const [adminConfirmPass, setAdminConfirmPass] = useState('');
   const [adminPassError, setAdminPassError] = useState<string | null>(null);
   const [adminPassSuccess, setAdminPassSuccess] = useState(false);
+
+  // School Crest / Logo Customization State
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoSuccessToast, setLogoSuccessToast] = useState<string | null>(null);
+  const [logoErrorToast, setLogoErrorToast] = useState<string | null>(null);
+  const [logoAutoRemoveBg, setLogoAutoRemoveBg] = useState(true);
 
   // Danger Zone: Delete School State
   const [isDeleteSchoolModalOpen, setIsDeleteSchoolModalOpen] = useState(false);
@@ -1461,6 +1470,102 @@ export default function AdminHubPage() {
                 </button>
               </form>
             )}
+
+            {/* WHITE-LABEL SCHOOL CREST & BRANDING */}
+            <div className="pt-6 border-t border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">School Crest & White-Label Branding</h3>
+                  <p className="text-xs text-gray-500">
+                    Custom transparent crest displayed across Student Result Sheets, Bursary Receipts, and Gate Stations.
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-xl border border-slate-200 bg-white p-1 flex items-center justify-center shadow-inner">
+                  <SchoolLogo
+                    logoUrl={currentSchool?.logo_url || currentSchool?.logoUrl}
+                    name={currentSchool?.name}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              </div>
+
+              {logoSuccessToast && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{logoSuccessToast}</span>
+                </div>
+              )}
+
+              {logoErrorToast && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{logoErrorToast}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <label className="flex-1 w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/30 text-slate-700 font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    disabled={logoUploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setLogoUploading(true);
+                      setLogoErrorToast(null);
+                      setLogoSuccessToast(null);
+                      try {
+                        const processedUrl = await processSchoolLogo(file, logoAutoRemoveBg);
+                        const res = await updateSchoolLogo(processedUrl);
+                        if (res.success) {
+                          setLogoSuccessToast('School crest updated and white-labeled successfully across all documents!');
+                          setTimeout(() => setLogoSuccessToast(null), 4000);
+                        } else {
+                          setLogoErrorToast(res.error || 'Failed to save school crest.');
+                        }
+                      } catch (err: any) {
+                        setLogoErrorToast(err?.message || 'Error processing logo image.');
+                      } finally {
+                        setLogoUploading(false);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <span>{logoUploading ? 'Processing Transparent Logo...' : 'Upload New School Crest (PNG/JPG)'}</span>
+                </label>
+
+                {(currentSchool?.logo_url || currentSchool?.logoUrl) && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setLogoUploading(true);
+                      try {
+                        await updateSchoolLogo(null);
+                        setLogoSuccessToast('Reset to official Aegis Shield crest.');
+                        setTimeout(() => setLogoSuccessToast(null), 3000);
+                      } finally {
+                        setLogoUploading(false);
+                      }
+                    }}
+                    disabled={logoUploading}
+                    className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition cursor-pointer"
+                  >
+                    Reset to Default Logo
+                  </button>
+                )}
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 font-medium">
+                <input
+                  type="checkbox"
+                  checked={logoAutoRemoveBg}
+                  onChange={(e) => setLogoAutoRemoveBg(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <span>Auto-remove light/solid background colors via intelligent edge flood-fill</span>
+              </label>
+            </div>
 
             {/* DANGER ZONE: PERMANENTLY DELETE SCHOOL (TENANT ISOLATED) */}
             {currentUser?.role === 'admin' && currentSchool?.invite_code !== 'AEGIS-2026' && currentSchool?.id !== '00000000-0000-0000-0000-000000000001' && (

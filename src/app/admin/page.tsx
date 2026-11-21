@@ -78,6 +78,7 @@ export default function AdminHubPage() {
     updateAdminPassword,
     staffAttendance = [],
     pickupPasses = [],
+    classDismissals = [],
     updateSchoolGeofence,
     currentUser,
     isAuthReady,
@@ -1806,7 +1807,7 @@ export default function AdminHubPage() {
           </div>
         )}
 
-        {/* TAB 8: SAFE PICK-UP & DISMISSAL AUDIT LOG (PHASE 4) */}
+        {/* TAB 8: SAFE PICK-UP & DISMISSAL AUDIT LOG (PHASE 4 & 5) */}
         {activeTab === 'pickup-log' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200">
@@ -1817,7 +1818,7 @@ export default function AdminHubPage() {
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">Safe Pick-Up & Dismissal Audit</h2>
                 <p className="text-slate-500 text-xs mt-0.5">
-                  Complete institutional log of student handovers authorized via 6-digit OTP codes or delegate QR vouchers.
+                  Complete institutional log of student handovers authorized via 6-digit OTP codes, delegate QR vouchers, and teacher end-of-day dismissal checks.
                 </p>
               </div>
 
@@ -1827,6 +1828,89 @@ export default function AdminHubPage() {
                 </span>
               </div>
             </div>
+
+            {/* UNVERIFIED DEPARTURE ALERTS & AUDIT CHECKS */}
+            {(() => {
+              const activeSchoolId = currentSchool?.id || currentUser?.school_id;
+              const schoolDismissalAudits = classDismissals.filter(
+                (d) => (!d.school_id || !activeSchoolId || d.school_id === activeSchoolId) && !d.is_reopened
+              );
+              const totalUnverified = schoolDismissalAudits.reduce((sum, d) => sum + (d.unverified_student_names?.length || 0), 0);
+
+              if (schoolDismissalAudits.length === 0) return null;
+
+              return (
+                <div className="space-y-3">
+                  {totalUnverified > 0 ? (
+                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs space-y-2">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                        <strong className="text-sm font-bold text-rose-950">
+                          ⚠️ {totalUnverified} student(s) flagged: Left Without Safe Pick-Up across {schoolDismissalAudits.length} class arm(s)
+                        </strong>
+                      </div>
+                      <p className="text-rose-800">
+                        Class teachers completed end-of-day dismissal audits and recorded unverified departures where students exited without authenticated Safe Pick-Up OTPs or delegate passes.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>All audited classes completed dismissal with 100% verified Safe Pick-Up compliance today.</span>
+                    </div>
+                  )}
+
+                  {/* Class-by-Class End-of-Day Audit Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {schoolDismissalAudits.map((audit) => {
+                      const hasUnverified = audit.unverified_student_names && audit.unverified_student_names.length > 0;
+
+                      return (
+                        <div
+                          key={audit.id}
+                          className={`p-4 rounded-xl border text-xs space-y-2 ${
+                            hasUnverified
+                              ? 'bg-rose-50/70 border-rose-300'
+                              : 'bg-emerald-50/60 border-emerald-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 text-sm">{audit.class_name}</span>
+                            <span className="font-mono text-[10px] text-slate-500">{audit.date}</span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-slate-500 uppercase font-semibold block">Audited By:</span>
+                            <span className="font-medium text-slate-800">
+                              {audit.marked_by_teacher_name} at{' '}
+                              {new Date(audit.marked_empty_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-200/60">
+                            {hasUnverified ? (
+                              <div>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 mb-1">
+                                  {audit.unverified_student_names.length} Left Without Safe Pick-Up
+                                </span>
+                                <p className="font-mono text-[11px] text-rose-700">
+                                  {audit.unverified_student_names.join(', ')}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>100% Safe Pick-Up Verified</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Completed Pick-Up Table */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">

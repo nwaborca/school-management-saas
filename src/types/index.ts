@@ -321,6 +321,22 @@ export interface PickupPass {
   verified_by_staff_id?: string | null;
 }
 
+// 11. Class Dismissal Audit & Safe Pick-Up Accountability
+export interface ClassDismissalAudit {
+  id: string;
+  school_id: string;
+  class_id: string;
+  class_name: string;
+  date: string; // YYYY-MM-DD
+  marked_empty_at: string; // ISO timestamp
+  marked_by_teacher_id: string;
+  marked_by_teacher_name: string;
+  is_reopened?: boolean;
+  reopened_at?: string | null;
+  unverified_student_ids: string[]; // Students flagged as LEFT_WITHOUT_SAFE_PICKUP
+  unverified_student_names: string[];
+}
+
 // Nigerian WAEC / NECO / Ministry of Education Grading Standard
 export function calculateGradeAndRemark(total: number): { grade: LetterGrade; remarks: string } {
   const score = Math.max(0, Math.min(100, Math.round(total)));

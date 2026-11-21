@@ -37,6 +37,8 @@ import {
   Check,
   X,
   ScanLine,
+  AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 
 const StaffAttendanceScannerModal = dynamic(
@@ -56,6 +58,9 @@ export default function AcademicHubPage() {
     results = [],
     staffAttendance = [],
     pickupPasses = [],
+    classDismissals = [],
+    markClassEmpty,
+    reopenClassDismissal,
     updateStudentScore,
     updateEarlyYearsCommentary,
     clockInStaff,
@@ -110,7 +115,22 @@ export default function AcademicHubPage() {
 
   const teacherName = currentUser?.full_name || loggedTeacher?.full_name || 'Faculty Educator';
 
-  const [activeTab, setActiveTab] = useState<'entry' | 'form_roster' | 'pickup_gate' | 'enroll_student'>('entry');
+  const [activeTab, setActiveTab] = useState<'entry' | 'form_roster' | 'pickup_gate' | 'dismissal' | 'enroll_student'>('entry');
+
+  // Mobile Drawer Tab Switch Listener
+  useEffect(() => {
+    const handleSwitch = (e: CustomEvent<{ tab: 'entry' | 'form_roster' | 'pickup_gate' | 'dismissal' | 'enroll_student' }>) => {
+      if (e.detail?.tab) {
+        setActiveTab(e.detail.tab);
+        const el = document.getElementById('academic-content-panel');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    };
+    window.addEventListener('aegis-teacher-tab-switch' as any, handleSwitch as any);
+    return () => window.removeEventListener('aegis-teacher-tab-switch' as any, handleSwitch as any);
+  }, []);
 
   const assignedSubjectIds = loggedTeacher?.assigned_subjects || loggedTeacher?.assigned_subject_ids || [];
   const formClassId = loggedTeacher?.is_part_time ? undefined : (loggedTeacher?.assigned_class_id || loggedTeacher?.form_class_id);
@@ -723,10 +743,117 @@ export default function AcademicHubPage() {
 
   // Today's handovers verified in this school
   const todayHandovers = useMemo(() => {
+    if (!clientTodayStr) return [];
     return pickupPasses.filter(
-      (p) => p.status === 'USED' && p.picked_up_at && p.picked_up_at.startsWith(clientTodayStr || new Date().toISOString().split('T')[0])
+      (p) => p.status === 'USED' && p.picked_up_at && p.picked_up_at.startsWith(clientTodayStr)
     );
   }, [pickupPasses, clientTodayStr]);
+
+  // Phase 5: Class-Scoped Safe Pick-Up Roster & Dismissal Tracker
+  const assignedOrFirstClass = formClass || classes[0];
+  const [selectedDismissalClassId, setSelectedDismissalClassId] = useState<string>(
+    formClassId || classes[0]?.id || ''
+  );
+
+  useEffect(() => {
+    if (formClassId) {
+      setSelectedDismissalClassId(formClassId);
+    } else if (!selectedDismissalClassId && classes[0]?.id) {
+      setSelectedDismissalClassId(classes[0].id);
+    }
+  }, [formClassId, classes]);
+
+  const activeDismissalClass = useMemo(() => {
+    return classes.find((c) => c.id === selectedDismissalClassId) || assignedOrFirstClass;
+  }, [classes, selectedDismissalClassId, assignedOrFirstClass]);
+
+  // Students in this dismissal class (multi-tenant filtered)
+  const activeClassStudents = useMemo(() => {
+    if (!activeDismissalClass) return [];
+    const activeSchoolId = currentSchool?.id || currentUser?.school_id;
+    return students.filter((s) => {
+      if (s.school_id && activeSchoolId && s.school_id !== activeSchoolId) return false;
+      return s.class_id === activeDismissalClass.id || s.class_grade === activeDismissalClass.name;
+    });
+  }, [students, activeDismissalClass, currentSchool?.id, currentUser?.school_id]);
+
+  // Today's verified pickup pass map by student_id
+  const todayVerifiedPickupByStudent = useMemo(() => {
+    const map = new Map<string, any>();
+    if (!clientTodayStr) return map;
+    pickupPasses
+      .filter((p) => p.status === 'USED' && p.picked_up_at && p.picked_up_at.startsWith(clientTodayStr))
+      .forEach((p) => {
+        map.set(p.student_id, p);
+      });
+    return map;
+  }, [pickupPasses, clientTodayStr]);
+
+  // Check if class dismissal has been audited/marked empty today
+  const classDismissalAuditToday = useMemo(() => {
+    if (!activeDismissalClass || !clientTodayStr) return null;
+    return classDismissals.find(
+      (a) => a.class_id === activeDismissalClass.id && a.date === clientTodayStr && !a.is_reopened
+    ) || null;
+  }, [classDismissals, activeDismissalClass, clientTodayStr]);
+
+  const [dismissalActionLoading, setDismissalActionLoading] = useState(false);
+  const [dismissalNotice, setDismissalNotice] = useState<{
+    type: 'success' | 'warning' | 'error';
+    message: string;
+    unverifiedNames?: string[];
+  } | null>(null);
+
+  const handleMarkClassEmpty = async () => {
+    if (!activeDismissalClass) return;
+    setDismissalActionLoading(true);
+    setDismissalNotice(null);
+    try {
+      const res = await markClassEmpty({
+        classId: activeDismissalClass.id,
+        className: activeDismissalClass.name,
+        teacherId: currentUser?.teacher_id || currentUser?.id || 'tch-current',
+        teacherName: teacherName,
+      });
+      if (res.success) {
+        if (res.unverifiedCount > 0) {
+          setDismissalNotice({
+            type: 'warning',
+            message: `⚠️ ${res.unverifiedCount} student(s) left the school today without the use of Safe Pick-Up.`,
+            unverifiedNames: res.unverifiedStudents.map((s) => s.name),
+          });
+        } else {
+          setDismissalNotice({
+            type: 'success',
+            message: `✅ All ${activeClassStudents.length} students have verified Safe Pick-Up records today. Class dismissal logged successfully.`,
+          });
+        }
+      } else {
+        setDismissalNotice({
+          type: 'error',
+          message: res.error || 'Failed to complete dismissal check.',
+        });
+      }
+    } finally {
+      setDismissalActionLoading(false);
+    }
+  };
+
+  const handleReopenDismissal = async () => {
+    if (!activeDismissalClass) return;
+    setDismissalActionLoading(true);
+    try {
+      const res = await reopenClassDismissal(activeDismissalClass.id);
+      if (res.success) {
+        setDismissalNotice({
+          type: 'success',
+          message: 'Dismissal reopened. You may continue scanning collector vouchers for this class.',
+        });
+      }
+    } finally {
+      setDismissalActionLoading(false);
+    }
+  };
 
   // Phase: Detect if current scope is Early Years (Creche, Playgroup, KG, Nursery)
   const isTargetEarlyYears = useMemo(() => {
@@ -1050,7 +1177,19 @@ export default function AcademicHubPage() {
             }`}
           >
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Safe Pick-Up Gate Verification</span>
+            <span>Gate Scanner</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('dismissal')}
+            className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'dismissal'
+                ? 'border-[#1D4ED8] text-[#1D4ED8] font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Users className="w-4 h-4 text-blue-600" />
+            <span>Class Dismissal & Safe Pick-Up</span>
           </button>
 
           <button
@@ -1065,6 +1204,9 @@ export default function AcademicHubPage() {
             <span>Form Teacher Dual Enrollment</span>
           </button>
         </div>
+
+        {/* Content Container with Anchor for Mobile Drawer Navigation */}
+        <div id="academic-content-panel" className="scroll-mt-20">
 
         {/* TAB 1: SCORE ENTRY */}
         {activeTab === 'entry' && (
@@ -1928,7 +2070,286 @@ export default function AcademicHubPage() {
           </div>
         )}
 
-        {/* TAB 4: DUAL ENROLLMENT */}
+        {/* TAB 4: CLASS DISMISSAL & SAFE PICK-UP ACCOUNTABILITY TRACKER */}
+        {activeTab === 'dismissal' && (
+          <div className="space-y-6">
+            {/* Header & Live KPI Summary */}
+            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-blue-700 text-xs font-bold uppercase tracking-wider mb-1">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  <span>Class Dismissal & Safe Pick-Up Tracker</span>
+                </div>
+                <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                  {activeDismissalClass ? activeDismissalClass.name : 'Class'} Safe Pick-Up Roster
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Real-time accountability roster cross-referencing daily OTP codes and 5-hour delegate passes.
+                </p>
+              </div>
+
+              {/* Class Selector & Mark Class Empty Actions */}
+              <div className="flex flex-wrap items-center gap-2">
+                {classes.length > 1 && (
+                  <select
+                    value={selectedDismissalClassId}
+                    onChange={(e) => {
+                      setSelectedDismissalClassId(e.target.value);
+                      setDismissalNotice(null);
+                    }}
+                    className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
+                    {classes.map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {!classDismissalAuditToday ? (
+                  <button
+                    type="button"
+                    onClick={handleMarkClassEmpty}
+                    disabled={dismissalActionLoading || activeClassStudents.length === 0}
+                    className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-amber-200" />
+                    <span>{dismissalActionLoading ? 'Auditing Roster...' : 'Mark Class Empty (End-of-Day Dismissal Check)'}</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-2 rounded-xl bg-slate-100 border border-slate-300 text-slate-700 text-xs font-bold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Class Marked Empty ({new Date(classDismissalAuditToday.marked_empty_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleReopenDismissal}
+                      disabled={dismissalActionLoading}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reset / Reopen Dismissal</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Live KPI Metric Badges */}
+            {(() => {
+              const totalClassCount = activeClassStudents.length;
+              const verifiedCount = activeClassStudents.filter((s) => todayVerifiedPickupByStudent.has(s.id)).length;
+              const pendingCount = totalClassCount - verifiedCount;
+
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 rounded-xl bg-white border border-slate-200">
+                    <span className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider block">
+                      Total Class Roster
+                    </span>
+                    <div className="text-2xl font-black text-slate-900 font-mono mt-1">
+                      {totalClassCount} <span className="text-xs font-normal text-slate-500">Students</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500">{activeDismissalClass?.name || 'Class Arm'}</span>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <span className="text-[11px] text-emerald-700 font-semibold uppercase tracking-wider block">
+                      Verified Safe Pick-Up
+                    </span>
+                    <div className="text-2xl font-black text-emerald-800 font-mono mt-1">
+                      {verifiedCount} <span className="text-xs font-normal text-emerald-700">Picked Up</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 font-medium">OTP / Delegate Pass Verified</span>
+                  </div>
+
+                  <div className={`p-4 rounded-xl border ${
+                    pendingCount > 0 ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <span className={`text-[11px] font-semibold uppercase tracking-wider block ${
+                      pendingCount > 0 ? 'text-amber-800' : 'text-slate-500'
+                    }`}>
+                      Pending / Unverified
+                    </span>
+                    <div className={`text-2xl font-black font-mono mt-1 ${
+                      pendingCount > 0 ? 'text-amber-900' : 'text-slate-700'
+                    }`}>
+                      {pendingCount} <span className="text-xs font-normal text-slate-500">Remaining</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500">
+                      {classDismissalAuditToday && pendingCount > 0
+                        ? 'Flagged as Left Without Safe Pick-Up'
+                        : 'Awaiting Gate Scan or Parent Pickup'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Dismissal Notice or Unverified Departure Warning Banner */}
+            {dismissalNotice && (
+              <div
+                className={`p-4 rounded-2xl border flex items-start gap-3 text-xs ${
+                  dismissalNotice.type === 'warning'
+                    ? 'bg-rose-50 border-rose-300 text-rose-900'
+                    : dismissalNotice.type === 'error'
+                    ? 'bg-rose-50 border-rose-200 text-rose-800'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                }`}
+              >
+                {dismissalNotice.type === 'warning' ? (
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                ) : dismissalNotice.type === 'error' ? (
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                )}
+                <div className="space-y-1">
+                  <span className="font-bold block text-sm">{dismissalNotice.message}</span>
+                  {dismissalNotice.unverifiedNames && dismissalNotice.unverifiedNames.length > 0 && (
+                    <div>
+                      <p className="font-semibold text-rose-800 mt-1">Unverified Students:</p>
+                      <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-rose-700 font-mono">
+                        {dismissalNotice.unverifiedNames.map((name, i) => (
+                          <li key={i}>{name}</li>
+                        ))}
+                      </ul>
+                      <p className="text-[11px] text-rose-600 mt-1">
+                        This unverified departure has been logged and escalated to the Admin Safe Pick-Up Audit log.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* If class was audited today and had unverified students, show persistent warning banner */}
+            {classDismissalAuditToday && classDismissalAuditToday.unverified_student_names.length > 0 && !dismissalNotice && (
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-300 text-rose-900 text-xs flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="block text-sm font-bold text-rose-950">
+                    ⚠️ {classDismissalAuditToday.unverified_student_names.length} student(s) left the school today without the use of Safe Pick-Up
+                  </strong>
+                  <p className="mt-1 text-rose-800">
+                    Audit conducted by {classDismissalAuditToday.marked_by_teacher_name} at{' '}
+                    {new Date(classDismissalAuditToday.marked_empty_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+                  </p>
+                  <p className="font-mono text-rose-700 font-semibold mt-1">
+                    Unverified: {classDismissalAuditToday.unverified_student_names.join(', ')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Students Roster Table */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Student Safe Pick-Up Roster ({activeClassStudents.length})
+                </h3>
+                <span className="text-xs text-slate-400 font-mono">
+                  {clientTodayStr || 'Today'}
+                </span>
+              </div>
+
+              {activeClassStudents.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-xl">
+                  No students enrolled in {activeDismissalClass?.name || 'this class'}.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="px-3.5 py-2.5">Student Details</th>
+                        <th className="px-3.5 py-2.5">Parent / Contact</th>
+                        <th className="px-3.5 py-2.5">Dismissal & Pick-Up Status</th>
+                        <th className="px-3.5 py-2.5">Collector Info</th>
+                        <th className="px-3.5 py-2.5">Handover Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {activeClassStudents.map((std) => {
+                        const verifiedPass = todayVerifiedPickupByStudent.get(std.id);
+                        const isMarkedEmpty = Boolean(classDismissalAuditToday);
+                        const leftWithoutSafePickup = isMarkedEmpty && !verifiedPass;
+
+                        return (
+                          <tr key={std.id} className="hover:bg-slate-50/50 transition">
+                            <td className="px-3.5 py-3">
+                              <span className="font-bold text-slate-900 block text-xs">
+                                {std.full_name}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                {std.reg_number} • {std.class_grade}
+                              </span>
+                            </td>
+                            <td className="px-3.5 py-3 text-slate-600 text-xs">
+                              <span className="block font-medium text-slate-800">{std.parent_name || 'Parent / Guardian'}</span>
+                              <span className="font-mono text-[11px] text-slate-500">{std.parent_phone}</span>
+                            </td>
+                            <td className="px-3.5 py-3">
+                              {verifiedPass ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Safe Pick-Up Verified</span>
+                                </span>
+                              ) : leftWithoutSafePickup ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                  <span>Left Without Safe Pick-Up</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-300">
+                                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>Awaiting Pick-Up</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3.5 py-3 text-xs">
+                              {verifiedPass ? (
+                                <div>
+                                  <strong className="block text-slate-900 font-semibold">
+                                    {verifiedPass.delegate_name || 'Registered Parent / Guardian'}
+                                  </strong>
+                                  <span className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-bold mt-0.5 ${
+                                    verifiedPass.pass_type === 'DAILY_PARENT'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {verifiedPass.pass_type === 'DAILY_PARENT' ? 'Parent Daily OTP' : 'Delegate 5H'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic text-[11px]">—</span>
+                              )}
+                            </td>
+                            <td className="px-3.5 py-3 text-xs font-mono text-slate-600">
+                              {verifiedPass?.picked_up_at ? (
+                                <span className="font-bold text-slate-800">
+                                  {new Date(verifiedPass.picked_up_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              ) : leftWithoutSafePickup ? (
+                                <span className="text-rose-600 font-semibold text-[11px]">Unverified Departure</span>
+                              ) : (
+                                <span className="text-slate-400 italic text-[11px]">Pending</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: DUAL ENROLLMENT */}
         {activeTab === 'enroll_student' && (
           <div className="max-w-2xl mx-auto space-y-6">
             <EnrollStudentForm
@@ -1954,6 +2375,7 @@ export default function AcademicHubPage() {
           onClose={() => setIsPassScannerOpen(false)}
           onScanSuccess={handlePassScanSuccess}
         />
+        </div>
       </div>
           </AnimatedContent>
     </div>

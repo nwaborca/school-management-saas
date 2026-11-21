@@ -27,6 +27,8 @@ import {
   CreditCard,
   ShieldCheck,
   Award,
+  Users,
+  CheckSquare,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -307,6 +309,44 @@ export function Navbar() {
                         }, 300);
                       } else {
                         window.dispatchEvent(new CustomEvent('aegis-student-tab-switch', { detail: { tab: item.tab } }));
+                      }
+                    }}
+                    className="w-full text-left px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2.5 transition cursor-pointer"
+                  >
+                    <IconComponent className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Teacher Academic Hub Sections (Mobile Drawer) */}
+          {isAuthenticated && currentUser?.role === 'teacher' && (
+            <div className="pt-2 border-t border-slate-200 space-y-1">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3.5 py-1">
+                Teacher Hub Sections
+              </div>
+              {[
+                { tab: 'entry', label: 'Subject Score Entry Grid', icon: CheckSquare },
+                { tab: 'pickup_gate', label: 'Safe Pick-Up Gate Scanner', icon: ShieldCheck },
+                { tab: 'dismissal', label: 'Class Dismissal & Safe Pick-Up', icon: Users },
+                { tab: 'enroll_student', label: 'Form Teacher Dual Enrollment', icon: UserPlus },
+              ].map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <button
+                    key={item.tab}
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (pathname !== '/academic-hub' && pathname !== '/academic' && pathname !== '/teacher') {
+                        router.push('/academic-hub');
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('aegis-teacher-tab-switch', { detail: { tab: item.tab } }));
+                        }, 300);
+                      } else {
+                        window.dispatchEvent(new CustomEvent('aegis-teacher-tab-switch', { detail: { tab: item.tab } }));
                       }
                     }}
                     className="w-full text-left px-3.5 py-2 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2.5 transition cursor-pointer"

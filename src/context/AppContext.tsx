@@ -23,6 +23,7 @@ import {
   ReceiptStatus,
   calculateGradeAndRemark,
   EarlyYearsCommentary,
+  ClassDismissalAudit,
 } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { generateUUID } from '@/lib/uuid';
@@ -61,6 +62,7 @@ interface AppContextType {
   announcements: SchoolAnnouncement[];
   staffAttendance: StaffAttendance[];
   pickupPasses: PickupPass[];
+  classDismissals: ClassDismissalAudit[];
 
   // Multi-Tenant School Registration & Management
   registerSchool: (payload: RegisterSchoolPayload) => Promise<{
@@ -215,6 +217,21 @@ interface AppContextType {
     error?: string;
     reason?: 'EXPIRED' | 'USED' | 'INVALID' | 'WRONG_SCHOOL';
   }>;
+
+  // Phase 5: Class Dismissal & Safe Pick-Up Accountability
+  markClassEmpty: (params: {
+    classId: string;
+    className: string;
+    teacherId: string;
+    teacherName: string;
+  }) => Promise<{
+    success: boolean;
+    audit?: ClassDismissalAudit;
+    unverifiedCount: number;
+    unverifiedStudents: { id: string; name: string }[];
+    error?: string;
+  }>;
+  reopenClassDismissal: (classId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -277,6 +294,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentSchool, setCurrentSchool] = useState<School | null>(DEFAULT_SCHOOL);
   const [staffAttendance, setStaffAttendance] = useState<StaffAttendance[]>([]);
   const [pickupPasses, setPickupPasses] = useState<PickupPass[]>([]);
+  const [classDismissals, setClassDismissals] = useState<ClassDismissalAudit[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('aegis_class_dismissals');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
 
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
@@ -3483,6 +3509,127 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Phase 5: Mark Class Empty & Reopen Dismissal Engine
+  const markClassEmpty = async (params: {
+    classId: string;
+    className: string;
+    teacherId: string;
+    teacherName: string;
+  }): Promise<{
+    success: boolean;
+    audit?: ClassDismissalAudit;
+    unverifiedCount: number;
+    unverifiedStudents: { id: string; name: string }[];
+    error?: string;
+  }> => {
+    try {
+      const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+      const todayDate = new Date().toISOString().split('T')[0];
+
+      // 1. Get all students in this class and school
+      const targetClass = classes.find((c) => c.id === params.classId || c.name === params.className);
+      const classStudents = students.filter((s) => {
+        if (s.school_id && s.school_id !== activeSchoolId) return false;
+        return s.class_id === params.classId || s.class_grade === params.className || (targetClass && (s.class_id === targetClass.id || s.class_grade === targetClass.name));
+      });
+
+      // 2. Identify students with verified Safe Pick-Up today
+      const verifiedStudentIds = new Set(
+        pickupPasses
+          .filter((p) => p.status === 'USED' && p.picked_up_at && p.picked_up_at.startsWith(todayDate))
+          .map((p) => p.student_id)
+      );
+
+      // 3. Any student without a verified pickup pass today is flagged LEFT_WITHOUT_SAFE_PICKUP
+      const unverified = classStudents.filter((s) => !verifiedStudentIds.has(s.id));
+      const unverifiedIds = unverified.map((s) => s.id);
+      const unverifiedNames = unverified.map((s) => s.full_name);
+
+      const auditRecord: ClassDismissalAudit = {
+        id: generateUUID(),
+        school_id: activeSchoolId,
+        class_id: params.classId,
+        class_name: params.className,
+        date: todayDate,
+        marked_empty_at: new Date().toISOString(),
+        marked_by_teacher_id: params.teacherId,
+        marked_by_teacher_name: params.teacherName,
+        is_reopened: false,
+        reopened_at: null,
+        unverified_student_ids: unverifiedIds,
+        unverified_student_names: unverifiedNames,
+      };
+
+      setClassDismissals((prev) => {
+        const filtered = prev.filter(
+          (a) => !(a.class_id === params.classId && a.date === todayDate)
+        );
+        const updated = [auditRecord, ...filtered];
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('aegis_class_dismissals', JSON.stringify(updated));
+          } catch {}
+        }
+        return updated;
+      });
+
+      // Optional: Post an automated high-priority system notice if students left without safe pickup
+      if (unverified.length > 0) {
+        const alertAnnouncement: SchoolAnnouncement = {
+          id: generateUUID(),
+          school_id: activeSchoolId,
+          title: `⚠️ Unverified Dismissal Alert: ${params.className}`,
+          content: `${unverified.length} student(s) (${unverifiedNames.join(', ')}) in ${params.className} left without verified Safe Pick-Up on ${todayDate}. Dismissal audit logged by ${params.teacherName}.`,
+          author_name: params.teacherName,
+          priority: 'high',
+          published_at: new Date().toISOString(),
+        };
+        setAnnouncements((prev) => [alertAnnouncement, ...prev]);
+      }
+
+      return {
+        success: true,
+        audit: auditRecord,
+        unverifiedCount: unverified.length,
+        unverifiedStudents: unverified.map((s) => ({ id: s.id, name: s.full_name })),
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        unverifiedCount: 0,
+        unverifiedStudents: [],
+        error: err?.message || 'Failed to complete class dismissal audit.',
+      };
+    }
+  };
+
+  const reopenClassDismissal = async (classId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const todayDate = new Date().toISOString().split('T')[0];
+      setClassDismissals((prev) => {
+        const updated = prev.map((a) => {
+          if (a.class_id === classId && a.date === todayDate) {
+            return {
+              ...a,
+              is_reopened: true,
+              reopened_at: new Date().toISOString(),
+            };
+          }
+          return a;
+        });
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('aegis_class_dismissals', JSON.stringify(updated));
+          } catch {}
+        }
+        return updated;
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to reopen class dismissal.' };
+    }
+  };
+
   const contextValue = React.useMemo(
     () => ({
       schoolInfo: SCHOOL_INFO,
@@ -3501,6 +3648,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       announcements,
       staffAttendance,
       pickupPasses,
+      classDismissals,
       registerSchool,
       setCurrentSchoolById,
       loginStudent,
@@ -3540,6 +3688,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       generateDelegatePass,
       revokePickupPass,
       verifyAndHandoverPass,
+      markClassEmpty,
+      reopenClassDismissal,
     }),
     [
       currentSchool,
@@ -3555,6 +3705,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       announcements,
       staffAttendance,
       pickupPasses,
+      classDismissals,
       feeStructures,
       receipts,
       transactions,
@@ -3572,6 +3723,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       generateDelegatePass,
       revokePickupPass,
       verifyAndHandoverPass,
+      markClassEmpty,
+      reopenClassDismissal,
     ]
   );
 

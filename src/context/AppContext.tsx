@@ -1271,6 +1271,82 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     error?: string;
   }> => {
     try {
+      // 1. First attempt reliable server-side registration route (bypasses RLS & enforces atomic schema consistency)
+      try {
+        const res = await fetch('/api/auth/register-school', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (res.ok && data?.success && data.school && data.staff) {
+          const newSchool: School = data.school;
+          const adminStaff: TeacherProfile = {
+            id: data.staff.id,
+            school_id: newSchool.id,
+            teacher_id_code: data.staff.staff_id_code,
+            full_name: data.staff.full_name,
+            phone: data.staff.phone,
+            email: data.staff.email,
+            username: data.staff.username,
+            password_hash: data.staff.password_hash,
+            assigned_subject_ids: [],
+            assigned_subjects: [],
+            is_part_time: false,
+            status: 'active',
+            session_token: data.staff.session_token,
+            created_at: data.staff.created_at,
+          };
+
+          const schoolClasses: AcademicClass[] = INITIAL_CLASSES.map((c) => ({
+            ...c,
+            id: `${newSchool.id}-${c.id}`,
+            school_id: newSchool.id,
+            student_count: 0,
+          }));
+
+          // Update local state
+          setSchools((prev) => [newSchool, ...prev]);
+          setCurrentSchool(newSchool);
+          setClasses(schoolClasses);
+          setStudents([]);
+          setTeachers([adminStaff]);
+          setResults([]);
+          setReceipts([]);
+          setFeeStructures([]);
+
+          const authUser: AuthUser = {
+            id: adminStaff.id,
+            school_id: newSchool.id,
+            school_name: newSchool.name,
+            invite_code: newSchool.invite_code,
+            username: adminStaff.username,
+            full_name: adminStaff.full_name,
+            role: 'admin',
+          };
+
+          setCurrentUser(authUser);
+          setSessionCookie(authUser, newSchool);
+
+          if (isSupabaseConfigured()) {
+            fetchLiveData(newSchool.id);
+          }
+
+          return {
+            success: true,
+            school: newSchool,
+            inviteCode: newSchool.invite_code,
+          };
+        } else if (data?.message) {
+          return { success: false, error: data.message };
+        }
+      } catch (serverErr) {
+        console.warn('Server registration route note, proceeding to local/client flow:', serverErr);
+      }
+
+      // 2. Client-side fallback if server route is unreachable
       const schoolId = generateUUID();
 
       // Generate unique collision-checked invite code: AEGIS-XXXX
@@ -1287,7 +1363,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         inviteCode = `AEGIS-${randomSuffix}`;
 
-        // Check if collision in local state or in cloud
         const localCollision = schools.some((s) => s.invite_code === inviteCode);
         if (!localCollision && isSupabaseConfigured()) {
           const { data } = await supabase.from('schools').select('id').eq('invite_code', inviteCode).maybeSingle();
@@ -1319,17 +1394,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         student_count: 0,
       }));
 
-      // 2. Provision the registering user as primary School Admin in staff table
+      // 2. Provision the registering user as primary School Admin in staff table with unique school-scoped identifiers
       const adminStaffId = generateUUID();
-      const adminUsername = (payload.email ? payload.email.split('@')[0] : payload.adminFullName.toLowerCase().replace(/\s+/g, '_')).replace(/[^a-zA-Z0-9_]/g, '');
+      const codeSuffix = inviteCode.includes('-') ? inviteCode.split('-')[1].toLowerCase() : inviteCode.toLowerCase();
+      const emailPrefix = (payload.email ? payload.email.split('@')[0] : payload.adminFullName.toLowerCase().replace(/\s+/g, '_')).replace(/[^a-z0-9_]/g, '');
+      const uniqueUsername = `admin_${codeSuffix}_${emailPrefix}`;
+      const uniqueStaffIdCode = `ADM-${codeSuffix.toUpperCase()}-001`;
+
       const adminStaff: TeacherProfile = {
         id: adminStaffId,
         school_id: schoolId,
-        teacher_id_code: `ADM/${new Date().getFullYear()}/001`,
+        teacher_id_code: uniqueStaffIdCode,
         full_name: payload.adminFullName.trim(),
         phone: payload.phone.trim(),
         email: payload.email.trim(),
-        username: adminUsername || 'admin',
+        username: uniqueUsername,
         password_hash: payload.password,
         assigned_subject_ids: [],
         assigned_subjects: [],
@@ -1395,7 +1474,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           await supabase.from('classes').insert(classesPayload);
 
           // C. Insert primary Admin staff member
-          await supabase.from('staff').insert({
+          const { error: staffError } = await supabase.from('staff').insert({
             id: adminStaff.id,
             school_id: schoolId,
             staff_id_code: adminStaff.teacher_id_code,
@@ -1409,6 +1488,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             assigned_subject_ids: [],
             session_token: adminStaff.session_token,
           });
+
+          if (staffError) {
+            console.error('Supabase staff insertion error:', staffError);
+            return {
+              success: false,
+              error: `School created, but failed to create Admin staff account: ${staffError.message}`,
+            };
+          }
         } catch (dbErr: any) {
           console.warn('Note on cloud multi-tenant persistence:', dbErr);
         }

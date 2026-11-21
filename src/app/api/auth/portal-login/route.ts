@@ -105,23 +105,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Master Super-Admin check
-      if (cleanUser === 'admin' && (cleanPass === 'admin123' || cleanPass === 'admin')) {
-        return NextResponse.json({
-          success: true,
-          role: 'admin',
-          school,
-          staff: {
-            id: `usr-admin-${school.id.slice(0, 8)}`,
-            school_id: school.id,
-            username: 'admin',
-            full_name: 'School Administrator',
-            role: 'admin',
-            status: 'active',
-          },
-        });
-      }
-
+      // Check database first so actual staff rows (with their true id, email, full_name, role) take precedence
       // Build safe orFilter for staff table (username, email, staff_id_code)
       const slashedUser = cleanUser.includes('_') ? cleanUser.replace(/_/g, '/') : cleanUser;
       const underscoredUser = cleanUser.includes('/') ? cleanUser.replace(/\//g, '_') : cleanUser;
@@ -141,28 +125,45 @@ export async function POST(req: NextRequest) {
         .eq('password_hash', cleanPass)
         .maybeSingle();
 
-      if (staffErr || !staffMember) {
-        return NextResponse.json(
-          { success: false, message: 'Invalid username or password for this school.' },
-          { status: 401 }
-        );
+      if (staffMember) {
+        if (staffMember.status === 'revoked') {
+          return NextResponse.json(
+            { success: false, message: 'Account access has been revoked by administration.' },
+            { status: 403 }
+          );
+        }
+
+        const assignedRole = staffMember.role === 'admin' ? 'admin' : 'teacher';
+
+        return NextResponse.json({
+          success: true,
+          role: assignedRole,
+          school,
+          staff: staffMember,
+        });
       }
 
-      if (staffMember.status === 'revoked') {
-        return NextResponse.json(
-          { success: false, message: 'Account access has been revoked by administration.' },
-          { status: 403 }
-        );
+      // Master Super-Admin fallback check (only if no custom database staff matched)
+      if (cleanUser === 'admin' && (cleanPass === 'admin123' || cleanPass === 'admin')) {
+        return NextResponse.json({
+          success: true,
+          role: 'admin',
+          school,
+          staff: {
+            id: `usr-admin-${school.id.slice(0, 8)}`,
+            school_id: school.id,
+            username: 'admin',
+            full_name: 'School Administrator',
+            role: 'admin',
+            status: 'active',
+          },
+        });
       }
 
-      const assignedRole = staffMember.role === 'admin' ? 'admin' : 'teacher';
-
-      return NextResponse.json({
-        success: true,
-        role: assignedRole,
-        school,
-        staff: staffMember,
-      });
+      return NextResponse.json(
+        { success: false, message: 'Invalid username or password for this school.' },
+        { status: 401 }
+      );
     }
 
     return NextResponse.json(

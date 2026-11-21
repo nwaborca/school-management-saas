@@ -18,7 +18,7 @@ export default function StaffAttendanceQROverlay({
 }: StaffAttendanceQROverlayProps) {
   if (!isOpen) return null;
 
-  const qrPayload = `AEGIS_ATTENDANCE:${school.id}`;
+  const qrPayload = `AEGIS_ATTENDANCE:${school.id}:${school.invite_code || ''}`;
 
   const handlePrint = () => {
     window.print();

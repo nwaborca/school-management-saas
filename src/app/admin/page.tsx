@@ -49,6 +49,7 @@ import {
   ZoomOut,
   RotateCcw,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { PdfCanvasViewer } from '@/components/PdfCanvasViewer';
 import { downloadOrShareReceipt } from '@/lib/receiptDownloader';
@@ -82,6 +83,7 @@ export default function AdminHubPage() {
     updateSchoolGeofence,
     currentUser,
     isAuthReady,
+    logout,
   } = useApp();
 
   // Route Guard: Require admin / bursar authentication
@@ -141,6 +143,13 @@ export default function AdminHubPage() {
   const [adminConfirmPass, setAdminConfirmPass] = useState('');
   const [adminPassError, setAdminPassError] = useState<string | null>(null);
   const [adminPassSuccess, setAdminPassSuccess] = useState(false);
+
+  // Danger Zone: Delete School State
+  const [isDeleteSchoolModalOpen, setIsDeleteSchoolModalOpen] = useState(false);
+  const [deleteConfirmNameInput, setDeleteConfirmNameInput] = useState('');
+  const [deleteAdminPasswordInput, setDeleteAdminPasswordInput] = useState('');
+  const [isDeletingSchool, setIsDeletingSchool] = useState(false);
+  const [deleteSchoolError, setDeleteSchoolError] = useState<string | null>(null);
 
   // Master Student Search & Dossier Modal State
   const [masterSearchQuery, setMasterSearchQuery] = useState('');
@@ -1451,6 +1460,41 @@ export default function AdminHubPage() {
                   <span>Update Master Password</span>
                 </button>
               </form>
+            )}
+
+            {/* DANGER ZONE: PERMANENTLY DELETE SCHOOL (TENANT ISOLATED) */}
+            {currentUser?.role === 'admin' && currentSchool?.invite_code !== 'AEGIS-2026' && currentSchool?.id !== '00000000-0000-0000-0000-000000000001' && (
+              <div className="pt-6 border-t border-rose-200">
+                <div className="p-5 rounded-2xl bg-rose-50/70 border-2 border-rose-300 space-y-3">
+                  <div className="flex items-center gap-2 text-rose-800">
+                    <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                    <h3 className="font-extrabold text-sm uppercase tracking-wide text-rose-950">
+                      Danger Zone — Permanently Delete School
+                    </h3>
+                  </div>
+                  <p className="text-xs text-rose-800 leading-relaxed">
+                    Once you delete this school, all tenant data—including student rosters, grades, staff attendance, fee ledgers, and safe pick-up logs—will be <strong>permanently and irreversibly erased</strong> from Supabase.
+                  </p>
+                  <div className="pt-2 flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-rose-700">
+                      Target: {currentSchool?.name} ({currentSchool?.invite_code})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteSchoolError(null);
+                        setDeleteConfirmNameInput('');
+                        setDeleteAdminPasswordInput('');
+                        setIsDeleteSchoolModalOpen(true);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete School Permanently</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -2980,6 +3024,126 @@ export default function AdminHubPage() {
           </div>
         );
       })()}
+
+      {/* DANGER ZONE: PERMANENTLY DELETE SCHOOL CONFIRMATION MODAL */}
+      {isDeleteSchoolModalOpen && currentSchool && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border-2 border-rose-500 space-y-4 my-auto relative">
+            <div className="flex items-center justify-between pb-3 border-b border-rose-100">
+              <div className="flex items-center gap-2 text-rose-700">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+                <h3 className="font-extrabold text-sm uppercase tracking-wide text-rose-950">
+                  Delete School Permanently
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeleteSchoolModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-xs text-rose-900 space-y-1">
+              <p className="font-bold">⚠️ Warning: This action cannot be undone.</p>
+              <p>
+                All student rosters, grades, staff attendance records, fee ledgers, and safe pick-up logs under{' '}
+                <strong className="underline">{currentSchool.name}</strong> will be permanently wiped.
+              </p>
+            </div>
+
+            {deleteSchoolError && (
+              <div className="p-3 rounded-xl bg-rose-100 border border-rose-300 text-rose-900 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                <span>{deleteSchoolError}</span>
+              </div>
+            )}
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setDeleteSchoolError(null);
+                setIsDeletingSchool(true);
+
+                try {
+                  const res = await fetch('/api/admin/delete-school', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      schoolId: currentSchool.id,
+                      schoolNameConfirmation: deleteConfirmNameInput.trim(),
+                      adminPassword: deleteAdminPasswordInput.trim(),
+                    }),
+                  });
+
+                  const data = await res.json().catch(() => null);
+
+                  if (res.ok && data?.success) {
+                    setIsDeleteSchoolModalOpen(false);
+                    logout();
+                    router.push('/');
+                  } else {
+                    setDeleteSchoolError(data?.message || 'Failed to delete school. Check your credentials.');
+                  }
+                } catch (err: any) {
+                  setDeleteSchoolError(err?.message || 'Network error occurred while deleting school.');
+                } finally {
+                  setIsDeletingSchool(false);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Type <span className="font-mono font-bold text-rose-700 select-all">{currentSchool.name}</span> or{' '}
+                  <span className="font-mono font-bold text-rose-700 select-all">{currentSchool.invite_code}</span> to confirm:
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={`Type "${currentSchool.name}" or "${currentSchool.invite_code}"`}
+                  value={deleteConfirmNameInput}
+                  onChange={(e) => setDeleteConfirmNameInput(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Proprietor / Admin Master Password:
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter your administrator password"
+                  value={deleteAdminPasswordInput}
+                  onChange={(e) => setDeleteAdminPasswordInput(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteSchoolModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isDeletingSchool || !deleteConfirmNameInput.trim() || !deleteAdminPasswordInput.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isDeletingSchool ? 'Erasing Tenant Data...' : 'Permanently Delete School'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       </div>
     </div>

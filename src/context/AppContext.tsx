@@ -237,23 +237,56 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Helper to set cross-browser, mobile-resilient session cookie and multi-store fallback
-function setSessionCookie(user: AuthUser | null) {
+function setSessionCookie(user: AuthUser | null, school?: School | null) {
   if (typeof document === 'undefined') return;
   try {
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
     const secureFlag = isHttps ? '; Secure' : '';
     if (!user) {
       document.cookie = `apex_auth_user=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
+      document.cookie = `aegis_auth_school=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
       try { sessionStorage.removeItem('apex_auth_user'); } catch {}
       try { localStorage.removeItem('apex_auth_user'); } catch {}
+      try { sessionStorage.removeItem('aegis_auth_school'); } catch {}
+      try { localStorage.removeItem('aegis_auth_school'); } catch {}
     } else {
       const encoded = encodeURIComponent(JSON.stringify(user));
       // 7 days expiration with explicit Lax and HTTPS Secure guard
       document.cookie = `apex_auth_user=${encoded}; path=/; max-age=604800; SameSite=Lax${secureFlag}`;
       try { sessionStorage.setItem('apex_auth_user', JSON.stringify(user)); } catch {}
       try { localStorage.setItem('apex_auth_user', JSON.stringify(user)); } catch {}
+
+      if (school) {
+        const encodedSchool = encodeURIComponent(JSON.stringify(school));
+        document.cookie = `aegis_auth_school=${encodedSchool}; path=/; max-age=604800; SameSite=Lax${secureFlag}`;
+        try { sessionStorage.setItem('aegis_auth_school', JSON.stringify(school)); } catch {}
+        try { localStorage.setItem('aegis_auth_school', JSON.stringify(school)); } catch {}
+      }
     }
   } catch {}
+}
+
+function getSavedSchool(): School | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const match = document.cookie.match(/(?:^|;\s*)aegis_auth_school=([^;]+)/);
+    if (match && match[1]) {
+      return JSON.parse(decodeURIComponent(match[1]));
+    }
+  } catch {}
+  try {
+    const sessionData = sessionStorage.getItem('aegis_auth_school');
+    if (sessionData) {
+      return JSON.parse(sessionData);
+    }
+  } catch {}
+  try {
+    const localData = localStorage.getItem('aegis_auth_school');
+    if (localData) {
+      return JSON.parse(localData);
+    }
+  } catch {}
+  return null;
 }
 
 function getSessionCookie(): AuthUser | null {
@@ -291,7 +324,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const [schools, setSchools] = useState<School[]>([DEFAULT_SCHOOL]);
-  const [currentSchool, setCurrentSchool] = useState<School | null>(DEFAULT_SCHOOL);
+  const [currentSchool, setCurrentSchool] = useState<School | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = getSavedSchool();
+      if (saved) return saved;
+    }
+    return DEFAULT_SCHOOL;
+  });
   const [staffAttendance, setStaffAttendance] = useState<StaffAttendance[]>([]);
   const [pickupPasses, setPickupPasses] = useState<PickupPass[]>([]);
   const [classDismissals, setClassDismissals] = useState<ClassDismissalAudit[]>(() => {
@@ -881,8 +920,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
         setSchools(schoolData as School[]);
-        const active = schoolData.find((s: any) => s.id === currentUser?.school_id) || schoolData[0];
-        if (active) setCurrentSchool(active);
+        // Only set currentSchool if matching the active user or target school, never blindly overwrite an active custom tenant
+        const matchingSchool = schoolData.find((s: any) => s.id === activeSchoolId) ||
+          schoolData.find((s: any) => s.id === currentUser?.school_id);
+        if (matchingSchool) {
+          setCurrentSchool(matchingSchool);
+          setSessionCookie(currentUser, matchingSchool);
+        }
       }
 
       if (attData && Array.isArray(attData) && attData.length > 0) {
@@ -907,10 +951,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const cookieUser = getSessionCookie();
+      const savedSchool = getSavedSchool();
+      if (savedSchool) {
+        setCurrentSchool(savedSchool);
+      }
       if (cookieUser) {
         setCurrentUser(cookieUser);
-        if (isSupabaseConfigured() && cookieUser.school_id) {
-          fetchLiveData(cookieUser.school_id);
+        const targetId = cookieUser.school_id || savedSchool?.id;
+        if (isSupabaseConfigured() && targetId) {
+          fetchLiveData(targetId);
         }
       } else {
         setCurrentUser(null);
@@ -920,9 +969,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsAuthReady(true);
     }
 
-    // Immediately fetch from Supabase cloud once on initial mount
+    // Immediately fetch from Supabase cloud once on initial mount if not already triggered with cookieUser
     if (isSupabaseConfigured()) {
-      fetchLiveData();
+      const cookieUser = getSessionCookie();
+      const savedSchool = getSavedSchool();
+      const targetId = cookieUser?.school_id || savedSchool?.id;
+      if (!targetId) {
+        fetchLiveData();
+      }
     }
   }, [fetchLiveData]);
 
@@ -1306,7 +1360,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         role: 'admin',
       };
       setCurrentUser(authUser);
-      setSessionCookie(authUser);
+      setSessionCookie(authUser, newSchool);
 
       // Persist to Supabase if connected
       if (isSupabaseConfigured()) {
@@ -1432,7 +1486,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
 
           setCurrentUser(authUser);
-          setSessionCookie(authUser);
+          setSessionCookie(authUser, targetSchool);
 
           if (isSupabaseConfigured()) {
             fetchLiveData(targetSchool.id);
@@ -1526,7 +1580,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     setCurrentUser(authUser);
-    setSessionCookie(authUser);
+    setSessionCookie(authUser, targetSchool);
 
     // Immediately hydrate tenant data for this school so Student Hub loads with full live data
     if (isSupabaseConfigured()) {
@@ -1603,7 +1657,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
 
           setCurrentUser(authUser);
-          setSessionCookie(authUser);
+          setSessionCookie(authUser, targetSchool);
 
           if (isSupabaseConfigured()) {
             fetchLiveData(targetSchool.id);
@@ -1662,7 +1716,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         role: 'admin',
       };
       setCurrentUser(authUser);
-      setSessionCookie(authUser);
+      setSessionCookie(authUser, targetSchool);
       return { success: true, role: 'admin' as UserRole };
     }
 
@@ -1744,7 +1798,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         session_token: matchedTeacher.session_token,
       };
       setCurrentUser(authUser);
-      setSessionCookie(authUser);
+      setSessionCookie(authUser, targetSchool);
 
       // Immediately hydrate tenant data for this school so Academic Hub / Admin loads with full live data
       if (isSupabaseConfigured()) {
@@ -3050,11 +3104,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: 'Only authenticated faculty/teachers can clock in.' };
     }
 
-    const activeSchoolId = currentSchool?.id || currentUser.school_id || DEFAULT_SCHOOL.id;
-    const expectedPayload = `AEGIS_ATTENDANCE:${activeSchoolId}`;
+    const activeSchoolId = (currentSchool?.id || currentUser.school_id || DEFAULT_SCHOOL.id).trim().toLowerCase();
+    const activeInviteCode = (currentSchool?.invite_code || currentUser.invite_code || '').trim().toUpperCase();
 
     // 1. Validate Scanned QR Code
-    if (params.scannedPayload.trim() !== expectedPayload) {
+    // Support formats: `AEGIS_ATTENDANCE:<schoolId>` or `AEGIS_ATTENDANCE:<schoolId>:<inviteCode>`
+    const rawPayload = params.scannedPayload.trim();
+    let isValidCode = false;
+
+    if (rawPayload.startsWith('AEGIS_ATTENDANCE:')) {
+      const parts = rawPayload.split(':');
+      const scannedId = (parts[1] || '').trim().toLowerCase();
+      const scannedInvite = (parts[2] || '').trim().toUpperCase();
+
+      if (scannedId === activeSchoolId) {
+        isValidCode = true;
+      } else if (activeInviteCode && scannedInvite === activeInviteCode) {
+        isValidCode = true;
+      } else if (scannedId === activeInviteCode.toLowerCase()) {
+        isValidCode = true;
+      }
+    }
+
+    if (!isValidCode) {
       return {
         success: false,
         message: 'Invalid Gate QR Code. Please scan the official QR poster for your school.',

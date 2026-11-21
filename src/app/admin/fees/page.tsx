@@ -31,7 +31,10 @@ import {
   FileText,
   Download,
   Lock,
+  Share2,
 } from 'lucide-react';
+import { PdfCanvasViewer } from '@/components/PdfCanvasViewer';
+import { downloadOrShareReceipt } from '@/lib/receiptDownloader';
 
 export default function AdminFeesPage() {
   const router = useRouter();
@@ -913,53 +916,35 @@ export default function AdminFeesPage() {
                           <button
                             type="button"
                             onClick={() => window.open(effectiveSource, '_blank')}
-                            className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[11px] flex items-center gap-1 border border-blue-200 cursor-pointer whitespace-nowrap"
-                            title="Open in native PDF viewer or external tab"
+                            className="hidden md:flex px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[11px] items-center gap-1 border border-blue-200 cursor-pointer whitespace-nowrap"
+                            title="Open PDF document in a new browser tab"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            <span>Open in Viewer</span>
+                            <span>Open in New Tab</span>
                           </button>
-                          <a
-                            href={effectiveSource}
-                            download={fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`}
+                          <button
+                            type="button"
+                            onClick={() => downloadOrShareReceipt(effectiveSource, fileName)}
                             className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-gray-950 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer whitespace-nowrap"
                           >
-                            <Download className="w-3 h-3" />
-                            <span>Download</span>
-                          </a>
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download PDF</span>
+                          </button>
                         </div>
                       </div>
 
-                      {/* PDF Document Preview & Android/WebView Proof Card */}
-                      <div className="w-full flex-1 flex flex-col items-center justify-center p-4 bg-slate-100/50">
-                        <div className="w-full max-w-sm bg-white border border-slate-200 rounded-xl p-5 shadow-sm text-center space-y-4">
-                          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 mx-auto flex items-center justify-center">
-                            <FileText className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm truncate max-w-full">{fileName}</h4>
-                            <p className="text-xs text-slate-500 mt-0.5">PDF Payment Transfer Proof</p>
-                            <p className="font-mono font-bold text-blue-600 text-sm mt-1">{formatNaira(activeReceipt.amount_claimed)}</p>
-                          </div>
-                          <div className="space-y-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => window.open(effectiveSource, '_blank')}
-                              className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs transition"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                              <span>Open PDF in Phone Viewer</span>
-                            </button>
-                            <a
-                              href={effectiveSource}
-                              download={fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`}
-                              className="w-full py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
-                            >
-                              <Download className="w-4 h-4" />
-                              <span>Download Receipt</span>
-                            </a>
-                          </div>
-                        </div>
+                      {/* Desktop View: Full-size inline iframe */}
+                      <div className="hidden md:block w-full flex-1 min-h-[360px] h-[420px] bg-white">
+                        <iframe
+                          src={effectiveSource}
+                          className="w-full h-full border-none rounded-b-xl"
+                          title={fileName}
+                        />
+                      </div>
+
+                      {/* Mobile / Android WebView View: In-app PDF Canvas pages */}
+                      <div className="block md:hidden w-full flex-1 overflow-hidden">
+                        <PdfCanvasViewer src={effectiveSource} fileName={fileName} zoomLevel={1} />
                       </div>
                     </div>
                   )}

@@ -1366,7 +1366,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const apiRes = await fetch('/api/auth/portal-login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
         body: JSON.stringify({
           type: 'student',
           schoolCode: cleanInvite,
@@ -1375,8 +1379,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      if (apiRes.ok) {
-        const payload = await apiRes.json();
+      const payload = await apiRes.json().catch(() => null);
+
+      if (apiRes.ok && payload) {
         if (payload.success && payload.student && payload.school) {
           const rawStudent = payload.student;
           const targetSchool: School = payload.school;
@@ -1411,6 +1416,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         } else if (payload.message) {
           return { success: false, message: payload.message };
         }
+      } else if (payload && payload.message) {
+        return { success: false, message: payload.message };
       }
     } catch (apiErr) {
       console.warn('Server portal login fallback to client check:', apiErr);
@@ -1524,7 +1531,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const apiRes = await fetch('/api/auth/portal-login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        },
         body: JSON.stringify({
           type: 'staff',
           schoolCode: cleanInvite,
@@ -1533,8 +1544,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      if (apiRes.ok) {
-        const payload = await apiRes.json();
+      const payload = await apiRes.json().catch(() => null);
+
+      if (apiRes.ok && payload) {
         if (payload.success && payload.staff && payload.school) {
           const rawStaff = payload.staff;
           const targetSchool: School = payload.school;
@@ -1575,6 +1587,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         } else if (payload.message) {
           return { success: false, message: payload.message };
         }
+      } else if (payload && payload.message) {
+        return { success: false, message: payload.message };
       }
     } catch (apiErr) {
       console.warn('Server portal login staff fallback to client check:', apiErr);
@@ -1720,6 +1734,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setCurrentUser(null);
     setSessionCookie(null);
+    if (typeof window !== 'undefined') {
+      try {
+        // Clear all session and localStorage keys starting with aegis_ or apex_
+        const keysToClear = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('aegis_') || k.startsWith('apex_'))) keysToClear.push(k);
+        }
+        keysToClear.forEach((k) => localStorage.removeItem(k));
+
+        const sessionKeys = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          if (k && (k.startsWith('aegis_') || k.startsWith('apex_'))) sessionKeys.push(k);
+        }
+        sessionKeys.forEach((k) => sessionStorage.removeItem(k));
+      } catch {}
+    }
   };
 
   // Teacher Score Entry Portal:

@@ -11,6 +11,9 @@ export interface SchoolAccessMeta {
   plan_label: SchoolPlanLabel;
   access_expires_at: string | null;
   logo_url?: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_name?: string | null;
   updated_at?: string;
 }
 
@@ -38,6 +41,9 @@ export async function getSchoolAccessRegistry(supabase: SupabaseClient): Promise
           plan_label: (item.plan_label as SchoolPlanLabel) || 'FREE_PILOT_TERM',
           access_expires_at: item.access_expires_at || null,
           logo_url: item.logo_url || null,
+          bank_name: item.bank_name || null,
+          account_number: item.account_number || null,
+          account_name: item.account_name || null,
           updated_at: item.updated_at,
         };
       }
@@ -110,6 +116,9 @@ export function resolveSchoolAccess(
   planLabel: SchoolPlanLabel;
   expiresAt: string | null;
   logoUrl: string | null;
+  bankName: string | null;
+  accountNumber: string | null;
+  accountName: string | null;
   isExpired: boolean;
   canAccess: boolean;
 } {
@@ -124,6 +133,9 @@ export function resolveSchoolAccess(
       planLabel: 'ACTIVE_TERM',
       expiresAt: null,
       logoUrl: school.logo_url || school.logoUrl || null,
+      bankName: school.bankName || school.bank_name || 'First Bank of Nigeria',
+      accountNumber: school.accountNumber || school.account_number || '0123456789',
+      accountName: school.accountName || school.account_name || 'Aegis Academy Nigeria',
       isExpired: false,
       canAccess: true,
     };
@@ -135,6 +147,9 @@ export function resolveSchoolAccess(
   const planLabel = school.plan_label || meta?.plan_label || 'FREE_PILOT_TERM';
   const expiresAt = school.access_expires_at !== undefined ? school.access_expires_at : (meta?.access_expires_at || null);
   const logoUrl = school.logo_url || school.logoUrl || meta?.logo_url || null;
+  const bankName = school.bankName || school.bank_name || meta?.bank_name || null;
+  const accountNumber = school.accountNumber || school.account_number || meta?.account_number || null;
+  const accountName = school.accountName || school.account_name || meta?.account_name || null;
 
   let isExpired = false;
   if (rawStatus === 'TERM_EXPIRED') {
@@ -155,6 +170,9 @@ export function resolveSchoolAccess(
     planLabel,
     expiresAt,
     logoUrl,
+    bankName,
+    accountNumber,
+    accountName,
     isExpired,
     canAccess,
   };

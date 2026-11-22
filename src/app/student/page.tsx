@@ -1191,116 +1191,142 @@ export default function StudentDashboardPage() {
                 — Amount: <strong className="text-slate-900 font-mono">{formatNaira(currentPayableAmount)}</strong>
               </div>
 
-              {/* Bank Details List with Copy Buttons */}
-              <div className="space-y-3">
-                {/* Bank Name */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block">
-                      Bank Name
-                    </span>
-                    <span className="text-sm font-bold text-slate-900">First Bank of Nigeria</span>
-                  </div>
-                  <button
-                    onClick={() => copyBankInfo('First Bank of Nigeria', 'bank')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
-                  >
-                    {copiedBankField === 'bank' ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+              {/* Bank Details List or Unconfigured Notice */}
+              {(() => {
+                const resolvedBankName = currentSchool?.bankName || currentSchool?.bank_name;
+                const resolvedAccountNumber = currentSchool?.accountNumber || currentSchool?.account_number;
+                const resolvedAccountName = currentSchool?.accountName || currentSchool?.account_name || (currentSchool?.name ? `${currentSchool.name} Educational Services` : null);
+                const activeInstitutionName = currentSchool?.name || schoolInfo.name;
 
-                {/* Account Number */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-blue-600 font-semibold uppercase tracking-wider block">
-                      Account Number (NUBAN)
-                    </span>
-                    <span className="text-lg font-black text-blue-600 font-mono tracking-wider">0123456789</span>
-                  </div>
-                  <button
-                    onClick={() => copyBankInfo('0123456789', 'account_no')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
-                  >
-                    {copiedBankField === 'account_no' ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                if (!resolvedAccountNumber || !resolvedBankName) {
+                  return (
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-xs text-amber-800">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Official Bank Details Not Configured Yet</span>
+                      </div>
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Official fee payment bank account details have not been configured by{' '}
+                        <strong>{activeInstitutionName}</strong> administrators yet. Please contact the school bursar or administration office before making any bank transfers.
+                      </p>
+                    </div>
+                  );
+                }
 
-                {/* Account Name */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div className="truncate mr-2">
-                    <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block">
-                      Account Name
-                    </span>
-                    <span className="text-sm font-bold text-slate-900 truncate block">
-                      {schoolInfo.name} Educational Services
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => copyBankInfo(`${schoolInfo.name} Educational Services`, 'account_name')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer shrink-0"
-                  >
-                    {copiedBankField === 'account_name' ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                return (
+                  <div className="space-y-3">
+                    {/* Bank Name */}
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block">
+                          Bank Name
+                        </span>
+                        <span className="text-sm font-bold text-slate-900">{resolvedBankName}</span>
+                      </div>
+                      <button
+                        onClick={() => copyBankInfo(resolvedBankName, 'bank')}
+                        className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
+                      >
+                        {copiedBankField === 'bank' ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
 
-                {/* Transfer Narration */}
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block">
-                      Payment Narration / Reference
-                    </span>
-                    <span className="text-xs font-mono font-bold text-slate-700">
-                      {activeStudent.reg_number} - {activeStudent.full_name}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => copyBankInfo(`${activeStudent.reg_number} ${activeStudent.full_name}`, 'narration')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
-                  >
-                    {copiedBankField === 'narration' ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy</span>
-                      </>
+                    {/* Account Number */}
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-blue-600 font-semibold uppercase tracking-wider block">
+                          Account Number (NUBAN)
+                        </span>
+                        <span className="text-lg font-black text-blue-600 font-mono tracking-wider">{resolvedAccountNumber}</span>
+                      </div>
+                      <button
+                        onClick={() => copyBankInfo(resolvedAccountNumber, 'account_no')}
+                        className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
+                      >
+                        {copiedBankField === 'account_no' ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Account Name */}
+                    {resolvedAccountName && (
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                        <div className="truncate mr-2">
+                          <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block">
+                            Account Name
+                          </span>
+                          <span className="text-sm font-bold text-slate-900 truncate block">
+                            {resolvedAccountName}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => copyBankInfo(resolvedAccountName, 'account_name')}
+                          className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer shrink-0"
+                        >
+                          {copiedBankField === 'account_name' ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-400">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     )}
-                  </button>
-                </div>
-              </div>
+
+                    {/* Transfer Narration */}
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block">
+                          Payment Narration / Reference
+                        </span>
+                        <span className="text-xs font-mono font-bold text-slate-700">
+                          {activeStudent.reg_number} - {activeStudent.full_name}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => copyBankInfo(`${activeStudent.reg_number} ${activeStudent.full_name}`, 'narration')}
+                        className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 transition cursor-pointer"
+                      >
+                        {copiedBankField === 'narration' ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="pt-2">
                 <button

@@ -76,6 +76,11 @@ interface AppContextType {
   }>;
   setCurrentSchoolById: (schoolId: string) => void;
   updateSchoolLogo: (logoUrl: string | null) => Promise<{ success: boolean; error?: string }>;
+  updateSchoolBankDetails: (
+    bankName: string,
+    accountNumber: string,
+    accountName: string
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // Auth (Strict Mandatory School Invite Code)
   loginStudent: (regNumber: string, pin: string, inviteCode: string) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
@@ -324,6 +329,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     latitude: 6.5244,
     longitude: 3.3792,
     geofence_radius_meters: 150,
+    bank_name: 'First Bank of Nigeria',
+    bankName: 'First Bank of Nigeria',
+    account_number: '0123456789',
+    accountNumber: '0123456789',
+    account_name: 'Aegis Academy Nigeria',
+    accountName: 'Aegis Academy Nigeria',
     access_status: 'ACTIVE',
     plan_label: 'ACTIVE_TERM',
     access_expires_at: null,
@@ -989,10 +1000,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const enrichedSchools = (schoolData as School[]).map((s) => {
           const acc = resolveSchoolAccess(s, registryMap);
           const resolvedLogo = s.logo_url || s.logoUrl || acc.logoUrl || null;
+          const resolvedBankName = s.bankName || s.bank_name || acc.bankName || null;
+          const resolvedAccountNumber = s.accountNumber || s.account_number || acc.accountNumber || null;
+          const resolvedAccountName = s.accountName || s.account_name || acc.accountName || null;
           return {
             ...s,
             logo_url: resolvedLogo,
             logoUrl: resolvedLogo,
+            bank_name: resolvedBankName,
+            bankName: resolvedBankName,
+            account_number: resolvedAccountNumber,
+            accountNumber: resolvedAccountNumber,
+            account_name: resolvedAccountName,
+            accountName: resolvedAccountName,
             access_status: acc.status,
             plan_label: acc.planLabel,
             access_expires_at: acc.expiresAt,
@@ -3360,6 +3380,68 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
+  // Official Fee Payment Bank Account Update (Admin)
+  const updateSchoolBankDetails = async (
+    bankName: string,
+    accountNumber: string,
+    accountName: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!currentSchool) {
+      return { success: false, error: 'No active school selected.' };
+    }
+
+    const cleanBank = (bankName || '').trim();
+    const cleanNum = (accountNumber || '').trim();
+    const cleanName = (accountName || '').trim();
+
+    if (cleanNum && !/^\d{10}$/.test(cleanNum)) {
+      return { success: false, error: 'Account number must be a valid 10-digit NUBAN number.' };
+    }
+
+    const updatedSchool: School = {
+      ...currentSchool,
+      bank_name: cleanBank || null,
+      bankName: cleanBank || null,
+      account_number: cleanNum || null,
+      accountNumber: cleanNum || null,
+      account_name: cleanName || null,
+      accountName: cleanName || null,
+    };
+
+    setCurrentSchool(updatedSchool);
+    setSchools((prev) => prev.map((s) => (s.id === updatedSchool.id ? updatedSchool : s)));
+    setSessionCookie(currentUser, updatedSchool);
+
+    if (isSupabaseConfigured()) {
+      try {
+        // 1. Attempt updating bank columns on public.schools table
+        const { error: schoolErr } = await supabase
+          .from('schools')
+          .update({
+            bank_name: cleanBank || null,
+            account_number: cleanNum || null,
+            account_name: cleanName || null,
+          })
+          .eq('id', updatedSchool.id);
+
+        if (schoolErr) {
+          console.warn('Note: schools table bank columns update note:', schoolErr.message);
+        }
+
+        // 2. Persist in high-availability access registry so bank details always persist
+        await saveSchoolAccessMeta(supabase, updatedSchool.id, {
+          bank_name: cleanBank || null,
+          account_number: cleanNum || null,
+          account_name: cleanName || null,
+        });
+      } catch (err: any) {
+        console.warn('Error updating school bank details:', err);
+      }
+    }
+
+    return { success: true };
+  };
+
   // Phase 3: Geofenced Staff Clock-In
   const clockInStaff = async (params: {
     scannedPayload: string;
@@ -4019,6 +4101,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleResultsPublished,
       updateAdminPassword,
       updateSchoolLogo,
+      updateSchoolBankDetails,
       updateSchoolGeofence,
       clockInStaff,
       clockOutStaff,
@@ -4055,6 +4138,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       registerSchool,
       setCurrentSchoolById,
       updateSchoolLogo,
+      updateSchoolBankDetails,
       updateSchoolGeofence,
       clockInStaff,
       clockOutStaff,

@@ -26,6 +26,7 @@ import {
   UploadCloud,
   X,
   Image as ImageIcon,
+  Landmark,
 } from 'lucide-react';
 import { processSchoolLogo } from '@/lib/logoProcessor';
 
@@ -39,6 +40,11 @@ export default function RegisterSchoolPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
+
+  // Official Fee Payment Bank Account State (Optional)
+  const [bankName, setBankName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
 
   // School Crest / Logo Upload State
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -101,6 +107,12 @@ export default function RegisterSchoolPage() {
         return;
       }
 
+      if (accountNumber && !/^\d{10}$/.test(accountNumber.trim())) {
+        setError('School bank account number must be exactly 10 digits (NUBAN format).');
+        setLoading(false);
+        return;
+      }
+
       const res = await registerSchool({
         schoolName,
         adminFullName,
@@ -109,6 +121,9 @@ export default function RegisterSchoolPage() {
         password,
         address,
         logoUrl: processedLogoUrl || null,
+        bankName: bankName.trim() || undefined,
+        accountNumber: accountNumber.trim() || undefined,
+        accountName: accountName.trim() || undefined,
       });
 
       if (res.success && res.inviteCode) {
@@ -368,6 +383,136 @@ export default function RegisterSchoolPage() {
                       </label>
                     </div>
                   )}
+                </div>
+
+                {/* Official Fee Payment Bank Account (Optional) */}
+                <div className="space-y-3 pt-3 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded-md bg-blue-50 text-blue-600 border border-blue-200">
+                      <Landmark className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-[#0F172A]">Official Tuition Bank Account (Optional)</h4>
+                      <p className="text-[10px] text-slate-500">
+                        Displays strictly on your school's Student & Parent fee payment portal.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Bank Name Selector / Input */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Bank Name
+                    </label>
+                    <div className="space-y-1.5">
+                      <select
+                        value={
+                          [
+                            'Access Bank',
+                            'Citibank Nigeria',
+                            'Ecobank Nigeria',
+                            'Fidelity Bank',
+                            'First Bank of Nigeria',
+                            'First City Monument Bank (FCMB)',
+                            'Guaranty Trust Bank (GTBank)',
+                            'Heritage Bank',
+                            'Keystone Bank',
+                            'Kuda MFB',
+                            'Moniepoint MFB',
+                            'OPay Digital Services',
+                            'Optimus Bank',
+                            'Palmpay',
+                            'Polaris Bank',
+                            'Providus Bank',
+                            'Stanbic IBTC Bank',
+                            'Standard Chartered Bank',
+                            'Sterling Bank',
+                            'SunTrust Bank',
+                            'Taj Bank',
+                            'Union Bank of Nigeria',
+                            'United Bank for Africa (UBA)',
+                            'Unity Bank',
+                            'Wema Bank / ALAT',
+                            'Zenith Bank',
+                          ].includes(bankName)
+                            ? bankName
+                            : bankName
+                            ? 'Other'
+                            : ''
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val !== 'Other') {
+                            setBankName(val);
+                          } else {
+                            setBankName('');
+                          }
+                        }}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+                      >
+                        <option value="">-- Select Bank or Type Below --</option>
+                        <option value="Access Bank">Access Bank</option>
+                        <option value="Fidelity Bank">Fidelity Bank</option>
+                        <option value="First Bank of Nigeria">First Bank of Nigeria</option>
+                        <option value="First City Monument Bank (FCMB)">First City Monument Bank (FCMB)</option>
+                        <option value="Guaranty Trust Bank (GTBank)">Guaranty Trust Bank (GTBank)</option>
+                        <option value="Kuda MFB">Kuda MFB</option>
+                        <option value="Moniepoint MFB">Moniepoint MFB</option>
+                        <option value="OPay Digital Services">OPay Digital Services</option>
+                        <option value="Palmpay">Palmpay</option>
+                        <option value="Polaris Bank">Polaris Bank</option>
+                        <option value="Stanbic IBTC Bank">Stanbic IBTC Bank</option>
+                        <option value="Sterling Bank">Sterling Bank</option>
+                        <option value="United Bank for Africa (UBA)">United Bank for Africa (UBA)</option>
+                        <option value="Union Bank of Nigeria">Union Bank of Nigeria</option>
+                        <option value="Wema Bank / ALAT">Wema Bank / ALAT</option>
+                        <option value="Zenith Bank">Zenith Bank</option>
+                        <option value="Other">Other Bank (specify)</option>
+                      </select>
+
+                      <input
+                        type="text"
+                        placeholder="Or enter custom bank name"
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Account Number */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        10-Digit NUBAN Account Number
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={10}
+                        placeholder="0123456789"
+                        value={accountNumber}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setAccountNumber(val);
+                        }}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-[#0F172A] font-mono tracking-wider placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+                      />
+                    </div>
+
+                    {/* Account Name */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Account Name / Beneficiary
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Divine Grace Academy"
+                        value={accountName}
+                        onChange={(e) => setAccountName(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-[#0F172A] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <button

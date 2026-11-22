@@ -34,7 +34,20 @@ function generateUUID(): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { schoolName, adminFullName, email, phone, password, address, latitude, longitude, logoUrl } = body;
+    const {
+      schoolName,
+      adminFullName,
+      email,
+      phone,
+      password,
+      address,
+      latitude,
+      longitude,
+      logoUrl,
+      bankName,
+      accountNumber,
+      accountName,
+    } = body;
 
     const cleanSchoolName = (schoolName || '').trim();
     const cleanAdminName = (adminFullName || '').trim();
@@ -42,6 +55,9 @@ export async function POST(req: NextRequest) {
     const cleanPhone = (phone || '').trim();
     const cleanPassword = (password || '').trim();
     const cleanLogoUrl = typeof logoUrl === 'string' && logoUrl.startsWith('data:image/') ? logoUrl : null;
+    const cleanBankName = typeof bankName === 'string' && bankName.trim() ? bankName.trim() : null;
+    const cleanAccountNumber = typeof accountNumber === 'string' && accountNumber.trim() ? accountNumber.trim() : null;
+    const cleanAccountName = typeof accountName === 'string' && accountName.trim() ? accountName.trim() : null;
 
     if (!cleanSchoolName || !cleanAdminName || !cleanEmail || !cleanPhone || !cleanPassword) {
       return NextResponse.json(
@@ -83,6 +99,9 @@ export async function POST(req: NextRequest) {
       longitude: longitude ?? 3.3792,
       geofence_radius_meters: 150,
       logo_url: cleanLogoUrl,
+      bank_name: cleanBankName,
+      account_number: cleanAccountNumber,
+      account_name: cleanAccountName,
       access_status: 'PENDING_APPROVAL',
       plan_label: 'FREE_PILOT_TERM',
       access_expires_at: null,
@@ -100,18 +119,25 @@ export async function POST(req: NextRequest) {
       created_at: newSchool.created_at,
     };
 
-    // Attempt insert with access control and logo columns first, fallback to base payload if column does not exist
+    // Attempt insert with bank details and logo columns first, fallback gracefully if columns do not exist
     let schoolInsertErr: any = null;
     const { error: fullSchoolError } = await supabase.from('schools').insert(newSchool);
     if (fullSchoolError) {
-      // Try without logo_url if logo_url does not exist on table yet
-      const withoutLogo = { ...newSchool };
-      delete (withoutLogo as any).logo_url;
-      const { error: withoutLogoErr } = await supabase.from('schools').insert(withoutLogo);
-      if (withoutLogoErr) {
-        const { error: baseErr } = await supabase.from('schools').insert(baseSchoolPayload);
-        if (baseErr) {
-          schoolInsertErr = baseErr;
+      // Try without bank columns if not migrated yet
+      const withoutBank = { ...newSchool };
+      delete (withoutBank as any).bank_name;
+      delete (withoutBank as any).account_number;
+      delete (withoutBank as any).account_name;
+      const { error: withoutBankErr } = await supabase.from('schools').insert(withoutBank);
+      if (withoutBankErr) {
+        // Try without logo_url
+        delete (withoutBank as any).logo_url;
+        const { error: withoutLogoErr } = await supabase.from('schools').insert(withoutBank);
+        if (withoutLogoErr) {
+          const { error: baseErr } = await supabase.from('schools').insert(baseSchoolPayload);
+          if (baseErr) {
+            schoolInsertErr = baseErr;
+          }
         }
       }
     }
@@ -123,12 +149,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Persist access control meta and white-label logo in the high-availability registry
+    // Persist access control meta, white-label logo, and bank account in the high-availability registry
     await saveSchoolAccessMeta(supabase, schoolId, {
       access_status: 'PENDING_APPROVAL',
       plan_label: 'FREE_PILOT_TERM',
       access_expires_at: null,
       logo_url: cleanLogoUrl,
+      bank_name: cleanBankName,
+      account_number: cleanAccountNumber,
+      account_name: cleanAccountName,
     });
 
     // 3. Seed 33-tier classes for this school

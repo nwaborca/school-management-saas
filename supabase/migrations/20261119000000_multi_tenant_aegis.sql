@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS public.schools (
   longitude DOUBLE PRECISION NULL,
   geofence_radius_meters INTEGER NOT NULL DEFAULT 150,
   logo_url TEXT NULL,
+  bank_name TEXT NULL,
+  account_number VARCHAR(20) NULL,
+  account_name TEXT NULL,
   access_status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL' CHECK (access_status IN ('PENDING_APPROVAL', 'ACTIVE', 'TERM_EXPIRED')),
   plan_label TEXT NOT NULL DEFAULT 'FREE_PILOT_TERM' CHECK (plan_label IN ('FREE_PILOT_TERM', 'ACTIVE_TERM')),
   access_expires_at TIMESTAMPTZ NULL,
@@ -41,6 +44,27 @@ BEGIN
     WHERE table_schema = 'public' AND table_name = 'schools' AND column_name = 'logo_url'
   ) THEN
     ALTER TABLE public.schools ADD COLUMN logo_url TEXT NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'schools' AND column_name = 'bank_name'
+  ) THEN
+    ALTER TABLE public.schools ADD COLUMN bank_name TEXT NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'schools' AND column_name = 'account_number'
+  ) THEN
+    ALTER TABLE public.schools ADD COLUMN account_number VARCHAR(20) NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'schools' AND column_name = 'account_name'
+  ) THEN
+    ALTER TABLE public.schools ADD COLUMN account_name TEXT NULL;
   END IF;
 
   IF NOT EXISTS (

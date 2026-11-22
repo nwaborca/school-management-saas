@@ -22,6 +22,12 @@ export interface School {
   resumption_cutoff_time?: string; // e.g. "08:00"
   logo_url?: string | null;
   logoUrl?: string | null;
+  bank_name?: string | null;
+  bankName?: string | null;
+  account_number?: string | null;
+  accountNumber?: string | null;
+  account_name?: string | null;
+  accountName?: string | null;
   access_status?: SchoolAccessStatus;
   plan_label?: SchoolPlanLabel;
   access_expires_at?: string | null; // ISO timestamp
@@ -38,6 +44,9 @@ export interface RegisterSchoolPayload {
   latitude?: number | null;
   longitude?: number | null;
   logoUrl?: string | null;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
 }
 
 export interface AuthUser {

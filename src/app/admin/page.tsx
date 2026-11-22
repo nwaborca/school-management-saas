@@ -43,6 +43,7 @@ import {
   Download,
   FileText,
   QrCode,
+  Landmark,
   MapPin,
   Calendar,
   ZoomIn,
@@ -84,6 +85,7 @@ export default function AdminHubPage() {
     classDismissals = [],
     updateSchoolGeofence,
     updateSchoolLogo,
+    updateSchoolBankDetails,
     currentUser,
     isAuthReady,
     logout,
@@ -152,6 +154,23 @@ export default function AdminHubPage() {
   const [logoSuccessToast, setLogoSuccessToast] = useState<string | null>(null);
   const [logoErrorToast, setLogoErrorToast] = useState<string | null>(null);
   const [logoAutoRemoveBg, setLogoAutoRemoveBg] = useState(true);
+
+  // Fee Payment Bank Account Settings State
+  const [bankEditName, setBankEditName] = useState('');
+  const [bankEditNumber, setBankEditNumber] = useState('');
+  const [bankEditAccountName, setBankEditAccountName] = useState('');
+  const [bankSaving, setBankSaving] = useState(false);
+  const [bankSuccessToast, setBankSuccessToast] = useState<string | null>(null);
+  const [bankErrorToast, setBankErrorToast] = useState<string | null>(null);
+
+  // Sync bank inputs whenever currentSchool changes
+  useEffect(() => {
+    if (currentSchool) {
+      setBankEditName(currentSchool.bankName || currentSchool.bank_name || '');
+      setBankEditNumber(currentSchool.accountNumber || currentSchool.account_number || '');
+      setBankEditAccountName(currentSchool.accountName || currentSchool.account_name || '');
+    }
+  }, [currentSchool]);
 
   // Danger Zone: Delete School State
   const [isDeleteSchoolModalOpen, setIsDeleteSchoolModalOpen] = useState(false);
@@ -1565,6 +1584,193 @@ export default function AdminHubPage() {
                 />
                 <span>Auto-remove light/solid background colors via intelligent edge flood-fill</span>
               </label>
+            </div>
+
+            {/* OFFICIAL FEE PAYMENT BANK ACCOUNT SETTINGS */}
+            <div className="pt-6 border-t border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-blue-600" />
+                    <span>Tuition Fee Payment Bank Account</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Configure the official settlement bank account presented to students and parents in their fee payment portal.
+                  </p>
+                </div>
+              </div>
+
+              {bankSuccessToast && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{bankSuccessToast}</span>
+                </div>
+              )}
+
+              {bankErrorToast && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{bankErrorToast}</span>
+                </div>
+              )}
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setBankSaving(true);
+                  setBankSuccessToast(null);
+                  setBankErrorToast(null);
+
+                  if (bankEditNumber.trim() && !/^\d{10}$/.test(bankEditNumber.trim())) {
+                    setBankErrorToast('Account number must be exactly 10 digits (NUBAN format).');
+                    setBankSaving(false);
+                    return;
+                  }
+
+                  try {
+                    const res = await updateSchoolBankDetails(
+                      bankEditName.trim(),
+                      bankEditNumber.trim(),
+                      bankEditAccountName.trim()
+                    );
+
+                    if (res.success) {
+                      setBankSuccessToast('Official school fee bank account updated successfully!');
+                      setTimeout(() => setBankSuccessToast(null), 4000);
+                    } else {
+                      setBankErrorToast(res.error || 'Failed to update bank details.');
+                    }
+                  } catch (err: any) {
+                    setBankErrorToast(err?.message || 'Error updating bank details.');
+                  } finally {
+                    setBankSaving(false);
+                  }
+                }}
+                className="space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-4"
+              >
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Bank Name
+                  </label>
+                  <div className="space-y-1.5">
+                    <select
+                      value={
+                        [
+                          'Access Bank',
+                          'Citibank Nigeria',
+                          'Ecobank Nigeria',
+                          'Fidelity Bank',
+                          'First Bank of Nigeria',
+                          'First City Monument Bank (FCMB)',
+                          'Guaranty Trust Bank (GTBank)',
+                          'Heritage Bank',
+                          'Keystone Bank',
+                          'Kuda MFB',
+                          'Moniepoint MFB',
+                          'OPay Digital Services',
+                          'Optimus Bank',
+                          'Palmpay',
+                          'Polaris Bank',
+                          'Providus Bank',
+                          'Stanbic IBTC Bank',
+                          'Standard Chartered Bank',
+                          'Sterling Bank',
+                          'SunTrust Bank',
+                          'Taj Bank',
+                          'Union Bank of Nigeria',
+                          'United Bank for Africa (UBA)',
+                          'Unity Bank',
+                          'Wema Bank / ALAT',
+                          'Zenith Bank',
+                        ].includes(bankEditName)
+                          ? bankEditName
+                          : bankEditName
+                          ? 'Other'
+                          : ''
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val !== 'Other') {
+                          setBankEditName(val);
+                        } else {
+                          setBankEditName('');
+                        }
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    >
+                      <option value="">-- Select Bank or Type Below --</option>
+                      <option value="Access Bank">Access Bank</option>
+                      <option value="Fidelity Bank">Fidelity Bank</option>
+                      <option value="First Bank of Nigeria">First Bank of Nigeria</option>
+                      <option value="First City Monument Bank (FCMB)">First City Monument Bank (FCMB)</option>
+                      <option value="Guaranty Trust Bank (GTBank)">Guaranty Trust Bank (GTBank)</option>
+                      <option value="Kuda MFB">Kuda MFB</option>
+                      <option value="Moniepoint MFB">Moniepoint MFB</option>
+                      <option value="OPay Digital Services">OPay Digital Services</option>
+                      <option value="Palmpay">Palmpay</option>
+                      <option value="Polaris Bank">Polaris Bank</option>
+                      <option value="Stanbic IBTC Bank">Stanbic IBTC Bank</option>
+                      <option value="Sterling Bank">Sterling Bank</option>
+                      <option value="United Bank for Africa (UBA)">United Bank for Africa (UBA)</option>
+                      <option value="Union Bank of Nigeria">Union Bank of Nigeria</option>
+                      <option value="Wema Bank / ALAT">Wema Bank / ALAT</option>
+                      <option value="Zenith Bank">Zenith Bank</option>
+                      <option value="Other">Other Bank (specify)</option>
+                    </select>
+
+                    <input
+                      type="text"
+                      placeholder="Or enter custom bank name"
+                      value={bankEditName}
+                      onChange={(e) => setBankEditName(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      10-Digit NUBAN Account Number
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      placeholder="0123456789"
+                      value={bankEditNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setBankEditNumber(val);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 font-mono tracking-wider placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Account Name / Beneficiary
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Divine Grace Academy"
+                      value={bankEditAccountName}
+                      onChange={(e) => setBankEditAccountName(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={bankSaving}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm disabled:opacity-50"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{bankSaving ? 'Saving Bank Details...' : 'Save Bank Details'}</span>
+                  </button>
+                </div>
+              </form>
             </div>
 
             {/* DANGER ZONE: PERMANENTLY DELETE SCHOOL (TENANT ISOLATED) */}

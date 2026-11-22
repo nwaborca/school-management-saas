@@ -29,7 +29,7 @@ import {
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { generateUUID } from '@/lib/uuid';
 import { calculateHaversineDistance, isLateCheckIn } from '@/lib/geofence';
-import { resolveSchoolAccess, getSchoolAccessRegistry, saveSchoolAccessMeta } from '@/lib/founderAccess';
+import { resolveSchoolAccess, getSchoolAccessRegistry, saveSchoolAccessMeta, MASTER_DEMO_SCHOOL_ID } from '@/lib/founderAccess';
 import { AccessGateModal } from '@/components/AccessGateModal';
 import {
   SCHOOL_INFO,
@@ -330,6 +330,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     created_at: '2026-01-01T00:00:00.000Z',
   };
 
+  const initialSavedSchool = typeof window !== 'undefined' ? getSavedSchool() : null;
+  const isCustomTenantSession = Boolean(
+    initialSavedSchool &&
+    initialSavedSchool.id !== DEFAULT_SCHOOL.id &&
+    initialSavedSchool.id !== MASTER_DEMO_SCHOOL_ID &&
+    initialSavedSchool.invite_code?.toUpperCase() !== 'AEGIS-2026'
+  );
+
   const [schools, setSchools] = useState<School[]>([DEFAULT_SCHOOL]);
   const [accessGateBlocked, setAccessGateBlocked] = useState<SchoolAccessStatus | null>(null);
   const [currentSchool, setCurrentSchool] = useState<School | null>(() => {
@@ -356,14 +364,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [classes, setClasses] = useState<AcademicClass[]>(INITIAL_CLASSES);
   const [subjects] = useState<AcademicSubject[]>(INITIAL_SUBJECTS);
   const [allocations] = useState<TeacherSubjectAllocation[]>(INITIAL_ALLOCATIONS);
-  const [results, setResults] = useState<StudentResult[]>(INITIAL_RESULTS);
-  const [students, setStudents] = useState<StudentProfile[]>(INITIAL_STUDENTS);
+  const [results, setResults] = useState<StudentResult[]>(() => isCustomTenantSession ? [] : INITIAL_RESULTS);
+  const [students, setStudents] = useState<StudentProfile[]>(() => isCustomTenantSession ? [] : INITIAL_STUDENTS);
   const [invoices, setInvoices] = useState<TuitionInvoice[]>(INITIAL_INVOICES);
-  const [announcements, setAnnouncements] = useState<SchoolAnnouncement[]>(INITIAL_ANNOUNCEMENTS);
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>(INITIAL_FEE_STRUCTURES);
-  const [receipts, setReceipts] = useState<PaymentReceipt[]>(INITIAL_RECEIPTS);
+  const [announcements, setAnnouncements] = useState<SchoolAnnouncement[]>(() => isCustomTenantSession ? [] : INITIAL_ANNOUNCEMENTS);
+  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>(() => isCustomTenantSession ? [] : INITIAL_FEE_STRUCTURES);
+  const [receipts, setReceipts] = useState<PaymentReceipt[]>(() => isCustomTenantSession ? [] : INITIAL_RECEIPTS);
   const [transactions, setTransactions] = useState<PaymentTransaction[]>(INITIAL_TRANSACTIONS);
-  const [teachers, setTeachers] = useState<TeacherProfile[]>(INITIAL_TEACHERS);
+  const [teachers, setTeachers] = useState<TeacherProfile[]>(() => isCustomTenantSession ? [] : INITIAL_TEACHERS);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [resultsPublished, setResultsPublished] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -431,6 +439,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return nextVal;
     });
   };
+
+  // Purge tenant-scoped in-memory state on tenant switch or logout
+  const purgeTenantState = useCallback(() => {
+    setStudents([]);
+    setTeachers([]);
+    setReceipts([]);
+    setResults([]);
+    setFeeStructures([]);
+    setPickupPasses([]);
+    setStaffAttendance([]);
+    setAnnouncements([]);
+    setClassDismissals([]);
+  }, []);
 
   const updateAdminPassword = (currentPass: string, newPass: string) => {
     if (currentPass !== adminPassword) {
@@ -678,9 +699,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Live Cloud Fetch from Supabase with granular per-query error isolation
   const fetchLiveData = useCallback(async (targetSchoolId?: string) => {
     if (!isSupabaseConfigured() || isFetchingRef.current) return;
+
+    // Require a valid resolvedSchoolId. If no user or school context is active yet, return immediately
+    const resolvedSchoolId = targetSchoolId || currentUser?.school_id || currentSchool?.id;
+    if (!resolvedSchoolId) return;
+
     isFetchingRef.current = true;
     try {
-      const activeSchoolId = targetSchoolId || currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+      const activeSchoolId = resolvedSchoolId;
 
       // 1. Ensure core classes exist in Supabase for default school so foreign keys never fail
       try {
@@ -714,12 +740,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             .eq('school_id', activeSchoolId)
             .order('created_at', { ascending: false });
           if (error) {
-            console.warn('Supabase students query returned error (falling back to cached/default state):', error.message || error);
+            console.warn('Supabase students query returned error:', error.message || error);
             return null;
           }
           return data;
         } catch (stdErr) {
-          console.warn('Supabase students fetch caught exception (falling back gracefully):', stdErr);
+          console.warn('Supabase students fetch caught exception:', stdErr);
           return null;
         }
       })();
@@ -732,7 +758,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             .eq('school_id', activeSchoolId)
             .order('created_at', { ascending: false });
           if (error) {
-            console.warn('Supabase staff query returned error (falling back to cached/default state):', error.message || error);
+            console.warn('Supabase staff query returned error:', error.message || error);
             return null;
           }
           return data;
@@ -874,56 +900,83 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchPickupPassesPromise,
       ]);
 
+      const isMasterDemoSchool = activeSchoolId === DEFAULT_SCHOOL.id || activeSchoolId === MASTER_DEMO_SCHOOL_ID;
+
       // Apply guarded updates: ensure students and classes are normalized first so receipts can link names and classes cleanly
       let activeStudentList = students;
-      if (stdData && Array.isArray(stdData) && stdData.length > 0) {
-        try {
-          const normalizedStudents = stdData.map(normalizeStudent);
-          activeStudentList = normalizedStudents;
-          setStudents(normalizedStudents);
-        } catch (normStdErr) {
-          console.warn('Error normalizing students payload:', normStdErr);
+      if (stdData && Array.isArray(stdData)) {
+        if (stdData.length > 0) {
+          try {
+            const normalizedStudents = stdData.map(normalizeStudent);
+            activeStudentList = normalizedStudents;
+            setStudents(normalizedStudents);
+          } catch (normStdErr) {
+            console.warn('Error normalizing students payload:', normStdErr);
+          }
+        } else if (!isMasterDemoSchool) {
+          activeStudentList = [];
+          setStudents([]);
         }
       }
 
       let activeClassList = classes;
-      if (classData && Array.isArray(classData) && classData.length > 0) {
-        activeClassList = classData as AcademicClass[];
-        setClasses(activeClassList);
-      }
-
-      if (staffData && Array.isArray(staffData) && staffData.length > 0) {
-        try {
-          const normalizedStaff = staffData.map(normalizeTeacher);
-          setTeachers(normalizedStaff);
-        } catch (normStaffErr) {
-          console.warn('Error normalizing staff payload:', normStaffErr);
+      if (classData && Array.isArray(classData)) {
+        if (classData.length > 0) {
+          activeClassList = classData as AcademicClass[];
+          setClasses(activeClassList);
+        } else if (!isMasterDemoSchool) {
+          // Keep classes mapped if any, or empty
         }
       }
 
-      if (resData && Array.isArray(resData) && resData.length > 0) {
-        try {
-          const normalizedResults = resData.map((r) => normalizeResult(r, activeStudentList));
-          setResults(normalizedResults);
-        } catch (normResErr) {
-          console.warn('Error normalizing term_results payload:', normResErr);
-          setResults(resData as StudentResult[]);
-        }
-      }
-
-      if (feeData && Array.isArray(feeData) && feeData.length > 0) {
-        setFeeStructures(feeData as FeeStructure[]);
-        const gateRow = feeData.find((f: any) => f.id === '00000000-0000-0000-0000-000000000001');
-        if (gateRow) {
-          setResultsPublished(Boolean(gateRow.published));
+      if (staffData && Array.isArray(staffData)) {
+        if (staffData.length > 0) {
           try {
-            localStorage.setItem('apex_results_published', String(Boolean(gateRow.published)));
-          } catch {}
+            const normalizedStaff = staffData.map(normalizeTeacher);
+            setTeachers(normalizedStaff);
+          } catch (normStaffErr) {
+            console.warn('Error normalizing staff payload:', normStaffErr);
+          }
+        } else if (!isMasterDemoSchool) {
+          setTeachers([]);
         }
       }
 
-      if (recData && Array.isArray(recData) && recData.length > 0) {
-        setReceipts(recData.map((r) => normalizeReceipt(r, activeStudentList, activeClassList)));
+      if (resData && Array.isArray(resData)) {
+        if (resData.length > 0) {
+          try {
+            const normalizedResults = resData.map((r) => normalizeResult(r, activeStudentList));
+            setResults(normalizedResults);
+          } catch (normResErr) {
+            console.warn('Error normalizing term_results payload:', normResErr);
+            setResults(resData as StudentResult[]);
+          }
+        } else if (!isMasterDemoSchool) {
+          setResults([]);
+        }
+      }
+
+      if (feeData && Array.isArray(feeData)) {
+        if (feeData.length > 0) {
+          setFeeStructures(feeData as FeeStructure[]);
+          const gateRow = feeData.find((f: any) => f.id === '00000000-0000-0000-0000-000000000001');
+          if (gateRow) {
+            setResultsPublished(Boolean(gateRow.published));
+            try {
+              localStorage.setItem('apex_results_published', String(Boolean(gateRow.published)));
+            } catch {}
+          }
+        } else if (!isMasterDemoSchool) {
+          setFeeStructures([]);
+        }
+      }
+
+      if (recData && Array.isArray(recData)) {
+        if (recData.length > 0) {
+          setReceipts(recData.map((r) => normalizeReceipt(r, activeStudentList, activeClassList)));
+        } else if (!isMasterDemoSchool) {
+          setReceipts([]);
+        }
       }
 
       if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
@@ -965,19 +1018,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      if (attData && Array.isArray(attData) && attData.length > 0) {
-        setStaffAttendance(attData.map(normalizeAttendance));
+      if (attData && Array.isArray(attData)) {
+        if (attData.length > 0) {
+          setStaffAttendance(attData.map(normalizeAttendance));
+        } else if (!isMasterDemoSchool) {
+          setStaffAttendance([]);
+        }
       }
 
-      if (passData && Array.isArray(passData) && passData.length > 0) {
-        setPickupPasses(passData.map(normalizePickupPass));
+      if (passData && Array.isArray(passData)) {
+        if (passData.length > 0) {
+          setPickupPasses(passData.map(normalizePickupPass));
+        } else if (!isMasterDemoSchool) {
+          setPickupPasses([]);
+        }
       }
     } catch (err) {
       console.warn('Non-fatal error in fetchLiveData (safely falling back to default/cached data):', err);
     } finally {
       isFetchingRef.current = false;
     }
-  }, []);
+  }, [currentSchool?.id, currentUser?.school_id]);
 
   // 1. Initial Mount: Authenticate session and trigger Cloud Sync (strictly run once on mount)
   const isInitialMountRef = useRef(false);
@@ -1005,13 +1066,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsAuthReady(true);
     }
 
-    // Immediately fetch from Supabase cloud once on initial mount if not already triggered with cookieUser
+    // If a valid tenant session exists, sync live data for that tenant.
+    // If no user or saved school is authenticated, DO NOT fetch unscoped rows.
     if (isSupabaseConfigured()) {
       const cookieUser = getSessionCookie();
       const savedSchool = getSavedSchool();
       const targetId = cookieUser?.school_id || savedSchool?.id;
-      if (!targetId) {
-        fetchLiveData();
+      if (targetId) {
+        fetchLiveData(targetId);
       }
     }
   }, [fetchLiveData]);
@@ -1567,9 +1629,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const targetSchool: School = payload.school;
           const normalized = normalizeStudent(rawStudent);
 
+          // Purge in-memory state of previous tenant
+          purgeTenantState();
+
           setCurrentSchool(targetSchool);
           setSchools((prev) => (prev.some((s) => s.id === targetSchool.id) ? prev : [targetSchool, ...prev]));
-          setStudents((prev) => (prev.some((s) => s.id === normalized.id) ? prev : [normalized, ...prev]));
+          setStudents([normalized]);
 
           const authUser: AuthUser = {
             id: normalized.id,
@@ -1589,7 +1654,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setSessionCookie(authUser, targetSchool);
 
           if (isSupabaseConfigured()) {
-            fetchLiveData(targetSchool.id);
+            await fetchLiveData(targetSchool.id);
           }
 
           return { success: true, role: 'student' as UserRole };
@@ -1696,12 +1761,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       parent_phone: student.parent_phone,
     };
 
+    // Purge in-memory state of previous tenant
+    purgeTenantState();
+    setStudents([student]);
+
     setCurrentUser(authUser);
     setSessionCookie(authUser, targetSchool);
 
     // Immediately hydrate tenant data for this school so Student Hub loads with full live data
     if (isSupabaseConfigured()) {
-      fetchLiveData(targetSchool.id);
+      await fetchLiveData(targetSchool.id);
     }
 
     return { success: true, role: 'student' as UserRole };
@@ -1749,9 +1818,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const targetSchool: School = payload.school;
           const normalized = normalizeTeacher(rawStaff);
 
+          // Purge in-memory state of previous tenant
+          purgeTenantState();
+
           setCurrentSchool(targetSchool);
           setSchools((prev) => (prev.some((s) => s.id === targetSchool.id) ? prev : [targetSchool, ...prev]));
-          setTeachers((prev) => (prev.some((t) => t.id === normalized.id) ? prev : [normalized, ...prev]));
+          setTeachers([normalized]);
 
           const assignedRole: UserRole = payload.role || ((rawStaff as any).role === 'admin' ? 'admin' : 'teacher');
 
@@ -1777,7 +1849,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setSessionCookie(authUser, targetSchool);
 
           if (isSupabaseConfigured()) {
-            fetchLiveData(targetSchool.id);
+            await fetchLiveData(targetSchool.id);
           }
 
           return { success: true, role: assignedRole };
@@ -1849,8 +1921,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         full_name: 'School Administrator',
         role: 'admin',
       };
+      // Purge in-memory state of previous tenant
+      purgeTenantState();
+
       setCurrentUser(authUser);
       setSessionCookie(authUser, targetSchool);
+
+      if (isSupabaseConfigured()) {
+        await fetchLiveData(targetSchool.id);
+      }
+
       return { success: true, role: 'admin' as UserRole };
     }
 
@@ -1931,12 +2011,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         is_part_time: Boolean(matchedTeacher.is_part_time),
         session_token: matchedTeacher.session_token,
       };
+      // Purge in-memory state of previous tenant
+      purgeTenantState();
+      setTeachers([matchedTeacher]);
+
       setCurrentUser(authUser);
       setSessionCookie(authUser, targetSchool);
 
       // Immediately hydrate tenant data for this school so Academic Hub / Admin loads with full live data
       if (isSupabaseConfigured()) {
-        fetchLiveData(targetSchool.id);
+        await fetchLiveData(targetSchool.id);
       }
 
       return { success: true, role: assignedRole };
@@ -1947,7 +2031,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setCurrentUser(null);
+    setCurrentSchool(DEFAULT_SCHOOL);
     setSessionCookie(null);
+    purgeTenantState();
     if (typeof window !== 'undefined') {
       try {
         // Clear all session and localStorage keys starting with aegis_ or apex_
@@ -1964,6 +2050,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (k && (k.startsWith('aegis_') || k.startsWith('apex_'))) sessionKeys.push(k);
         }
         sessionKeys.forEach((k) => sessionStorage.removeItem(k));
+
+        // Explicitly remove cookies
+        const isHttps = window.location.protocol === 'https:';
+        const secureFlag = isHttps ? '; Secure' : '';
+        document.cookie = `apex_auth_user=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
+        document.cookie = `aegis_auth_school=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
       } catch {}
     }
   };

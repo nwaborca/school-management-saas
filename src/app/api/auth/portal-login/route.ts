@@ -173,7 +173,13 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const assignedRole = staffMember.role === 'admin' ? 'admin' : 'teacher';
+        const rawRole = staffMember.role;
+        const assignedRole =
+          rawRole === 'gate_security' || rawRole === 'GATE_SECURITY'
+            ? 'gate_security'
+            : rawRole === 'admin'
+            ? 'admin'
+            : 'teacher';
 
         return NextResponse.json({
           success: true,

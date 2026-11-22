@@ -58,6 +58,10 @@ export function Navbar() {
       ];
     }
 
+    if (role === 'gate_security') {
+      return [{ href: '/gate', label: 'Gate Security Checkpoint' }];
+    }
+
     if (role === 'student') {
       return [{ href: '/student-hub', label: 'My Student Hub' }];
     }

@@ -100,6 +100,8 @@ export default function AdminHubPage() {
       router.push('/student-hub');
     } else if (currentUser.role === 'teacher') {
       router.push('/academic-hub');
+    } else if (currentUser.role === 'gate_security') {
+      router.push('/gate');
     }
   }, [currentUser, isAuthReady, router]);
 
@@ -2349,7 +2351,12 @@ export default function AdminHubPage() {
                                 {staff?.full_name || (pass.verified_by_staff_id ? 'Gate Staff' : '—')}
                               </td>
                               <td className="px-4 py-3">
-                                {pass.status === 'USED' ? (
+                                {pass.status === 'RELEASED_AT_GATE' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <Shield className="w-3 h-3 text-indigo-600" />
+                                    <span>Released at Gate</span>
+                                  </span>
+                                ) : pass.status === 'USED' ? (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                     Handover Complete
                                   </span>

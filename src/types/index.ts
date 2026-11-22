@@ -6,7 +6,8 @@ export type EducationalStage =
   | 'junior_secondary' // JSS 1, JSS 2, JSS 3
   | 'senior_secondary';// SS1, SS2, SS3 (Arms A, B, C, D, E, F)
 
-export type UserRole = 'admin' | 'teacher' | 'student';
+export type UserRole = 'admin' | 'teacher' | 'student' | 'gate_security';
+export type StaffRole = 'teacher' | 'admin' | 'gate_security';
 
 export type SchoolAccessStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'TERM_EXPIRED';
 export type SchoolPlanLabel = 'FREE_PILOT_TERM' | 'ACTIVE_TERM';
@@ -76,12 +77,13 @@ export interface AuthUser {
 export interface TeacherProfile {
   id: string;
   school_id?: string;
-  teacher_id_code: string;  // e.g. "TCH/2026/001"
+  teacher_id_code: string;  // e.g. "TCH/2026/001" or "SEC-XXXX-001"
   full_name: string;
   phone: string;            // Nigerian prefix +234
   email: string;
   username: string;
   password_hash: string;    // Auto-generated initial or reset password
+  role?: StaffRole;         // 'teacher' | 'admin' | 'gate_security'
   assigned_subject_ids: string[]; // IDs of assigned subjects
   assigned_subjects?: string[];   // Assigned subject IDs / names
   form_class_id?: string;   // If assigned as Form / Class Teacher (e.g. "cls-ss1-a")
@@ -322,7 +324,7 @@ export interface StaffAttendance {
 
 // 10. Pickup Passes (Digital Dismissal Security)
 export type PickupPassType = 'DAILY_PARENT' | 'DELEGATE_5H';
-export type PickupPassStatus = 'ACTIVE' | 'USED' | 'EXPIRED';
+export type PickupPassStatus = 'ACTIVE' | 'USED' | 'RELEASED_AT_GATE' | 'EXPIRED';
 
 export interface PickupPass {
   id: string;
@@ -337,6 +339,8 @@ export interface PickupPass {
   expires_at: string;
   picked_up_at?: string | null;
   verified_by_staff_id?: string | null;
+  gate_released_at?: string | null;
+  released_by_security_id?: string | null;
 }
 
 // 11. Class Dismissal Audit & Safe Pick-Up Accountability

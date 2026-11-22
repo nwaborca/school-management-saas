@@ -10,6 +10,7 @@ import {
   Edit3,
   Trash2,
   X,
+  Shield,
   ShieldCheck,
   ShieldOff,
   KeyRound,
@@ -76,6 +77,7 @@ export default function TeacherRegistry() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('+234');
   const [email, setEmail] = useState('');
+  const [staffRole, setStaffRole] = useState<'teacher' | 'gate_security'>('teacher');
   const [assignedSubjects, setAssignedSubjects] = useState<string[]>([]);
   const [formClassId, setFormClassId] = useState('');
   const [isPartTime, setIsPartTime] = useState(false);
@@ -85,6 +87,7 @@ export default function TeacherRegistry() {
   const [editFullName, setEditFullName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editStaffRole, setEditStaffRole] = useState<'teacher' | 'gate_security'>('teacher');
   const [editAssignedSubjects, setEditAssignedSubjects] = useState<string[]>([]);
   const [editFormClassId, setEditFormClassId] = useState('');
   const [editIsPartTime, setEditIsPartTime] = useState(false);
@@ -124,11 +127,12 @@ export default function TeacherRegistry() {
         fullName: fullName.trim(),
         phone: phone.trim().startsWith('+234') ? phone.trim() : `+234${phone.trim()}`,
         email: email.trim(),
-        assignedSubjectIds: assignedSubjects,
-        assignedSubjects: assignedSubjects,
-        formClassId: isPartTime ? undefined : (formClassId || undefined),
-        assignedClassId: isPartTime ? null : (formClassId || null),
-        isPartTime,
+        role: staffRole,
+        assignedSubjectIds: staffRole === 'gate_security' ? [] : assignedSubjects,
+        assignedSubjects: staffRole === 'gate_security' ? [] : assignedSubjects,
+        formClassId: isPartTime || staffRole === 'gate_security' ? undefined : (formClassId || undefined),
+        assignedClassId: isPartTime || staffRole === 'gate_security' ? null : (formClassId || null),
+        isPartTime: staffRole === 'gate_security' ? true : isPartTime,
       });
 
       setIsRegisterOpen(false);
@@ -144,6 +148,7 @@ export default function TeacherRegistry() {
       setFullName('');
       setPhone('+234');
       setEmail('');
+      setStaffRole('teacher');
       setAssignedSubjects([]);
       setFormClassId('');
       setIsPartTime(false);
@@ -162,6 +167,7 @@ export default function TeacherRegistry() {
     setEditFullName(t.full_name);
     setEditPhone(t.phone);
     setEditEmail(t.email);
+    setEditStaffRole(t.role === 'gate_security' ? 'gate_security' : 'teacher');
     setEditAssignedSubjects(t.assigned_subjects || t.assigned_subject_ids || []);
     setEditFormClassId(t.assigned_class_id || t.form_class_id || '');
     setEditIsPartTime(Boolean(t.is_part_time));
@@ -173,15 +179,17 @@ export default function TeacherRegistry() {
     e.preventDefault();
     if (!editingTeacher) return;
 
+    const isSecurity = editStaffRole === 'gate_security';
     const res = updateTeacher(editingTeacher.id, {
       fullName: editFullName.trim(),
       phone: editPhone.trim(),
       email: editEmail.trim(),
-      assignedSubjectIds: editAssignedSubjects,
-      assignedSubjects: editAssignedSubjects,
-      formClassId: editIsPartTime ? undefined : (editFormClassId || undefined),
-      assignedClassId: editIsPartTime ? null : (editFormClassId || null),
-      isPartTime: editIsPartTime,
+      role: editStaffRole,
+      assignedSubjectIds: isSecurity ? [] : editAssignedSubjects,
+      assignedSubjects: isSecurity ? [] : editAssignedSubjects,
+      formClassId: editIsPartTime || isSecurity ? undefined : (editFormClassId || undefined),
+      assignedClassId: editIsPartTime || isSecurity ? null : (editFormClassId || null),
+      isPartTime: isSecurity ? true : editIsPartTime,
       resetCredentials,
     });
 
@@ -350,7 +358,12 @@ export default function TeacherRegistry() {
                     </td>
 
                     <td className="px-4 py-3">
-                      {t.is_part_time ? (
+                      {t.role === 'gate_security' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 w-fit">
+                          <Shield className="w-3 h-3 text-indigo-600" />
+                          <span>Gate Security</span>
+                        </span>
+                      ) : t.is_part_time ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
                           Part-Time (No Form Class)
                         </span>
@@ -526,7 +539,12 @@ export default function TeacherRegistry() {
                   </div>
                   <div>
                     <div className="text-[10px] text-slate-500">Class Role</div>
-                    {t.is_part_time ? (
+                    {t.role === 'gate_security' ? (
+                      <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <Shield className="w-3 h-3 text-indigo-600" />
+                        <span>Gate Security</span>
+                      </span>
+                    ) : t.is_part_time ? (
                       <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
                         Part-Time
                       </span>
@@ -647,179 +665,225 @@ export default function TeacherRegistry() {
                 </div>
               </div>
 
-              {/* Part-Time Teacher Toggle Switch */}
-              <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-xl flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                    <span>Part-Time Teacher</span>
-                    {isPartTime && (
-                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-semibold">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {isPartTime
-                      ? 'Part-time faculty: Class assignment disabled (no fixed form class).'
-                      : 'Full-time faculty: Can be assigned as a Form Class Teacher.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={isPartTime}
-                  onClick={() => {
-                    const nextVal = !isPartTime;
-                    setIsPartTime(nextVal);
-                    if (nextVal) {
-                      setFormClassId('');
-                    }
-                  }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    isPartTime ? 'bg-amber-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                      isPartTime ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Class Assignment Dropdown (33-tier Nigerian Hierarchy) */}
+              {/* Staff Role Selector */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
-                    <span>What class will they be assigned to? (Creche to SS3 Arm F):</span>
-                  </span>
-                  {isPartTime && (
-                    <span className="text-[10px] text-blue-600 italic">Disabled for Part-Time</span>
-                  )}
-                </label>
-                <select
-                  value={formClassId}
-                  disabled={isPartTime}
-                  onChange={(e) => setFormClassId(e.target.value)}
-                  className={`w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
-                    isPartTime
-                      ? 'opacity-40 cursor-not-allowed border-slate-200 bg-gray-950/70 text-slate-9000'
-                      : 'border-slate-200 cursor-pointer'
-                  }`}
-                >
-                  <option value="">
-                    {isPartTime
-                      ? '-- Class Assignment Disabled (Part-Time Teacher) --'
-                      : '-- None (Subject Teacher Only) --'}
-                  </option>
-                  {!isPartTime &&
-                    availableClasses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.level || c.stage})
-                      </option>
-                    ))}
-                </select>
-                {isPartTime && (
-                  <p className="text-[10px] text-blue-600/80 mt-1 italic">
-                    Part-time teachers do not manage a fixed form class. They teach their assigned subject(s) across classes.
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Staff Designation / Role:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStaffRole('teacher')}
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
+                      staffRole === 'teacher'
+                        ? 'bg-blue-50 text-blue-700 border-blue-400 font-bold'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <GraduationCap className="w-4 h-4 text-blue-600" />
+                    <span>Academic Teacher</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStaffRole('gate_security');
+                      setIsPartTime(true);
+                      setFormClassId('');
+                      setAssignedSubjects([]);
+                    }}
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
+                      staffRole === 'gate_security'
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-400 font-bold'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Shield className="w-4 h-4 text-indigo-600" />
+                    <span>Gate Security (Gateman)</span>
+                  </button>
+                </div>
+                {staffRole === 'gate_security' && (
+                  <p className="text-[11px] text-indigo-700 bg-indigo-50/70 border border-indigo-200 rounded-lg p-2 mt-2">
+                    🛡️ <strong>Non-Teaching Staff:</strong> Automatically provisions Security ID (<code>SEC-...</code>) and grants dedicated access strictly to the <strong>Mobile Gate Dismissal Checkpoint</strong> (blocks academic, finance, and administrative data).
                   </p>
                 )}
               </div>
 
-              {/* NERDC Subjects Multi-Select */}
-              <div className="space-y-2">
-                <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                    <span>What subject(s) will the teacher be teaching? (NERDC Curriculum):</span>
-                  </span>
-                  <span className="text-[11px] font-mono text-blue-600">
-                    {assignedSubjects.length} selected
-                  </span>
-                </label>
+              {staffRole === 'teacher' && (
+                <>
+                  {/* Part-Time Teacher Toggle Switch */}
+                  <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-xl flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                        <span>Part-Time Teacher</span>
+                        {isPartTime && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-semibold">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {isPartTime
+                          ? 'Part-time faculty: Class assignment disabled (no fixed form class).'
+                          : 'Full-time faculty: Can be assigned as a Form Class Teacher.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isPartTime}
+                      onClick={() => {
+                        const nextVal = !isPartTime;
+                        setIsPartTime(nextVal);
+                        if (nextVal) {
+                          setFormClassId('');
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isPartTime ? 'bg-amber-600' : 'bg-gray-700'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          isPartTime ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
 
-                {/* Selected subjects tags */}
-                {assignedSubjects.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50/60 rounded-xl border border-slate-200 max-h-24 overflow-y-auto">
-                    {assignedSubjects.map((subId) => {
-                      const subj = availableSubjects.find((s) => s.id === subId);
-                      return (
-                        <span
-                          key={subId}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-semibold"
-                        >
-                          <span>{subj ? `${subj.name} (${subj.code})` : subId}</span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              toggleSubject(subId, assignedSubjects, setAssignedSubjects)
-                            }
-                            className="hover:text-slate-900 cursor-pointer"
+                  {/* Class Assignment Dropdown (33-tier Nigerian Hierarchy) */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
+                        <span>What class will they be assigned to? (Creche to SS3 Arm F):</span>
+                      </span>
+                      {isPartTime && (
+                        <span className="text-[10px] text-blue-600 italic">Disabled for Part-Time</span>
+                      )}
+                    </label>
+                    <select
+                      value={formClassId}
+                      disabled={isPartTime}
+                      onChange={(e) => setFormClassId(e.target.value)}
+                      className={`w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
+                        isPartTime
+                          ? 'opacity-40 cursor-not-allowed border-slate-200 bg-gray-950/70 text-slate-9000'
+                          : 'border-slate-200 cursor-pointer'
+                      }`}
+                    >
+                      <option value="">
+                        {isPartTime
+                          ? '-- Class Assignment Disabled (Part-Time Teacher) --'
+                          : '-- None (Subject Teacher Only) --'}
+                      </option>
+                      {!isPartTime &&
+                        availableClasses.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.level || c.stage})
+                          </option>
+                        ))}
+                    </select>
+                    {isPartTime && (
+                      <p className="text-[10px] text-blue-600/80 mt-1 italic">
+                        Part-time teachers do not manage a fixed form class. They teach their assigned subject(s) across classes.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {staffRole === 'teacher' && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                      <span>What subject(s) will the teacher be teaching? (NERDC Curriculum):</span>
+                    </span>
+                    <span className="text-[11px] font-mono text-blue-600">
+                      {assignedSubjects.length} selected
+                    </span>
+                  </label>
+
+                  {/* Selected subjects tags */}
+                  {assignedSubjects.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50/60 rounded-xl border border-slate-200 max-h-24 overflow-y-auto">
+                      {assignedSubjects.map((subId) => {
+                        const subj = availableSubjects.find((s) => s.id === subId);
+                        return (
+                          <span
+                            key={subId}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-semibold"
                           >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
+                            <span>{subj ? `${subj.name} (${subj.code})` : subId}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleSubject(subId, assignedSubjects, setAssignedSubjects)
+                              }
+                              className="hover:text-slate-900 cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Search Bar for Subjects */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search NERDC subjects (e.g. Mathematics, Biology, English)..."
+                      value={subjectSearch}
+                      onChange={(e) => setSubjectSearch(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    />
+                  </div>
+
+                  {/* Scrollable multi-select subject list */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto p-2 bg-slate-50/40 border border-slate-200 rounded-xl">
+                    {filteredRegisterSubjects.map((subj) => {
+                      const isSelected = assignedSubjects.includes(subj.id);
+                      return (
+                        <button
+                          type="button"
+                          key={subj.id}
+                          onClick={() =>
+                            toggleSubject(subj.id, assignedSubjects, setAssignedSubjects)
+                          }
+                          className={`text-left p-2 rounded-lg border text-xs flex items-center justify-between transition cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-600/30 border-rose-700 text-slate-900 font-bold'
+                              : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-white'
+                          }`}
+                        >
+                          <div className="truncate mr-2">
+                            <div className="truncate text-[11px]">{subj.name}</div>
+                            <div className="text-[9px] text-slate-9000 font-mono">
+                              {subj.code} • {subj.category || 'General'}
+                            </div>
+                          </div>
+                          <div
+                            className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
+                              isSelected
+                                ? 'bg-amber-500 border-amber-500 text-gray-950 font-bold'
+                                : 'border-slate-200'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3 h-3" />}
+                          </div>
+                        </button>
                       );
                     })}
                   </div>
-                )}
-
-                {/* Search Bar for Subjects */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Search NERDC subjects (e.g. Mathematics, Biology, English)..."
-                    value={subjectSearch}
-                    onChange={(e) => setSubjectSearch(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  />
                 </div>
-
-                {/* Scrollable multi-select subject list */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto p-2 bg-slate-50/40 border border-slate-200 rounded-xl">
-                  {filteredRegisterSubjects.map((subj) => {
-                    const isSelected = assignedSubjects.includes(subj.id);
-                    return (
-                      <button
-                        type="button"
-                        key={subj.id}
-                        onClick={() =>
-                          toggleSubject(subj.id, assignedSubjects, setAssignedSubjects)
-                        }
-                        className={`text-left p-2 rounded-lg border text-xs flex items-center justify-between transition cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-600/30 border-rose-700 text-slate-900 font-bold'
-                            : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-white'
-                        }`}
-                      >
-                        <div className="truncate mr-2">
-                          <div className="truncate text-[11px]">{subj.name}</div>
-                          <div className="text-[9px] text-slate-9000 font-mono">
-                            {subj.code} • {subj.category || 'General'}
-                          </div>
-                        </div>
-                        <div
-                          className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
-                            isSelected
-                              ? 'bg-amber-500 border-amber-500 text-gray-950 font-bold'
-                              : 'border-slate-200'
-                          }`}
-                        >
-                          {isSelected && <Check className="w-3 h-3" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              )}
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer shadow-md mt-2"
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 border border-blue-600 transition cursor-pointer shadow-md mt-2"
               >
-                <span>Save Teacher & Generate Credentials</span>
+                <span>{staffRole === 'gate_security' ? 'Save Security Guard & Generate Gate Pass Key' : 'Save Teacher & Generate Credentials'}</span>
               </button>
             </form>
           </div>
@@ -877,165 +941,205 @@ export default function TeacherRegistry() {
                 </div>
               </div>
 
-              {/* Part-Time Toggle Switch */}
-              <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-xl flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                    <span>Part-Time Teacher</span>
-                    {editIsPartTime && (
-                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-semibold">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {editIsPartTime
-                      ? 'Part-time faculty: Class assignment disabled (no fixed form class).'
-                      : 'Full-time faculty: Can be assigned as a Form Class Teacher.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={editIsPartTime}
-                  onClick={() => {
-                    const nextVal = !editIsPartTime;
-                    setEditIsPartTime(nextVal);
-                    if (nextVal) {
-                      setEditFormClassId('');
-                    }
-                  }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    editIsPartTime ? 'bg-amber-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                      editIsPartTime ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Class Assignment Dropdown */}
+              {/* Staff Designation in Edit Form */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
-                    <span>What class will they be assigned to? (33-tier Hierarchy):</span>
-                  </span>
-                  {editIsPartTime && (
-                    <span className="text-[10px] text-blue-600 italic">Disabled for Part-Time</span>
-                  )}
-                </label>
-                <select
-                  value={editFormClassId}
-                  disabled={editIsPartTime}
-                  onChange={(e) => setEditFormClassId(e.target.value)}
-                  className={`w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
-                    editIsPartTime
-                      ? 'opacity-40 cursor-not-allowed border-slate-200 bg-gray-950/70 text-slate-9000'
-                      : 'border-slate-200 cursor-pointer'
-                  }`}
-                >
-                  <option value="">
-                    {editIsPartTime
-                      ? '-- Class Assignment Disabled (Part-Time Teacher) --'
-                      : '-- None (Subject Teacher Only) --'}
-                  </option>
-                  {!editIsPartTime &&
-                    availableClasses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.level || c.stage})
-                      </option>
-                    ))}
-                </select>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Staff Designation / Role:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditStaffRole('teacher')}
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
+                      editStaffRole === 'teacher'
+                        ? 'bg-blue-50 text-blue-700 border-blue-400 font-bold'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <GraduationCap className="w-4 h-4 text-blue-600" />
+                    <span>Academic Teacher</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditStaffRole('gate_security');
+                      setEditIsPartTime(true);
+                      setEditFormClassId('');
+                      setEditAssignedSubjects([]);
+                    }}
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
+                      editStaffRole === 'gate_security'
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-400 font-bold'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Shield className="w-4 h-4 text-indigo-600" />
+                    <span>Gate Security (Gateman)</span>
+                  </button>
+                </div>
               </div>
 
-              {/* NERDC Subjects Multi-Select */}
-              <div className="space-y-2">
-                <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Assigned Subjects (NERDC Curriculum):</span>
-                  </span>
-                  <span className="text-[11px] font-mono text-blue-600">
-                    {editAssignedSubjects.length} selected
-                  </span>
-                </label>
+              {editStaffRole === 'teacher' && (
+                <>
+                  {/* Part-Time Toggle Switch */}
+                  <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-xl flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                        <span>Part-Time Teacher</span>
+                        {editIsPartTime && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-semibold">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {editIsPartTime
+                          ? 'Part-time faculty: Class assignment disabled (no fixed form class).'
+                          : 'Full-time faculty: Can be assigned as a Form Class Teacher.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={editIsPartTime}
+                      onClick={() => {
+                        const nextVal = !editIsPartTime;
+                        setEditIsPartTime(nextVal);
+                        if (nextVal) {
+                          setEditFormClassId('');
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        editIsPartTime ? 'bg-amber-600' : 'bg-gray-700'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          editIsPartTime ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
 
-                {editAssignedSubjects.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50/60 rounded-xl border border-slate-200 max-h-24 overflow-y-auto">
-                    {editAssignedSubjects.map((subId) => {
-                      const subj = availableSubjects.find((s) => s.id === subId);
-                      return (
-                        <span
-                          key={subId}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-semibold"
-                        >
-                          <span>{subj ? `${subj.name} (${subj.code})` : subId}</span>
+                  {/* Class Assignment Dropdown */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
+                        <span>What class will they be assigned to? (33-tier Hierarchy):</span>
+                      </span>
+                      {editIsPartTime && (
+                        <span className="text-[10px] text-blue-600 italic">Disabled for Part-Time</span>
+                      )}
+                    </label>
+                    <select
+                      value={editFormClassId}
+                      disabled={editIsPartTime}
+                      onChange={(e) => setEditFormClassId(e.target.value)}
+                      className={`w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition ${
+                        editIsPartTime
+                          ? 'opacity-40 cursor-not-allowed border-slate-200 bg-gray-950/70 text-slate-9000'
+                          : 'border-slate-200 cursor-pointer'
+                      }`}
+                    >
+                      <option value="">
+                        {editIsPartTime
+                          ? '-- Class Assignment Disabled (Part-Time Teacher) --'
+                          : '-- None (Subject Teacher Only) --'}
+                      </option>
+                      {!editIsPartTime &&
+                        availableClasses.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.level || c.stage})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* NERDC Subjects Multi-Select */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Assigned Subjects (NERDC Curriculum):</span>
+                      </span>
+                      <span className="text-[11px] font-mono text-blue-600">
+                        {editAssignedSubjects.length} selected
+                      </span>
+                    </label>
+
+                    {editAssignedSubjects.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50/60 rounded-xl border border-slate-200 max-h-24 overflow-y-auto">
+                        {editAssignedSubjects.map((subId) => {
+                          const subj = availableSubjects.find((s) => s.id === subId);
+                          return (
+                            <span
+                              key={subId}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-semibold"
+                            >
+                              <span>{subj ? `${subj.name} (${subj.code})` : subId}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  toggleSubject(subId, editAssignedSubjects, setEditAssignedSubjects)
+                                }
+                                className="hover:text-slate-900 cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="Search NERDC subjects..."
+                        value={editSubjectSearch}
+                        onChange={(e) => setEditSubjectSearch(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto p-2 bg-slate-50/40 border border-slate-200 rounded-xl">
+                      {filteredEditSubjects.map((subj) => {
+                        const isSelected = editAssignedSubjects.includes(subj.id);
+                        return (
                           <button
                             type="button"
+                            key={subj.id}
                             onClick={() =>
-                              toggleSubject(subId, editAssignedSubjects, setEditAssignedSubjects)
+                              toggleSubject(subj.id, editAssignedSubjects, setEditAssignedSubjects)
                             }
-                            className="hover:text-slate-900 cursor-pointer"
+                            className={`text-left p-2 rounded-lg border text-xs flex items-center justify-between transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-600/30 border-rose-700 text-slate-900 font-bold'
+                                : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-white'
+                            }`}
                           >
-                            <X className="w-3 h-3" />
+                            <div className="truncate mr-2">
+                              <div className="truncate text-[11px]">{subj.name}</div>
+                              <div className="text-[9px] text-slate-9000 font-mono">
+                                {subj.code} • {subj.category || 'General'}
+                              </div>
+                            </div>
+                            <div
+                              className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
+                                isSelected
+                                  ? 'bg-amber-500 border-amber-500 text-gray-950 font-bold'
+                                  : 'border-slate-200'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3" />}
+                            </div>
                           </button>
-                        </span>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
-
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Search NERDC subjects..."
-                    value={editSubjectSearch}
-                    onChange={(e) => setEditSubjectSearch(e.target.value)}
-                    className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto p-2 bg-slate-50/40 border border-slate-200 rounded-xl">
-                  {filteredEditSubjects.map((subj) => {
-                    const isSelected = editAssignedSubjects.includes(subj.id);
-                    return (
-                      <button
-                        type="button"
-                        key={subj.id}
-                        onClick={() =>
-                          toggleSubject(subj.id, editAssignedSubjects, setEditAssignedSubjects)
-                        }
-                        className={`text-left p-2 rounded-lg border text-xs flex items-center justify-between transition cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-600/30 border-rose-700 text-slate-900 font-bold'
-                            : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-white'
-                        }`}
-                      >
-                        <div className="truncate mr-2">
-                          <div className="truncate text-[11px]">{subj.name}</div>
-                          <div className="text-[9px] text-slate-9000 font-mono">
-                            {subj.code} • {subj.category || 'General'}
-                          </div>
-                        </div>
-                        <div
-                          className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
-                            isSelected
-                              ? 'bg-amber-500 border-amber-500 text-gray-950 font-bold'
-                              : 'border-slate-200'
-                          }`}
-                        >
-                          {isSelected && <Check className="w-3 h-3" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                </>
+              )}
 
               {/* Password Reset Option */}
               <div className="p-3 bg-slate-50/80 border border-slate-200 rounded-xl flex items-center gap-3">

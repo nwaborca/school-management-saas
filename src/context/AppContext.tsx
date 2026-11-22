@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import {
   AuthUser,
   UserRole,
+  StaffRole,
   School,
   RegisterSchoolPayload,
   StaffAttendance,
@@ -166,6 +167,7 @@ interface AppContextType {
     fullName: string;
     phone: string;
     email: string;
+    role?: StaffRole;
     assignedSubjectIds: string[];
     assignedSubjects?: string[];
     formClassId?: string;
@@ -178,6 +180,7 @@ interface AppContextType {
       fullName?: string;
       phone?: string;
       email?: string;
+      role?: StaffRole;
       assignedSubjectIds?: string[];
       assignedSubjects?: string[];
       formClassId?: string;
@@ -225,6 +228,15 @@ interface AppContextType {
     student?: StudentProfile;
     error?: string;
     reason?: 'EXPIRED' | 'USED' | 'INVALID' | 'WRONG_SCHOOL';
+  }>;
+  confirmGateRelease: (params: {
+    passId: string;
+    securityStaffId?: string;
+    securityStaffName?: string;
+  }) => Promise<{
+    success: boolean;
+    pass?: PickupPass;
+    error?: string;
   }>;
 
   // Phase 5: Class Dismissal & Safe Pick-Up Accountability
@@ -487,6 +499,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       email: t.email || `${t.username || t.id}@school.edu.ng`,
       username: t.username || `tch_${t.id}`,
       password_hash: t.password_hash || 'Tch2026!',
+      role: t.role === 'gate_security' || t.role === 'GATE_SECURITY' ? 'gate_security' : (t.role === 'admin' ? 'admin' : 'teacher'),
       assigned_subject_ids: Array.isArray(assignedIds) ? assignedIds : [],
       assigned_subjects: Array.isArray(assignedIds) ? assignedIds : [],
       form_class_id: t.is_part_time ? undefined : (t.form_class_id || (t.assigned_class_id ?? undefined)),
@@ -704,6 +717,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       expires_at: p.expires_at || new Date(Date.now() + 5 * 3600 * 1000).toISOString(),
       picked_up_at: p.picked_up_at || null,
       verified_by_staff_id: p.verified_by_staff_id || null,
+      gate_released_at: p.gate_released_at || null,
+      released_by_security_id: p.released_by_security_id || null,
     };
   };
 
@@ -1845,7 +1860,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setSchools((prev) => (prev.some((s) => s.id === targetSchool.id) ? prev : [targetSchool, ...prev]));
           setTeachers([normalized]);
 
-          const assignedRole: UserRole = payload.role || ((rawStaff as any).role === 'admin' ? 'admin' : 'teacher');
+          const rawRole = (rawStaff as any).role;
+          const assignedRole: UserRole = payload.role || (
+            rawRole === 'gate_security' || rawRole === 'GATE_SECURITY'
+              ? 'gate_security'
+              : rawRole === 'admin'
+              ? 'admin'
+              : 'teacher'
+          );
 
           const authUser: AuthUser = {
             id: normalized.id,
@@ -2011,8 +2033,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: 'Invalid username or password.' };
       }
 
-      // Determine role: staff row may have role 'admin' or 'teacher'
-      const assignedRole: UserRole = (matchedTeacher as any).role === 'admin' ? 'admin' : 'teacher';
+      // Determine role: staff row may have role 'admin', 'gate_security', or 'teacher'
+      const rawRole = (matchedTeacher as any).role;
+      const assignedRole: UserRole =
+        rawRole === 'gate_security' || rawRole === 'GATE_SECURITY'
+          ? 'gate_security'
+          : rawRole === 'admin'
+          ? 'admin'
+          : 'teacher';
 
       const authUser: AuthUser = {
         id: matchedTeacher.id,
@@ -3112,21 +3140,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fullName: string;
     phone: string;
     email: string;
+    role?: StaffRole;
     assignedSubjectIds: string[];
     assignedSubjects?: string[];
     formClassId?: string;
     assignedClassId?: string | null;
     isPartTime?: boolean;
   }) => {
-    const nextSeq = String(teachers.length + 1).padStart(3, '0');
-    const teacherIdCode = `TCH/2026/${nextSeq}`;
-    const generatedPassword = `Tch${Math.floor(1000 + Math.random() * 9000)}!`;
-    const resolvedSubjectIds = data.assignedSubjects || data.assignedSubjectIds || [];
-    const isPartTime = Boolean(data.isPartTime);
-    const assignedClassId = isPartTime ? null : (data.assignedClassId ?? data.formClassId ?? null);
-    const formClass = !isPartTime && assignedClassId ? classes.find((c) => c.id === assignedClassId) : undefined;
-    const newStaffUuid = generateUUID();
+    const isSecurity = data.role === 'gate_security';
     const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+    const activeInvite = (currentSchool?.invite_code || currentUser?.invite_code || 'AEGIS-2026').toUpperCase();
+    const inviteSuffix = activeInvite.includes('-') ? activeInvite.split('-')[1] : activeInvite.slice(-4);
+
+    const nextSeq = String(teachers.length + 1).padStart(3, '0');
+    const teacherIdCode = isSecurity
+      ? `SEC-${inviteSuffix}-${nextSeq}`
+      : `TCH/2026/${nextSeq}`;
+    const generatedPassword = isSecurity
+      ? `Gate${Math.floor(1000 + Math.random() * 9000)}!`
+      : `Tch${Math.floor(1000 + Math.random() * 9000)}!`;
+    const resolvedSubjectIds = isSecurity ? [] : (data.assignedSubjects || data.assignedSubjectIds || []);
+    const isPartTime = isSecurity ? true : Boolean(data.isPartTime);
+    const assignedClassId = isSecurity || isPartTime ? null : (data.assignedClassId ?? data.formClassId ?? null);
+    const formClass = !isPartTime && !isSecurity && assignedClassId ? classes.find((c) => c.id === assignedClassId) : undefined;
+    const newStaffUuid = generateUUID();
 
     const newTeacher: TeacherProfile = {
       id: newStaffUuid,
@@ -3135,13 +3172,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       full_name: data.fullName,
       phone: data.phone,
       email: data.email,
-      username: teacherIdCode.toLowerCase().replace(/\//g, '_'),
+      username: teacherIdCode.toLowerCase().replace(/[\/-]/g, '_'),
       password_hash: generatedPassword,
+      role: data.role || 'teacher',
       assigned_subject_ids: resolvedSubjectIds,
       assigned_subjects: resolvedSubjectIds,
-      form_class_id: isPartTime ? undefined : (assignedClassId || undefined),
+      form_class_id: isPartTime || isSecurity ? undefined : (assignedClassId || undefined),
       assigned_class_id: assignedClassId,
-      form_class_name: isPartTime ? undefined : formClass?.name,
+      form_class_name: isPartTime || isSecurity ? undefined : formClass?.name,
       is_part_time: isPartTime,
       status: 'active',
       session_token: generateUUID(),
@@ -3150,7 +3188,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setTeachers((prev) => [newTeacher, ...prev]);
 
-    if (!isPartTime && assignedClassId) {
+    if (!isPartTime && !isSecurity && assignedClassId) {
       setClasses((prev) =>
         prev.map((c) => (c.id === assignedClassId ? { ...c, class_teacher: data.fullName } : c))
       );
@@ -3167,7 +3205,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         email: newTeacher.email,
         username: newTeacher.username,
         password_hash: newTeacher.password_hash,
-        role: 'teacher',
+        role: newTeacher.role || 'teacher',
         status: newTeacher.status,
         assigned_subject_ids: newTeacher.assigned_subject_ids,
         form_class_id: newTeacher.form_class_id || null,
@@ -3181,7 +3219,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (res?.error) {
             console.error('CRITICAL: Supabase staff insert failed:', res.error);
           } else {
-            console.log('✓ Successfully saved new teacher to Supabase staff table:', newTeacher.teacher_id_code);
+            console.log('✓ Successfully saved new staff member to Supabase staff table:', newTeacher.teacher_id_code);
           }
         })
         .catch((e: unknown) => console.error('CRITICAL: Supabase staff insert exception:', e));
@@ -3196,6 +3234,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fullName?: string;
       phone?: string;
       email?: string;
+      role?: StaffRole;
       assignedSubjectIds?: string[];
       assignedSubjects?: string[];
       formClassId?: string;
@@ -3211,76 +3250,72 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       prev.map((t) => {
         if (t.id === teacherId) {
           if (updates.resetCredentials) {
-            newPassword = `Reset${Math.floor(1000 + Math.random() * 9000)}#`;
+            newPassword = t.role === 'gate_security'
+              ? `Gate${Math.floor(1000 + Math.random() * 9000)}#`
+              : `Reset${Math.floor(1000 + Math.random() * 9000)}#`;
           }
 
-          const isPartTime = updates.isPartTime !== undefined ? Boolean(updates.isPartTime) : Boolean(t.is_part_time);
-          const resolvedSubjectIds = updates.assignedSubjects !== undefined
+          const resolvedRole = updates.role !== undefined ? updates.role : (t.role || 'teacher');
+          const isSecurity = resolvedRole === 'gate_security';
+          const isPartTime = isSecurity ? true : (updates.isPartTime !== undefined ? Boolean(updates.isPartTime) : Boolean(t.is_part_time));
+          const resolvedSubjectIds = isSecurity ? [] : (updates.assignedSubjects !== undefined
             ? updates.assignedSubjects
-            : (updates.assignedSubjectIds !== undefined ? updates.assignedSubjectIds : t.assigned_subject_ids);
+            : (updates.assignedSubjectIds !== undefined ? updates.assignedSubjectIds : t.assigned_subject_ids));
 
           let targetClassId: string | null = null;
-          if (!isPartTime) {
-            if (updates.assignedClassId !== undefined) {
-              targetClassId = updates.assignedClassId;
-            } else if (updates.formClassId !== undefined) {
-              targetClassId = updates.formClassId || null;
-            } else {
-              targetClassId = t.assigned_class_id ?? t.form_class_id ?? null;
-            }
+          if (!isPartTime && !isSecurity) {
+            targetClassId = updates.assignedClassId !== undefined ? updates.assignedClassId : (updates.formClassId || t.form_class_id || null);
           }
 
-          const formClass = targetClassId ? classes.find((c) => c.id === targetClassId) : undefined;
+          const targetClass = targetClassId ? classes.find((c) => c.id === targetClassId) : undefined;
 
-          const updatedT: TeacherProfile = {
+          return {
             ...t,
-            full_name: updates.fullName !== undefined ? updates.fullName : t.full_name,
-            phone: updates.phone !== undefined ? updates.phone : t.phone,
-            email: updates.email !== undefined ? updates.email : t.email,
+            full_name: updates.fullName || t.full_name,
+            phone: updates.phone || t.phone,
+            email: updates.email || t.email,
+            role: resolvedRole,
             assigned_subject_ids: resolvedSubjectIds,
             assigned_subjects: resolvedSubjectIds,
-            form_class_id: isPartTime ? undefined : (targetClassId || undefined),
-            assigned_class_id: isPartTime ? null : targetClassId,
-            form_class_name: isPartTime ? undefined : formClass?.name,
+            form_class_id: targetClassId || undefined,
+            assigned_class_id: targetClassId,
+            form_class_name: targetClass?.name,
             is_part_time: isPartTime,
             password_hash: newPassword || t.password_hash,
             session_token: updates.resetCredentials ? newToken : t.session_token,
             last_credential_reset: updates.resetCredentials ? new Date().toISOString() : t.last_credential_reset,
           };
-
-          if (isSupabaseConfigured()) {
-            const staffUpdatePayload: Record<string, any> = {
-              full_name: updatedT.full_name,
-              phone: updatedT.phone,
-              email: updatedT.email,
-              assigned_subject_ids: updatedT.assigned_subject_ids,
-              form_class_id: updatedT.form_class_id || null,
-              status: updatedT.status,
-              session_token: updatedT.session_token,
-            };
-            if (newPassword) {
-              staffUpdatePayload.password_hash = updatedT.password_hash;
-              staffUpdatePayload.last_credential_reset = updatedT.last_credential_reset;
-            }
-
-            Promise.resolve(
-              supabase.from('staff').update(staffUpdatePayload).eq('id', updatedT.id)
-            )
-              .then((res: any) => {
-                if (res?.error) console.error('Error updating staff in Supabase:', res.error);
-              })
-              .catch((e: unknown) => console.error('Supabase staff update failed:', e));
-          }
-
-          return updatedT;
         }
         return t;
       })
     );
 
-    // If active user is this teacher and credentials were reset, force logout
-    if (currentUser?.teacher_id === teacherId && updates.resetCredentials) {
-      logout();
+    if (isSupabaseConfigured()) {
+      const dbUpdates: any = {};
+      if (updates.fullName) dbUpdates.full_name = updates.fullName;
+      if (updates.phone) dbUpdates.phone = updates.phone;
+      if (updates.email) dbUpdates.email = updates.email;
+      if (updates.role) dbUpdates.role = updates.role;
+      if (updates.assignedSubjects !== undefined || updates.assignedSubjectIds !== undefined) {
+        dbUpdates.assigned_subject_ids = updates.role === 'gate_security' ? [] : (updates.assignedSubjects || updates.assignedSubjectIds);
+      }
+      if (updates.role === 'gate_security' || updates.isPartTime) {
+        dbUpdates.form_class_id = null;
+      } else if (updates.formClassId !== undefined || updates.assignedClassId !== undefined) {
+        dbUpdates.form_class_id = updates.assignedClassId || updates.formClassId || null;
+      }
+      if (newPassword) {
+        dbUpdates.password_hash = newPassword;
+        dbUpdates.session_token = newToken;
+      }
+
+      Promise.resolve(
+        supabase.from('staff').update(dbUpdates).eq('id', teacherId)
+      )
+        .then((res: any) => {
+          if (res?.error) console.error('Supabase staff update error:', res.error);
+        })
+        .catch((e: unknown) => console.error('Supabase staff update exception:', e));
     }
 
     return { success: true, newPassword };
@@ -3853,12 +3888,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      if (matchedPass.status === 'USED') {
+      if (matchedPass.status === 'USED' || matchedPass.status === 'RELEASED_AT_GATE') {
         return {
           success: false,
           reason: 'USED',
           pass: matchedPass,
-          error: `Code Already Used at ${matchedPass.picked_up_at ? new Date(matchedPass.picked_up_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier today'}.`,
+          error: `Code Already Used / Released at ${matchedPass.gate_released_at || matchedPass.picked_up_at ? new Date(matchedPass.gate_released_at || matchedPass.picked_up_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'earlier today'}.`,
         };
       }
 
@@ -3925,6 +3960,80 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         success: false,
         reason: 'INVALID',
         error: err?.message || 'Verification process encountered an error.',
+      };
+    }
+  };
+
+  // Phase 4b: Gate Security - 1-Tap Confirm Gate Release
+  const confirmGateRelease = async (params: {
+    passId: string;
+    securityStaffId?: string;
+    securityStaffName?: string;
+  }): Promise<{
+    success: boolean;
+    pass?: PickupPass;
+    error?: string;
+  }> => {
+    try {
+      const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+      const targetPass = pickupPasses.find((p) => p.id === params.passId && p.school_id === activeSchoolId);
+
+      const nowIso = new Date().toISOString();
+      const securityId = params.securityStaffId || currentUser?.id || null;
+
+      const updatedPass: PickupPass = targetPass
+        ? {
+            ...targetPass,
+            status: 'RELEASED_AT_GATE',
+            picked_up_at: targetPass.picked_up_at || nowIso,
+            gate_released_at: nowIso,
+            released_by_security_id: securityId,
+          }
+        : {
+            id: params.passId,
+            school_id: activeSchoolId,
+            student_id: '',
+            pass_type: 'DAILY_PARENT',
+            otp_code: '000000',
+            qr_token: '',
+            status: 'RELEASED_AT_GATE',
+            created_at: nowIso,
+            expires_at: nowIso,
+            picked_up_at: nowIso,
+            gate_released_at: nowIso,
+            released_by_security_id: securityId,
+          };
+
+      setPickupPasses((prev) =>
+        prev.some((p) => p.id === params.passId)
+          ? prev.map((p) => (p.id === params.passId ? updatedPass : p))
+          : [updatedPass, ...prev]
+      );
+
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase
+            .from('pickup_passes')
+            .update({
+              status: 'RELEASED_AT_GATE',
+              picked_up_at: updatedPass.picked_up_at,
+              gate_released_at: nowIso,
+              released_by_security_id: securityId,
+            })
+            .eq('id', params.passId);
+        } catch (dbErr: any) {
+          console.warn('Supabase confirmGateRelease error:', dbErr);
+        }
+      }
+
+      return {
+        success: true,
+        pass: updatedPass,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Failed to confirm gate release.',
       };
     }
   };
@@ -4110,6 +4219,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       generateDelegatePass,
       revokePickupPass,
       verifyAndHandoverPass,
+      confirmGateRelease,
       markClassEmpty,
       reopenClassDismissal,
     }),
@@ -4147,6 +4257,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       generateDelegatePass,
       revokePickupPass,
       verifyAndHandoverPass,
+      confirmGateRelease,
       markClassEmpty,
       reopenClassDismissal,
     ]

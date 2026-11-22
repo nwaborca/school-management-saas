@@ -148,6 +148,8 @@ export default function StudentDashboardPage() {
         router.push('/academic-hub');
       } else if (currentUser.role === 'admin') {
         router.push('/admin-hub');
+      } else if (currentUser.role === 'gate_security') {
+        router.push('/gate');
       }
     }
   }, [currentUser, isAuthReady, router]);

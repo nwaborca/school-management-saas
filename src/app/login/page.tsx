@@ -133,7 +133,12 @@ export default function LoginPage() {
     try {
       const res = await loginStaff(username, password, cleanInvite);
       if (res.success) {
-        const targetRoute = res.role === 'admin' ? '/admin-hub' : '/academic-hub';
+        const targetRoute =
+          res.role === 'gate_security'
+            ? '/gate'
+            : res.role === 'admin'
+            ? '/admin-hub'
+            : '/academic-hub';
         router.replace(targetRoute);
       } else {
         setError(res.message || 'Invalid username or password.');

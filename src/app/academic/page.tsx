@@ -31,6 +31,7 @@ import {
   AlertCircle,
   LogOut,
   Camera,
+  Shield,
   ShieldCheck,
   UserCheck,
   KeyRound,
@@ -107,6 +108,8 @@ export default function AcademicHubPage() {
       router.push('/student-hub');
     } else if (currentUser.role === 'admin') {
       router.push('/admin-hub');
+    } else if (currentUser.role === 'gate_security') {
+      router.push('/gate');
     }
   }, [currentUser, isAuthReady, router]);
 
@@ -2293,10 +2296,18 @@ export default function AcademicHubPage() {
                             </td>
                             <td className="px-3.5 py-3">
                               {verifiedPass ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>Safe Pick-Up Verified</span>
-                                </span>
+                                <div className="space-y-1">
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Safe Pick-Up Verified</span>
+                                  </span>
+                                  {verifiedPass.status === 'RELEASED_AT_GATE' && (
+                                    <span className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-300">
+                                      <Shield className="w-3 h-3 text-indigo-600" />
+                                      <span>Released at Gate</span>
+                                    </span>
+                                  )}
+                                </div>
                               ) : leftWithoutSafePickup ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
                                   <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />

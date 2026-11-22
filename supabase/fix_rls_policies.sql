@@ -343,12 +343,32 @@ CREATE TABLE IF NOT EXISTS public.pickup_passes (
   delegate_name TEXT NULL,
   otp_code TEXT NOT NULL,
   qr_token TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'USED', 'EXPIRED')),
+  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'USED', 'RELEASED_AT_GATE', 'EXPIRED')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ NOT NULL,
   picked_up_at TIMESTAMPTZ NULL,
-  verified_by_staff_id UUID NULL REFERENCES public.staff(id) ON DELETE SET NULL
+  verified_by_staff_id UUID NULL REFERENCES public.staff(id) ON DELETE SET NULL,
+  gate_released_at TIMESTAMPTZ NULL,
+  released_by_security_id UUID NULL REFERENCES public.staff(id) ON DELETE SET NULL
 );
+
+-- Ensure gate release columns and check constraint exist if table already exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'pickup_passes' AND column_name = 'gate_released_at'
+  ) THEN
+    ALTER TABLE public.pickup_passes ADD COLUMN gate_released_at TIMESTAMPTZ NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'pickup_passes' AND column_name = 'released_by_security_id'
+  ) THEN
+    ALTER TABLE public.pickup_passes ADD COLUMN released_by_security_id UUID NULL REFERENCES public.staff(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_pickup_passes_school_id ON public.pickup_passes(school_id);
 CREATE INDEX IF NOT EXISTS idx_pickup_passes_student_id ON public.pickup_passes(student_id);

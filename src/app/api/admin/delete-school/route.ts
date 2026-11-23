@@ -1,21 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { verifySessionToken, verifyPassword } from '@/lib/security';
-
-// Resolve Supabase Client with service role if available, otherwise anonymous server client
-function getSupabaseServerClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
-
-  const keyToUse = serviceKey || anonKey;
-  return createClient(url, keyToUse, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
 
 const PROTECTED_DEMO_SCHOOL_ID = '00000000-0000-0000-0000-000000000001';
 const PROTECTED_DEMO_INVITE = 'AEGIS-2026';
@@ -66,7 +51,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseServerClient();
+    const supabase = getSupabaseAdmin();
 
     // 2. Fetch the target school to confirm existence and match confirmation string
     const { data: targetSchool, error: schoolFetchErr } = await supabase

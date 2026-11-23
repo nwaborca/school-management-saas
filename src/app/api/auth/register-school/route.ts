@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { INITIAL_CLASSES } from '@/lib/mockData';
 import { AcademicClass } from '@/types';
 import { saveSchoolAccessMeta } from '@/lib/founderAccess';
 import { hashPassword } from '@/lib/security';
-
-function getSupabaseServerClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
-
-  const keyToUse = serviceKey || anonKey;
-  return createClient(url, keyToUse, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
 
 function generateRandomHex(length: number): string {
   const chars = '0123456789abcdef';
@@ -67,7 +53,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseServerClient();
+    const supabase = getSupabaseAdmin();
     const schoolId = generateUUID();
 
     // 1. Generate unique 4-character invite code (e.g., AEGIS-XXXX)

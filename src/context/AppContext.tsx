@@ -725,7 +725,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Live Cloud Fetch from Supabase with granular per-query error isolation
   const fetchLiveData = useCallback(async (targetSchoolId?: string) => {
-    if (!isSupabaseConfigured() || isFetchingRef.current) return;
+    if (isFetchingRef.current) return;
 
     // Require a valid resolvedSchoolId. If no user or school context is active yet, return immediately
     const resolvedSchoolId = targetSchoolId || currentUser?.school_id || currentSchool?.id;
@@ -735,7 +735,123 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const activeSchoolId = resolvedSchoolId;
 
-      // 1. Ensure core classes exist in Supabase for default school so foreign keys never fail
+      // 1. First attempt fast, authenticated server gateway fetch via /api/tenant/data
+      let gatewaySucceeded = false;
+      try {
+        const gatewayRes = await fetch(`/api/tenant/data?schoolId=${encodeURIComponent(activeSchoolId)}`, {
+          headers: {
+            'x-school-id': activeSchoolId,
+          },
+        });
+        const gatewayPayload = await gatewayRes.json().catch(() => null);
+
+        if (gatewayRes.ok && gatewayPayload?.success && gatewayPayload.data) {
+          const gData = gatewayPayload.data;
+          gatewaySucceeded = true;
+          const isMasterDemoSchool = activeSchoolId === DEFAULT_SCHOOL.id || activeSchoolId === MASTER_DEMO_SCHOOL_ID;
+
+          let activeStudentList = students;
+          if (Array.isArray(gData.students)) {
+            if (gData.students.length > 0) {
+              const normalizedStudents = gData.students.map(normalizeStudent);
+              activeStudentList = normalizedStudents;
+              setStudents(normalizedStudents);
+            } else if (!isMasterDemoSchool) {
+              activeStudentList = [];
+              setStudents([]);
+            }
+          }
+
+          let activeClassList = classes;
+          if (Array.isArray(gData.classes)) {
+            if (gData.classes.length > 0) {
+              activeClassList = gData.classes as AcademicClass[];
+              setClasses(activeClassList);
+            }
+          }
+
+          if (Array.isArray(gData.staff)) {
+            if (gData.staff.length > 0) {
+              setTeachers(gData.staff.map(normalizeTeacher));
+            } else if (!isMasterDemoSchool) {
+              setTeachers([]);
+            }
+          }
+
+          if (Array.isArray(gData.termResults)) {
+            if (gData.termResults.length > 0) {
+              setResults(gData.termResults.map((r: any) => normalizeResult(r, activeStudentList)));
+            } else if (!isMasterDemoSchool) {
+              setResults([]);
+            }
+          }
+
+          if (Array.isArray(gData.feeStructures)) {
+            if (gData.feeStructures.length > 0) {
+              setFeeStructures(gData.feeStructures as FeeStructure[]);
+            } else if (!isMasterDemoSchool) {
+              setFeeStructures([]);
+            }
+          }
+
+          if (Array.isArray(gData.receipts)) {
+            if (gData.receipts.length > 0) {
+              setReceipts(gData.receipts.map((r: any) => normalizeReceipt(r, activeStudentList, activeClassList)));
+            } else if (!isMasterDemoSchool) {
+              setReceipts([]);
+            }
+          }
+
+          if (Array.isArray(gData.staffAttendance)) {
+            if (gData.staffAttendance.length > 0) {
+              setStaffAttendance(gData.staffAttendance.map(normalizeAttendance));
+            } else if (!isMasterDemoSchool) {
+              setStaffAttendance([]);
+            }
+          }
+
+          if (Array.isArray(gData.pickupPasses)) {
+            if (gData.pickupPasses.length > 0) {
+              setPickupPasses(gData.pickupPasses.map(normalizePickupPass));
+            } else if (!isMasterDemoSchool) {
+              setPickupPasses([]);
+            }
+          }
+
+          if (gData.school) {
+            const rawSchool = gData.school;
+            const enrichedSchool: School = {
+              ...rawSchool,
+              logo_url: rawSchool.logo_url || null,
+              logoUrl: rawSchool.logo_url || null,
+              bank_name: rawSchool.bank_name || null,
+              bankName: rawSchool.bank_name || null,
+              account_number: rawSchool.account_number || null,
+              accountNumber: rawSchool.account_number || null,
+              account_name: rawSchool.account_name || null,
+              accountName: rawSchool.account_name || null,
+            };
+            setSchools((prev) => (prev.some((s) => s.id === enrichedSchool.id) ? prev.map((s) => s.id === enrichedSchool.id ? enrichedSchool : s) : [enrichedSchool, ...prev]));
+            setCurrentSchool(enrichedSchool);
+            setSessionCookie(currentUser, enrichedSchool);
+          }
+        }
+      } catch (gatewayErr) {
+        console.warn('Tenant data gateway fetch note (falling back to direct client if enabled):', gatewayErr);
+      }
+
+      if (gatewaySucceeded) {
+        isFetchingRef.current = false;
+        return;
+      }
+
+      if (!isSupabaseConfigured()) {
+        isFetchingRef.current = false;
+        return;
+      }
+
+      // 2. Direct Supabase Client fallback (for local development or if gateway is unreachable)
+      // Ensure core classes exist in Supabase for default school so foreign keys never fail
       try {
         const { data: existingClasses, error: classSelectErr } = await supabase
           .from('classes')

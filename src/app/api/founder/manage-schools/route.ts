@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import {
   getSchoolAccessRegistry,
   saveSchoolAccessMeta,
@@ -9,20 +9,6 @@ import {
 } from '@/lib/founderAccess';
 import { School, SchoolAccessStatus, SchoolPlanLabel } from '@/types';
 import { checkRateLimit, recordRateLimitAttempt, clearRateLimit } from '@/lib/security';
-
-function getSupabaseServerClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
-
-  const keyToUse = serviceKey || anonKey;
-  return createClient(url, keyToUse, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
 
 function verifyFounderPassword(password: string): boolean {
   const masterPassword = (process.env.FOUNDER_PASSWORD || 'jesusislord').trim();
@@ -64,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     clearRateLimit(rateLimitKey);
 
-    const supabase = getSupabaseServerClient();
+    const supabase = getSupabaseAdmin();
 
     // ACTION: 'list' - Return all registered schools with statistics
     if (action === 'list') {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { getSchoolAccessRegistry, resolveSchoolAccess } from '@/lib/founderAccess';
 import {
   verifyPassword,
@@ -9,21 +9,6 @@ import {
   recordRateLimitAttempt,
   clearRateLimit,
 } from '@/lib/security';
-
-// Resolve Supabase Client with service role if available, otherwise anonymous server client
-function getSupabaseServerClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
-
-  const keyToUse = serviceKey || anonKey;
-  return createClient(url, keyToUse, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,7 +42,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseServerClient();
+    const supabase = getSupabaseAdmin();
 
     // 1. Resolve Target School and Founder Access Registry concurrently
     const [schoolRes, registryMap] = await Promise.all([
@@ -155,11 +140,15 @@ export async function POST(req: NextRequest) {
         inviteCode: school.invite_code,
       });
 
+      // Strip sensitive access_pin before returning to client
+      const safeStudent = { ...student };
+      delete safeStudent.access_pin;
+
       const res = NextResponse.json({
         success: true,
         role: 'student',
         school,
-        student,
+        student: safeStudent,
       });
 
       // Set HttpOnly signed session cookie
@@ -256,11 +245,16 @@ export async function POST(req: NextRequest) {
           inviteCode: school.invite_code,
         });
 
+        // Strip sensitive password_hash before returning to client
+        const safeStaff = { ...matchedStaff };
+        delete safeStaff.password_hash;
+        delete safeStaff.password;
+
         const res = NextResponse.json({
           success: true,
           role: assignedRole,
           school,
-          staff: matchedStaff,
+          staff: safeStaff,
         });
 
         // Set HttpOnly signed session cookie

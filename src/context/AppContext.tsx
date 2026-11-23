@@ -1688,8 +1688,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setCurrentUser(authUser);
           setSessionCookie(authUser, targetSchool);
 
+          // Non-blocking background hydration so student dashboard shell mounts instantaneously
           if (isSupabaseConfigured()) {
-            await fetchLiveData(targetSchool.id);
+            void fetchLiveData(targetSchool.id);
           }
 
           return { success: true, role: 'student' as UserRole };
@@ -1803,9 +1804,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(authUser);
     setSessionCookie(authUser, targetSchool);
 
-    // Immediately hydrate tenant data for this school so Student Hub loads with full live data
+    // Non-blocking background hydration so student dashboard shell mounts instantaneously
     if (isSupabaseConfigured()) {
-      await fetchLiveData(targetSchool.id);
+      void fetchLiveData(targetSchool.id);
     }
 
     return { success: true, role: 'student' as UserRole };
@@ -1890,8 +1891,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setCurrentUser(authUser);
           setSessionCookie(authUser, targetSchool);
 
+          // Non-blocking background hydration so dashboard shell mounts instantaneously
           if (isSupabaseConfigured()) {
-            await fetchLiveData(targetSchool.id);
+            void fetchLiveData(targetSchool.id);
           }
 
           return { success: true, role: assignedRole };
@@ -1969,8 +1971,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(authUser);
       setSessionCookie(authUser, targetSchool);
 
+      // Non-blocking background hydration so admin dashboard shell mounts instantaneously
       if (isSupabaseConfigured()) {
-        await fetchLiveData(targetSchool.id);
+        void fetchLiveData(targetSchool.id);
       }
 
       return { success: true, role: 'admin' as UserRole };
@@ -2066,9 +2069,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(authUser);
       setSessionCookie(authUser, targetSchool);
 
-      // Immediately hydrate tenant data for this school so Academic Hub / Admin loads with full live data
+      // Non-blocking background hydration so dashboard shell mounts instantaneously
       if (isSupabaseConfigured()) {
-        await fetchLiveData(targetSchool.id);
+        void fetchLiveData(targetSchool.id);
       }
 
       return { success: true, role: assignedRole };

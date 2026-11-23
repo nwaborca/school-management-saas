@@ -33,23 +33,17 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabaseServerClient();
 
-    // 1. Resolve Target School by invite_code / school_code
-    let { data: school, error: schoolErr } = await supabase
-      .from('schools')
-      .select('*')
-      .ilike('invite_code', cleanSchoolCode)
-      .maybeSingle();
-
-    if (schoolErr || !school) {
-      // Fallback check against potential school_code column if schema variations exist
-      const { data: schoolFallback } = await supabase
+    // 1. Resolve Target School and Founder Access Registry concurrently
+    const [schoolRes, registryMap] = await Promise.all([
+      supabase
         .from('schools')
         .select('*')
-        .or(`invite_code.ilike.${cleanSchoolCode}`)
-        .maybeSingle();
+        .ilike('invite_code', cleanSchoolCode)
+        .maybeSingle(),
+      getSchoolAccessRegistry(supabase).catch(() => ({})),
+    ]);
 
-      school = schoolFallback;
-    }
+    let school = schoolRes.data;
 
     if (!school) {
       return NextResponse.json(
@@ -59,7 +53,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 1b. Enforce Founder Access Control & Term Expiry Checks (skip for demo school AEGIS-2026)
-    const registryMap = await getSchoolAccessRegistry(supabase);
     const access = resolveSchoolAccess(school, registryMap);
 
     // Attach resolved access status properties to school object

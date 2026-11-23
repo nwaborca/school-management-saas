@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import Link from 'next/link';
@@ -30,6 +30,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Warm up and prefetch target dashboard bundles immediately on mount
+  useEffect(() => {
+    router.prefetch('/admin');
+    router.prefetch('/admin-hub');
+    router.prefetch('/academic');
+    router.prefetch('/academic-hub');
+    router.prefetch('/student');
+    router.prefetch('/student-hub');
+    router.prefetch('/gate');
+  }, [router]);
 
   // Hidden Founder Console Secret Trigger
   // 1. 5-tap counter with generous 3-second rolling window and visual feedback

@@ -8,6 +8,7 @@ import {
   MASTER_DEMO_INVITE,
 } from '@/lib/founderAccess';
 import { School, SchoolAccessStatus, SchoolPlanLabel } from '@/types';
+import { checkRateLimit, recordRateLimitAttempt, clearRateLimit } from '@/lib/security';
 
 function getSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -34,13 +35,34 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, founderPassword, schoolId, customExpiresAt } = body;
 
+    // Rate Limiting Check (max 8 failed attempts per 10 minutes per IP)
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip') ||
+      'unknown-ip';
+    const rateLimitKey = `founder:${clientIp}`;
+
+    const limitStatus = checkRateLimit(rateLimitKey, 8, 600000);
+    if (!limitStatus.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Too many attempts on Founder Console. Please wait ${limitStatus.retryAfterSeconds} seconds before trying again.`,
+        },
+        { status: 429 }
+      );
+    }
+
     // 1. Authenticate Founder Master Password
     if (!verifyFounderPassword(founderPassword)) {
+      recordRateLimitAttempt(rateLimitKey);
       return NextResponse.json(
         { success: false, message: 'Invalid Founder Master Access Password.' },
         { status: 401 }
       );
     }
+
+    clearRateLimit(rateLimitKey);
 
     const supabase = getSupabaseServerClient();
 

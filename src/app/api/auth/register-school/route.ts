@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { INITIAL_CLASSES } from '@/lib/mockData';
 import { AcademicClass } from '@/types';
 import { saveSchoolAccessMeta } from '@/lib/founderAccess';
+import { hashPassword } from '@/lib/security';
 
 function getSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -184,6 +185,7 @@ export async function POST(req: NextRequest) {
     const uniqueUsername = `admin_${codeSuffix}_${emailPrefix}`;
     const uniqueStaffIdCode = `ADM-${codeSuffix.toUpperCase()}-001`;
     const adminStaffId = generateUUID();
+    const hashedPassword = await hashPassword(cleanPassword);
 
     const adminStaff = {
       id: adminStaffId,
@@ -193,7 +195,7 @@ export async function POST(req: NextRequest) {
       phone: cleanPhone,
       email: cleanEmail,
       username: uniqueUsername,
-      password_hash: cleanPassword,
+      password_hash: hashedPassword,
       role: 'admin',
       status: 'active',
       assigned_subject_ids: [],

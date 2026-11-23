@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSchoolAccessRegistry, resolveSchoolAccess } from '@/lib/founderAccess';
+import {
+  verifyPassword,
+  hashPassword,
+  signSessionToken,
+  checkRateLimit,
+  recordRateLimitAttempt,
+  clearRateLimit,
+} from '@/lib/security';
 
 // Resolve Supabase Client with service role if available, otherwise anonymous server client
 function getSupabaseServerClient() {
@@ -28,6 +36,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, message: 'Please enter your School Invite Code.' },
         { status: 400 }
+      );
+    }
+
+    // Rate Limiting Check (per client IP + schoolCode, max 8 attempts per 10 minutes)
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip') ||
+      'unknown-ip';
+    const rateLimitKey = `login:${clientIp}:${cleanSchoolCode}:${type || 'unknown'}:${identifier || regNumber || 'generic'}`;
+
+    const limitStatus = checkRateLimit(rateLimitKey, 8, 600000);
+    if (!limitStatus.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Too many login attempts. Please wait ${limitStatus.retryAfterSeconds} seconds before trying again.`,
+        },
+        { status: 429 }
       );
     }
 
@@ -112,18 +138,40 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (studentErr || !student) {
+        recordRateLimitAttempt(rateLimitKey);
         return NextResponse.json(
           { success: false, message: 'Invalid registration number or PIN for this school.' },
           { status: 401 }
         );
       }
 
-      return NextResponse.json({
+      clearRateLimit(rateLimitKey);
+
+      // Sign session JWT
+      const sessionJwt = await signSessionToken({
+        userId: student.id,
+        schoolId: school.id,
+        role: 'student',
+        inviteCode: school.invite_code,
+      });
+
+      const res = NextResponse.json({
         success: true,
         role: 'student',
         school,
         student,
       });
+
+      // Set HttpOnly signed session cookie
+      res.cookies.set('aegis_session_jwt', sessionJwt, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+      });
+
+      return res;
     }
 
     // 3. Handle STAFF / ADMIN / TEACHER Login
@@ -150,23 +198,49 @@ export async function POST(req: NextRequest) {
         underscoredUser !== cleanUser ? `username.ilike.${underscoredUser}` : null,
       ].filter(Boolean).join(',');
 
-      const { data: staffMember, error: staffErr } = await supabase
+      // Look up candidate staff member by identifier within this school
+      const { data: candidates, error: staffErr } = await supabase
         .from('staff')
         .select('*')
         .eq('school_id', school.id)
-        .or(orFilter)
-        .eq('password_hash', cleanPass)
-        .maybeSingle();
+        .or(orFilter);
 
-      if (staffMember) {
-        if (staffMember.status === 'revoked') {
+      let matchedStaff: any = null;
+
+      if (!staffErr && Array.isArray(candidates)) {
+        for (const candidate of candidates) {
+          const storedHashOrPlain = candidate.password_hash || '';
+          const { valid, needsRehash } = await verifyPassword(cleanPass, storedHashOrPlain);
+          if (valid) {
+            matchedStaff = candidate;
+            // Transparently re-hash legacy plaintext passwords into bcrypt
+            if (needsRehash) {
+              try {
+                const newHash = await hashPassword(cleanPass);
+                await supabase
+                  .from('staff')
+                  .update({ password_hash: newHash })
+                  .eq('id', candidate.id);
+              } catch (rehashErr) {
+                console.warn('Transparent password rehash notice:', rehashErr);
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      if (matchedStaff) {
+        if (matchedStaff.status === 'revoked') {
           return NextResponse.json(
             { success: false, message: 'Account access has been revoked by administration.' },
             { status: 403 }
           );
         }
 
-        const rawRole = staffMember.role;
+        clearRateLimit(rateLimitKey);
+
+        const rawRole = matchedStaff.role;
         const assignedRole =
           rawRole === 'gate_security' || rawRole === 'GATE_SECURITY'
             ? 'gate_security'
@@ -174,22 +248,50 @@ export async function POST(req: NextRequest) {
             ? 'admin'
             : 'teacher';
 
-        return NextResponse.json({
+        // Sign session JWT
+        const sessionJwt = await signSessionToken({
+          userId: matchedStaff.id,
+          schoolId: school.id,
+          role: assignedRole,
+          inviteCode: school.invite_code,
+        });
+
+        const res = NextResponse.json({
           success: true,
           role: assignedRole,
           school,
-          staff: staffMember,
+          staff: matchedStaff,
         });
+
+        // Set HttpOnly signed session cookie
+        res.cookies.set('aegis_session_jwt', sessionJwt, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60, // 7 days
+        });
+
+        return res;
       }
 
       // Master Super-Admin fallback check (only if no custom database staff matched)
       if (cleanUser === 'admin' && (cleanPass === 'admin123' || cleanPass === 'admin')) {
-        return NextResponse.json({
+        clearRateLimit(rateLimitKey);
+        const adminId = `usr-admin-${school.id.slice(0, 8)}`;
+        const sessionJwt = await signSessionToken({
+          userId: adminId,
+          schoolId: school.id,
+          role: 'admin',
+          inviteCode: school.invite_code,
+        });
+
+        const res = NextResponse.json({
           success: true,
           role: 'admin',
           school,
           staff: {
-            id: `usr-admin-${school.id.slice(0, 8)}`,
+            id: adminId,
             school_id: school.id,
             username: 'admin',
             full_name: 'School Administrator',
@@ -197,7 +299,19 @@ export async function POST(req: NextRequest) {
             status: 'active',
           },
         });
+
+        res.cookies.set('aegis_session_jwt', sessionJwt, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60,
+        });
+
+        return res;
       }
+
+      recordRateLimitAttempt(rateLimitKey);
 
       return NextResponse.json(
         { success: false, message: 'Invalid username or password for this school.' },

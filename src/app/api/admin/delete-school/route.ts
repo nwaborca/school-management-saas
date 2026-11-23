@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifySessionToken, verifyPassword } from '@/lib/security';
 
 // Resolve Supabase Client with service role if available, otherwise anonymous server client
 function getSupabaseServerClient() {
@@ -33,6 +34,24 @@ export async function POST(req: NextRequest) {
         { success: false, message: 'All confirmation fields and admin password are required.' },
         { status: 400 }
       );
+    }
+
+    // 0. Enforce Server-Side Signed HttpOnly Session JWT Verification
+    const sessionCookie = req.cookies.get('aegis_session_jwt')?.value;
+    if (sessionCookie) {
+      const session = await verifySessionToken(sessionCookie);
+      if (!session) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid or expired session. Please re-login as Administrator.' },
+          { status: 401 }
+        );
+      }
+      if (session.role !== 'admin' || session.schoolId !== cleanSchoolId) {
+        return NextResponse.json(
+          { success: false, message: 'Unauthorized. You do not have permission to delete this school.' },
+          { status: 403 }
+        );
+      }
     }
 
     // 1. Guard Default / Demo School: Absolutely non-deletable
@@ -100,7 +119,9 @@ export async function POST(req: NextRequest) {
     let passwordValid = false;
 
     if (matchedAdmin) {
-      if (matchedAdmin.password_hash === cleanPassword) {
+      const stored = matchedAdmin.password_hash || '';
+      const check = await verifyPassword(cleanPassword, stored);
+      if (check.valid) {
         passwordValid = true;
       }
     }

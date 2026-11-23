@@ -31,6 +31,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { generateUUID } from '@/lib/uuid';
 import { calculateHaversineDistance, isLateCheckIn } from '@/lib/geofence';
 import { resolveSchoolAccess, getSchoolAccessRegistry, saveSchoolAccessMeta, MASTER_DEMO_SCHOOL_ID } from '@/lib/founderAccess';
+import { hashPassword } from '@/lib/security';
 import { AccessGateModal } from '@/components/AccessGateModal';
 import {
   SCHOOL_INFO,
@@ -3199,25 +3200,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Persist to Supabase staff table immediately with exact column mappings matching PostgreSQL schema
     if (isSupabaseConfigured()) {
-      const staffPayload = {
-        id: newTeacher.id,
-        school_id: activeSchoolId,
-        staff_id_code: newTeacher.teacher_id_code,
-        full_name: newTeacher.full_name,
-        phone: newTeacher.phone,
-        email: newTeacher.email,
-        username: newTeacher.username,
-        password_hash: newTeacher.password_hash,
-        role: newTeacher.role || 'teacher',
-        status: newTeacher.status,
-        assigned_subject_ids: newTeacher.assigned_subject_ids,
-        form_class_id: newTeacher.form_class_id || null,
-        session_token: newTeacher.session_token,
-      };
+      hashPassword(generatedPassword)
+        .then((hashedPass) => {
+          const staffPayload = {
+            id: newTeacher.id,
+            school_id: activeSchoolId,
+            staff_id_code: newTeacher.teacher_id_code,
+            full_name: newTeacher.full_name,
+            phone: newTeacher.phone,
+            email: newTeacher.email,
+            username: newTeacher.username,
+            password_hash: hashedPass,
+            role: newTeacher.role || 'teacher',
+            status: newTeacher.status,
+            assigned_subject_ids: newTeacher.assigned_subject_ids,
+            form_class_id: newTeacher.form_class_id || null,
+            session_token: newTeacher.session_token,
+          };
 
-      Promise.resolve(
-        supabase.from('staff').insert(staffPayload)
-      )
+          return supabase.from('staff').insert(staffPayload);
+        })
         .then((res: any) => {
           if (res?.error) {
             console.error('CRITICAL: Supabase staff insert failed:', res.error);
@@ -3307,18 +3309,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else if (updates.formClassId !== undefined || updates.assignedClassId !== undefined) {
         dbUpdates.form_class_id = updates.assignedClassId || updates.formClassId || null;
       }
-      if (newPassword) {
-        dbUpdates.password_hash = newPassword;
-        dbUpdates.session_token = newToken;
-      }
 
-      Promise.resolve(
-        supabase.from('staff').update(dbUpdates).eq('id', teacherId)
-      )
-        .then((res: any) => {
-          if (res?.error) console.error('Supabase staff update error:', res.error);
-        })
-        .catch((e: unknown) => console.error('Supabase staff update exception:', e));
+      const syncStaffUpdate = async () => {
+        if (newPassword) {
+          const hashed = await hashPassword(newPassword);
+          dbUpdates.password_hash = hashed;
+          dbUpdates.session_token = newToken;
+        }
+        const res = await supabase.from('staff').update(dbUpdates).eq('id', teacherId);
+        if (res?.error) console.error('Supabase staff update error:', res.error);
+      };
+
+      syncStaffUpdate().catch((e: unknown) => console.error('Supabase staff update exception:', e));
     }
 
     return { success: true, newPassword };

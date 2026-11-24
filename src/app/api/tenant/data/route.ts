@@ -18,6 +18,10 @@ const ALLOWED_TABLES = [
 
 type AllowedTable = typeof ALLOWED_TABLES[number];
 
+function allowedForRestrictedRole(table: string, allowedList: AllowedTable[]): boolean {
+  return allowedList.includes(table as AllowedTable);
+}
+
 // Explicit safe columns for staff - NEVER return password or password_hash
 const SAFE_STAFF_COLUMNS = [
   'id',
@@ -94,9 +98,9 @@ export async function GET(req: NextRequest) {
       attendanceRes,
       passesRes,
       announcementsRes,
+      dismissalsRes,
     ] = await Promise.all([
       supabase.from('schools').select('*').eq('id', resolvedSchoolId).maybeSingle(),
-      // Fetch all students for the tenant, or if students select returns empty or specific safe list
       supabase.from('students').select('*').eq('school_id', resolvedSchoolId),
       supabase.from('staff').select(SAFE_STAFF_COLUMNS).eq('school_id', resolvedSchoolId),
       supabase.from('classes').select('*').eq('school_id', resolvedSchoolId),
@@ -106,6 +110,7 @@ export async function GET(req: NextRequest) {
       supabase.from('staff_attendance').select('*').eq('school_id', resolvedSchoolId),
       supabase.from('pickup_passes').select('*').eq('school_id', resolvedSchoolId),
       supabase.from('announcements').select('*').eq('school_id', resolvedSchoolId),
+      supabase.from('class_dismissal_audits').select('*').eq('school_id', resolvedSchoolId),
     ]);
 
     // Strip sensitive access_pin from student records in the list
@@ -129,6 +134,7 @@ export async function GET(req: NextRequest) {
         staffAttendance: attendanceRes.data || [],
         pickupPasses: passesRes.data || [],
         announcements: announcementsRes.data || [],
+        classDismissalAudits: dismissalsRes.data || [],
       },
     });
   } catch (err: any) {
@@ -160,17 +166,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Role-based authorization: student and gate_security roles have restricted write permissions
+    // Role-based authorization: student, teacher, and gate_security roles have restricted write permissions
     const userRole = session?.role;
-    if (userRole === 'student' || userRole === 'gate_security') {
-      const allowedForRestricted: AllowedTable[] = [
-        'staff_attendance',
+    if (userRole === 'student') {
+      const allowedForStudent: AllowedTable[] = [
         'pickup_passes',
         'receipts',
       ];
-      if (!allowedForRestricted.includes(table)) {
+      if (!allowedForRestrictedRole(table, allowedForStudent)) {
         return NextResponse.json(
-          { success: false, message: `Access denied. Role '${userRole}' cannot modify '${table}'.` },
+          { success: false, message: `Access denied. Role 'student' cannot modify '${table}'.` },
+          { status: 403 }
+        );
+      }
+    } else if (userRole === 'gate_security') {
+      const allowedForSecurity: AllowedTable[] = [
+        'staff_attendance',
+        'pickup_passes',
+      ];
+      if (!allowedForRestrictedRole(table, allowedForSecurity)) {
+        return NextResponse.json(
+          { success: false, message: `Access denied. Role 'gate_security' cannot modify '${table}'.` },
+          { status: 403 }
+        );
+      }
+    } else if (userRole === 'teacher') {
+      const allowedForTeacher: AllowedTable[] = [
+        'term_results',
+        'staff_attendance',
+        'pickup_passes',
+        'class_dismissal_audits',
+        'announcements',
+      ];
+      if (!allowedForRestrictedRole(table, allowedForTeacher)) {
+        return NextResponse.json(
+          { success: false, message: `Access denied. Role 'teacher' cannot modify '${table}'.` },
           { status: 403 }
         );
       }

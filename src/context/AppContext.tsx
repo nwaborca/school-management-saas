@@ -437,29 +437,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('apex_results_published', String(nextVal));
       } catch {}
 
-      if (isSupabaseConfigured()) {
-        Promise.resolve(
-          supabase
-            .from('fee_structures')
-            .upsert({
-              id: '00000000-0000-0000-0000-000000000001',
-              class_id: 'cls-creche',
-              class_name: 'SYSTEM_SETTINGS_RESULTS_GATE',
-              term: 'GLOBAL_GATE',
-              session: '2025/2026',
-              line_items: [{ name: 'results_published', amount: 0 }],
-              total_amount: 0,
-              published: nextVal,
-              published_at: new Date().toISOString(),
-            })
-        )
-          .then((res: any) => {
-            if (res?.error) {
-              console.warn('Supabase results gate sync note:', res.error.message);
-            }
-          })
-          .catch(() => {});
-      }
+      // Persist global gate setting via secure tenant data gateway
+      void mutateTenantData({
+        action: 'upsert',
+        table: 'fee_structures',
+        payload: {
+          id: '00000000-0000-0000-0000-000000000001',
+          class_id: 'cls-creche',
+          class_name: 'SYSTEM_SETTINGS_RESULTS_GATE',
+          term: 'GLOBAL_GATE',
+          session: '2025/2026',
+          line_items: [{ name: 'results_published', amount: 0 }],
+          total_amount: 0,
+          published: nextVal,
+          published_at: new Date().toISOString(),
+        },
+      });
+
       return nextVal;
     });
   };
@@ -878,6 +872,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
+          if (Array.isArray(gData.announcements)) {
+            if (gData.announcements.length > 0) {
+              setAnnouncements(gData.announcements);
+            } else if (!isMasterDemoSchool) {
+              setAnnouncements([]);
+            }
+          }
+
+          if (Array.isArray(gData.classDismissalAudits)) {
+            if (gData.classDismissalAudits.length > 0) {
+              setClassDismissals(gData.classDismissalAudits);
+            }
+          }
+
           if (gData.school) {
             const rawSchool = gData.school;
             const enrichedSchool: School = {
@@ -897,353 +905,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (gatewayErr) {
-        console.warn('Tenant data gateway fetch note (falling back to direct client if enabled):', gatewayErr);
-      }
-
-      if (gatewaySucceeded) {
-        isFetchingRef.current = false;
-        return;
-      }
-
-      if (!isSupabaseConfigured()) {
-        isFetchingRef.current = false;
-        return;
-      }
-
-      // 2. Direct Supabase Client fallback (for local development or if gateway is unreachable)
-      // Ensure core classes exist in Supabase for default school so foreign keys never fail
-      try {
-        const { data: existingClasses, error: classSelectErr } = await supabase
-          .from('classes')
-          .select('id')
-          .eq('school_id', activeSchoolId);
-        if (!classSelectErr && (!existingClasses || existingClasses.length === 0)) {
-          const classesPayload = INITIAL_CLASSES.map((c) => ({
-            id: activeSchoolId === DEFAULT_SCHOOL.id ? c.id : `${activeSchoolId}-${c.id}`,
-            school_id: activeSchoolId,
-            name: c.name,
-            session: c.session,
-            level: c.level,
-            arm: c.arm || null,
-            stage: c.stage,
-            student_count: 0,
-          }));
-          await supabase.from('classes').upsert(classesPayload, { onConflict: 'id' });
-        }
-      } catch (classInitErr) {
-        console.warn('Initial classes cloud check note:', classInitErr);
-      }
-
-      // 2. Fetch each table with dedicated try/catch guards scoped by school_id
-      const fetchStudentsPromise = (async () => {
-        try {
-          const { data, error } = await supabase
-            .from('students')
-            .select('*')
-            .eq('school_id', activeSchoolId)
-            .order('created_at', { ascending: false });
-          if (error) {
-            console.warn('Supabase students query returned error:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (stdErr) {
-          console.warn('Supabase students fetch caught exception:', stdErr);
-          return null;
-        }
-      })();
-
-      const fetchStaffPromise = (async () => {
-        try {
-          const { data, error } = await supabase
-            .from('staff')
-            .select('*')
-            .eq('school_id', activeSchoolId)
-            .order('created_at', { ascending: false });
-          if (error) {
-            console.warn('Supabase staff query returned error:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (staffErr) {
-          console.warn('Supabase staff fetch caught exception:', staffErr);
-          return null;
-        }
-      })();
-
-      const fetchResultsPromise = (async () => {
-        try {
-          const { data, error } = await supabase
-            .from('term_results')
-            .select('*')
-            .eq('school_id', activeSchoolId)
-            .order('created_at', { ascending: false });
-          if (error) {
-            console.warn('Supabase term_results query note:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (resErr) {
-          console.warn('Supabase term_results fetch caught exception:', resErr);
-          return null;
-        }
-      })();
-
-      const fetchClassesPromise = (async () => {
-        try {
-          const { data, error } = await supabase
-            .from('classes')
-            .select('*')
-            .eq('school_id', activeSchoolId);
-          if (error) {
-            console.warn('Supabase classes query note:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (clsErr) {
-          console.warn('Supabase classes fetch caught exception:', clsErr);
-          return null;
-        }
-      })();
-
-      const fetchFeesPromise = (async () => {
-        try {
-          const { data, error } = await supabase
-            .from('fee_structures')
-            .select('*')
-            .eq('school_id', activeSchoolId);
-          if (error) {
-            console.warn('Supabase fee_structures query note:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (feeErr) {
-          console.warn('Supabase fee_structures fetch caught exception:', feeErr);
-          return null;
-        }
-      })();
-
-      const fetchReceiptsPromise = (async () => {
-        try {
-          const { data, error } = await supabase
-            .from('receipts')
-            .select('*')
-            .eq('school_id', activeSchoolId)
-            .order('created_at', { ascending: false });
-          if (error) {
-            console.warn('Supabase receipts query note:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (recErr) {
-          console.warn('Supabase receipts fetch caught exception:', recErr);
-          return null;
-        }
-      })();
-
-      const fetchSchoolsPromise = (async () => {
-        try {
-          const { data, error } = await supabase.from('schools').select('*');
-          if (error) {
-            console.warn('Supabase schools query note:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (schoolErr) {
-          console.warn('Supabase schools fetch caught exception:', schoolErr);
-          return null;
-        }
-      })();
-
-      const fetchAttendancePromise = (async () => {
-        try {
-          const { data, error } = await supabase
-            .from('staff_attendance')
-            .select('*')
-            .eq('school_id', activeSchoolId)
-            .order('check_in_time', { ascending: false });
-          if (error) {
-            console.warn('Supabase staff_attendance query note:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (attErr) {
-          console.warn('Supabase staff_attendance fetch caught exception:', attErr);
-          return null;
-        }
-      })();
-
-      const fetchPickupPassesPromise = (async () => {
-        try {
-          const { data, error } = await supabase
-            .from('pickup_passes')
-            .select('*')
-            .eq('school_id', activeSchoolId)
-            .order('created_at', { ascending: false });
-          if (error) {
-            console.warn('Supabase pickup_passes query note:', error.message || error);
-            return null;
-          }
-          return data;
-        } catch (passErr) {
-          console.warn('Supabase pickup_passes fetch caught exception:', passErr);
-          return null;
-        }
-      })();
-
-      const [stdData, staffData, resData, classData, feeData, recData, schoolData, attData, passData] = await Promise.all([
-        fetchStudentsPromise,
-        fetchStaffPromise,
-        fetchResultsPromise,
-        fetchClassesPromise,
-        fetchFeesPromise,
-        fetchReceiptsPromise,
-        fetchSchoolsPromise,
-        fetchAttendancePromise,
-        fetchPickupPassesPromise,
-      ]);
-
-      const isMasterDemoSchool = activeSchoolId === DEFAULT_SCHOOL.id || activeSchoolId === MASTER_DEMO_SCHOOL_ID;
-
-      // Apply guarded updates: ensure students and classes are normalized first so receipts can link names and classes cleanly
-      let activeStudentList = students;
-      if (stdData && Array.isArray(stdData)) {
-        if (stdData.length > 0) {
-          try {
-            const normalizedStudents = stdData.map(normalizeStudent);
-            activeStudentList = normalizedStudents;
-            setStudents(normalizedStudents);
-          } catch (normStdErr) {
-            console.warn('Error normalizing students payload:', normStdErr);
-          }
-        } else if (!isMasterDemoSchool) {
-          activeStudentList = [];
-          setStudents([]);
-        }
-      }
-
-      let activeClassList = classes;
-      if (classData && Array.isArray(classData)) {
-        if (classData.length > 0) {
-          activeClassList = classData as AcademicClass[];
-          setClasses(activeClassList);
-        } else if (!isMasterDemoSchool) {
-          // Keep classes mapped if any, or empty
-        }
-      }
-
-      if (staffData && Array.isArray(staffData)) {
-        if (staffData.length > 0) {
-          try {
-            const normalizedStaff = staffData.map(normalizeTeacher);
-            setTeachers(normalizedStaff);
-          } catch (normStaffErr) {
-            console.warn('Error normalizing staff payload:', normStaffErr);
-          }
-        } else if (!isMasterDemoSchool) {
-          setTeachers([]);
-        }
-      }
-
-      if (resData && Array.isArray(resData)) {
-        if (resData.length > 0) {
-          try {
-            const normalizedResults = resData.map((r) => normalizeResult(r, activeStudentList));
-            setResults(normalizedResults);
-          } catch (normResErr) {
-            console.warn('Error normalizing term_results payload:', normResErr);
-            setResults(resData as StudentResult[]);
-          }
-        } else if (!isMasterDemoSchool) {
-          setResults([]);
-        }
-      }
-
-      if (feeData && Array.isArray(feeData)) {
-        if (feeData.length > 0) {
-          setFeeStructures(feeData as FeeStructure[]);
-          const gateRow = feeData.find((f: any) => f.id === '00000000-0000-0000-0000-000000000001');
-          if (gateRow) {
-            setResultsPublished(Boolean(gateRow.published));
-            try {
-              localStorage.setItem('apex_results_published', String(Boolean(gateRow.published)));
-            } catch {}
-          }
-        } else if (!isMasterDemoSchool) {
-          setFeeStructures([]);
-        }
-      }
-
-      if (recData && Array.isArray(recData)) {
-        if (recData.length > 0) {
-          setReceipts(recData.map((r) => normalizeReceipt(r, activeStudentList, activeClassList)));
-        } else if (!isMasterDemoSchool) {
-          setReceipts([]);
-        }
-      }
-
-      if (schoolData && Array.isArray(schoolData) && schoolData.length > 0) {
-        // Enforce access control meta from high-availability registry
-        let registryMap: Record<string, any> = {};
-        try {
-          registryMap = await getSchoolAccessRegistry(supabase);
-        } catch {}
-
-        const enrichedSchools = (schoolData as School[]).map((s) => {
-          const acc = resolveSchoolAccess(s, registryMap);
-          const resolvedLogo = s.logo_url || s.logoUrl || acc.logoUrl || null;
-          const resolvedBankName = s.bankName || s.bank_name || acc.bankName || null;
-          const resolvedAccountNumber = s.accountNumber || s.account_number || acc.accountNumber || null;
-          const resolvedAccountName = s.accountName || s.account_name || acc.accountName || null;
-          return {
-            ...s,
-            logo_url: resolvedLogo,
-            logoUrl: resolvedLogo,
-            bank_name: resolvedBankName,
-            bankName: resolvedBankName,
-            account_number: resolvedAccountNumber,
-            accountNumber: resolvedAccountNumber,
-            account_name: resolvedAccountName,
-            accountName: resolvedAccountName,
-            access_status: acc.status,
-            plan_label: acc.planLabel,
-            access_expires_at: acc.expiresAt,
-          };
-        });
-
-        setSchools(enrichedSchools);
-
-        // Only set currentSchool if matching the active user or target school, never blindly overwrite an active custom tenant
-        const matchingSchool = enrichedSchools.find((s: any) => s.id === activeSchoolId) ||
-          enrichedSchools.find((s: any) => s.id === currentUser?.school_id);
-        if (matchingSchool) {
-          setCurrentSchool(matchingSchool);
-          setSessionCookie(currentUser, matchingSchool);
-
-          // Check if session belongs to non-demo school with pending/expired access
-          const accessInfo = resolveSchoolAccess(matchingSchool, registryMap);
-          if (!accessInfo.canAccess) {
-            setAccessGateBlocked(accessInfo.status);
-          } else {
-            setAccessGateBlocked(null);
-          }
-        }
-      }
-
-      if (attData && Array.isArray(attData)) {
-        if (attData.length > 0) {
-          setStaffAttendance(attData.map(normalizeAttendance));
-        } else if (!isMasterDemoSchool) {
-          setStaffAttendance([]);
-        }
-      }
-
-      if (passData && Array.isArray(passData)) {
-        if (passData.length > 0) {
-          setPickupPasses(passData.map(normalizePickupPass));
-        } else if (!isMasterDemoSchool) {
-          setPickupPasses([]);
-        }
+        console.warn('Tenant data gateway fetch note:', gatewayErr);
       }
     } catch (err) {
       console.warn('Non-fatal error in fetchLiveData (safely falling back to default/cached data):', err);
@@ -1652,157 +1314,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.warn('Server registration route note, proceeding to local/client flow:', serverErr);
       }
 
-      // 2. Client-side fallback if server route is unreachable
-      const schoolId = generateUUID();
-
-      // Generate unique collision-checked invite code: AEGIS-XXXX
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let inviteCode = '';
-      let isUnique = false;
-      let attempts = 0;
-
-      while (!isUnique && attempts < 10) {
-        attempts++;
-        let randomSuffix = '';
-        for (let i = 0; i < 4; i++) {
-          randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        inviteCode = `AEGIS-${randomSuffix}`;
-
-        const localCollision = schools.some((s) => s.invite_code === inviteCode);
-        if (!localCollision && isSupabaseConfigured()) {
-          const { data } = await supabase.from('schools').select('id').eq('invite_code', inviteCode).maybeSingle();
-          if (!data) isUnique = true;
-        } else if (!localCollision) {
-          isUnique = true;
-        }
-      }
-
-      if (!isUnique) {
-        inviteCode = `AEGIS-${Math.floor(1000 + Math.random() * 9000)}`;
-      }
-
-      const newSchool: School = {
-        id: schoolId,
-        name: payload.schoolName.trim(),
-        invite_code: inviteCode,
-        latitude: payload.latitude ?? 6.5244,
-        longitude: payload.longitude ?? 3.3792,
-        geofence_radius_meters: 150,
-        created_at: new Date().toISOString(),
-      };
-
-      // 1. Seed unique 33 class tiers for this school
-      const schoolClasses: AcademicClass[] = INITIAL_CLASSES.map((c) => ({
-        ...c,
-        id: `${schoolId}-${c.id}`,
-        school_id: schoolId,
-        student_count: 0,
-      }));
-
-      // 2. Provision the registering user as primary School Admin in staff table with unique school-scoped identifiers
-      const adminStaffId = generateUUID();
-      const codeSuffix = inviteCode.includes('-') ? inviteCode.split('-')[1].toLowerCase() : inviteCode.toLowerCase();
-      const emailPrefix = (payload.email ? payload.email.split('@')[0] : payload.adminFullName.toLowerCase().replace(/\s+/g, '_')).replace(/[^a-z0-9_]/g, '');
-      const uniqueUsername = `admin_${codeSuffix}_${emailPrefix}`;
-      const uniqueStaffIdCode = `ADM-${codeSuffix.toUpperCase()}-001`;
-
-      const adminStaff: TeacherProfile = {
-        id: adminStaffId,
-        school_id: schoolId,
-        teacher_id_code: uniqueStaffIdCode,
-        full_name: payload.adminFullName.trim(),
-        phone: payload.phone.trim(),
-        email: payload.email.trim(),
-        username: uniqueUsername,
-        password_hash: payload.password,
-        assigned_subject_ids: [],
-        assigned_subjects: [],
-        is_part_time: false,
-        status: 'active',
-        session_token: generateUUID(),
-        created_at: new Date().toISOString(),
-      };
-
-      // Update React State immediately
-      setSchools((prev) => [newSchool, ...prev]);
-      setCurrentSchool(newSchool);
-      setClasses(schoolClasses);
-      setStudents([]);
-      setTeachers([adminStaff]);
-      setResults([]);
-      setReceipts([]);
-      setFeeStructures([]);
-
-      // In accordance with Founder Access Control, newly registered schools await Founder Activation
-      // Do NOT auto-login registering admin into active dashboard
-      setCurrentUser(null);
-      setSessionCookie(null);
-
-      // Persist to Supabase if connected
-      if (isSupabaseConfigured()) {
-        try {
-          // A. Insert school
-          const { error: schoolError } = await supabase.from('schools').insert({
-            id: newSchool.id,
-            name: newSchool.name,
-            invite_code: newSchool.invite_code,
-            latitude: newSchool.latitude,
-            longitude: newSchool.longitude,
-            geofence_radius_meters: newSchool.geofence_radius_meters,
-            created_at: newSchool.created_at,
-          });
-
-          if (schoolError) {
-            console.error('Supabase school insertion error:', schoolError);
-            return { success: false, error: schoolError.message };
-          }
-
-          // B. Seed classes scoped to school_id
-          const classesPayload = schoolClasses.map((c) => ({
-            id: c.id,
-            school_id: schoolId,
-            name: c.name,
-            session: c.session,
-            level: c.level,
-            arm: c.arm || null,
-            stage: c.stage,
-            student_count: 0,
-          }));
-          await supabase.from('classes').insert(classesPayload);
-
-          // C. Insert primary Admin staff member
-          const { error: staffError } = await supabase.from('staff').insert({
-            id: adminStaff.id,
-            school_id: schoolId,
-            staff_id_code: adminStaff.teacher_id_code,
-            full_name: adminStaff.full_name,
-            phone: adminStaff.phone,
-            email: adminStaff.email,
-            username: adminStaff.username,
-            password_hash: adminStaff.password_hash,
-            role: 'admin',
-            status: adminStaff.status,
-            assigned_subject_ids: [],
-            session_token: adminStaff.session_token,
-          });
-
-          if (staffError) {
-            console.error('Supabase staff insertion error:', staffError);
-            return {
-              success: false,
-              error: `School created, but failed to create Admin staff account: ${staffError.message}`,
-            };
-          }
-        } catch (dbErr: any) {
-          console.warn('Note on cloud multi-tenant persistence:', dbErr);
-        }
-      }
-
       return {
-        success: true,
-        school: newSchool,
-        inviteCode: newSchool.invite_code,
+        success: false,
+        error: 'Unable to connect to registration server. Please check your internet connection and try again.',
       };
     } catch (err: any) {
       console.error('Registration exception:', err);
@@ -2366,40 +1880,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setResults((prev) => [...prev, updatedResultRecord]);
     }
 
-    // Direct Cloud Upsert to Supabase
-    if (isSupabaseConfigured()) {
-      try {
-        const dbSubjectId = toDbSubjectId(updatedResultRecord.subject_id);
-        const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
-        const payload = {
-          student_id: updatedResultRecord.student_id,
-          class_id: updatedResultRecord.class_id,
-          subject_id: dbSubjectId,
-          school_id: activeSchoolId,
-          term: updatedResultRecord.term,
-          session: updatedResultRecord.session,
-          ca1: updatedResultRecord.ca1,
-          ca2: updatedResultRecord.ca2,
-          exam: updatedResultRecord.exam,
-          grade: updatedResultRecord.grade,
-          remarks: updatedResultRecord.remarks,
-          audited_by: updatedResultRecord.audited_by,
-          graded_at: updatedResultRecord.graded_at,
-          audit_timestamp: updatedResultRecord.audit_timestamp,
-        };
+    // Persist score via secure tenant data gateway
+    const dbSubjectId = toDbSubjectId(updatedResultRecord.subject_id);
+    const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+    const scorePayload = {
+      student_id: updatedResultRecord.student_id,
+      class_id: updatedResultRecord.class_id,
+      subject_id: dbSubjectId,
+      school_id: activeSchoolId,
+      term: updatedResultRecord.term,
+      session: updatedResultRecord.session,
+      ca1: updatedResultRecord.ca1,
+      ca2: updatedResultRecord.ca2,
+      exam: updatedResultRecord.exam,
+      grade: updatedResultRecord.grade,
+      remarks: updatedResultRecord.remarks,
+      audited_by: updatedResultRecord.audited_by,
+      graded_at: updatedResultRecord.graded_at,
+      audit_timestamp: updatedResultRecord.audit_timestamp,
+    };
 
-        const { error } = await supabase.from('term_results').upsert(payload, {
-          onConflict: 'student_id, subject_id, term, session',
-        });
+    const mutateRes = await mutateTenantData({
+      action: 'upsert',
+      table: 'term_results',
+      payload: scorePayload,
+    });
 
-        if (error) {
-          console.error('CRITICAL: Error saving score to Supabase term_results:', error);
-        } else {
-          console.log('✓ Successfully saved student score to Supabase term_results:', updatedResultRecord.student_name, updatedResultRecord.subject_name);
-        }
-      } catch (err) {
-        console.error('Error saving score to Supabase term_results:', err);
-      }
+    if (!mutateRes.success) {
+      console.warn('Tenant data gateway term_results upsert warning:', mutateRes.message);
     }
   };
 
@@ -2470,34 +1978,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setResults((prev) => [...prev, updatedResult]);
       }
 
-      if (isSupabaseConfigured()) {
-        try {
-          const dbSubjectId = toDbSubjectId(updatedResult.subject_id);
-          const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
-          const payload = {
-            student_id: updatedResult.student_id,
-            class_id: updatedResult.class_id,
-            subject_id: dbSubjectId,
-            school_id: activeSchoolId,
-            term: updatedResult.term,
-            session: updatedResult.session,
-            ca1: 0,
-            ca2: 0,
-            exam: 0,
-            grade: 'A',
-            remarks: encodedRemarks,
-            audited_by: updatedResult.audited_by,
-            graded_at: updatedResult.graded_at,
-            audit_timestamp: updatedResult.audit_timestamp,
-          };
+      // Persist early years score via secure tenant data gateway
+      const dbSubjectId = toDbSubjectId(updatedResult.subject_id);
+      const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+      const payload = {
+        student_id: updatedResult.student_id,
+        class_id: updatedResult.class_id,
+        subject_id: dbSubjectId,
+        school_id: activeSchoolId,
+        term: updatedResult.term,
+        session: updatedResult.session,
+        ca1: 0,
+        ca2: 0,
+        exam: 0,
+        grade: 'A',
+        remarks: encodedRemarks,
+        audited_by: updatedResult.audited_by,
+        graded_at: updatedResult.graded_at,
+        audit_timestamp: updatedResult.audit_timestamp,
+      };
 
-          await supabase.from('term_results').upsert(payload, {
-            onConflict: 'student_id, subject_id, term, session',
-          });
-        } catch (dbErr) {
-          console.warn('Supabase early years save note:', dbErr);
-        }
-      }
+      await mutateTenantData({
+        action: 'upsert',
+        table: 'term_results',
+        payload,
+      });
 
       return { success: true };
     } catch (e: any) {
@@ -2562,23 +2067,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setSessionCookie(updatedUser);
     }
 
-    // Centralize write to Supabase
-    if (isSupabaseConfigured()) {
-      const studentIds = studentsToPromote.map((s) => s.id);
-      Promise.resolve(
-        supabase
-          .from('students')
-          .update({
-            class_id: toClass.id,
-            class_grade: toClass.name,
-            session: toClass.session,
-          })
-          .in('id', studentIds)
-      )
-        .then((res: any) => {
-          if (res?.error) console.error('Error promoting students in Supabase:', res.error);
-        })
-        .catch((err: unknown) => console.error('Error promoting students in Supabase:', err));
+    // Persist class promotion via secure tenant data gateway
+    for (const s of studentsToPromote) {
+      void mutateTenantData({
+        action: 'update',
+        table: 'students',
+        payload: {
+          class_id: toClass.id,
+          class_grade: toClass.name,
+          session: toClass.session,
+        },
+        filter: { id: s.id },
+      });
     }
 
     addAnnouncement({
@@ -2679,75 +2179,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     setInvoices((prev) => [newInvoice, ...prev]);
 
-    // Persist to Supabase students table immediately with exact column mappings matching PostgreSQL schema
-    if (isSupabaseConfigured()) {
-      const studentPayload = {
-        id: newStudent.id,
-        school_id: activeSchoolId,
-        reg_number: newStudent.reg_number,
-        access_pin: newStudent.access_pin,
-        full_name: newStudent.full_name,
-        class_id: newStudent.class_id,
-        class_grade: newStudent.class_grade,
-        session: newStudent.session,
-        parent_name: newStudent.parent_name,
-        parent_phone: newStudent.parent_phone,
-        gpa: newStudent.gpa,
-        attendance_percentage: newStudent.attendance_percentage,
-        fee_paid: newStudent.fee_paid,
-        payment_status: newStudent.payment_status,
-        enrolled_by_role: newStudent.enrolled_by_role,
-        enrolled_by_name: newStudent.enrolled_by_name,
-        enrollment_date: newStudent.enrollment_date,
-        ndpa_consent_granted: newStudent.ndpa_consent_granted,
-        consent_timestamp: newStudent.consent_timestamp,
-        created_at: newStudent.created_at,
-      };
+    // Persist new student via secure tenant data gateway
+    const studentPayload = {
+      id: newStudent.id,
+      school_id: activeSchoolId,
+      reg_number: newStudent.reg_number,
+      access_pin: newStudent.access_pin,
+      full_name: newStudent.full_name,
+      class_id: newStudent.class_id,
+      class_grade: newStudent.class_grade,
+      session: newStudent.session,
+      parent_name: newStudent.parent_name,
+      parent_phone: newStudent.parent_phone,
+      gpa: newStudent.gpa,
+      attendance_percentage: newStudent.attendance_percentage,
+      fee_paid: newStudent.fee_paid,
+      payment_status: newStudent.payment_status,
+      enrolled_by_role: newStudent.enrolled_by_role,
+      enrolled_by_name: newStudent.enrolled_by_name,
+      enrollment_date: newStudent.enrollment_date,
+      ndpa_consent_granted: newStudent.ndpa_consent_granted,
+      consent_timestamp: newStudent.consent_timestamp,
+      created_at: newStudent.created_at,
+    };
 
-      try {
-        // Guarantee the referenced class exists in Supabase before foreign-key insertion
-        const { error: classUpsertError } = await supabase
-          .from('classes')
-          .upsert(
-            {
-              id: matchedClass.id,
-              name: matchedClass.name,
-              session: matchedClass.session,
-              level: matchedClass.level,
-              arm: matchedClass.arm || null,
-              stage: matchedClass.stage,
-              student_count: 0,
-            },
-            { onConflict: 'id' }
-          );
+    const res = await mutateTenantData({
+      action: 'insert',
+      table: 'students',
+      payload: studentPayload,
+    });
 
-        if (classUpsertError) {
-          console.warn('Class upsert warning (may be restricted by RLS if classes table not seeded):', classUpsertError.message);
-        }
-
-        const { error: studentInsertError } = await supabase.from('students').insert(studentPayload);
-        if (studentInsertError) {
-          console.error('CRITICAL: Supabase student insert failed:', studentInsertError);
-          return {
-            success: false,
-            student: newStudent,
-            error: studentInsertError.message || 'Supabase student insert failed',
-          };
-        } else {
-          console.log('✓ Successfully saved new student to Supabase students table:', newStudent.reg_number);
-          return {
-            success: true,
-            student: newStudent,
-          };
-        }
-      } catch (e: any) {
-        console.error('CRITICAL: Supabase student insert exception:', e);
-        return {
-          success: false,
-          student: newStudent,
-          error: e?.message || 'Unexpected exception during cloud persistence',
-        };
-      }
+    if (!res.success) {
+      console.warn('Tenant data gateway student insert notice:', res.message);
     }
 
     return {
@@ -2811,36 +2274,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [newStructure, ...filtered];
     });
 
-    if (isSupabaseConfigured()) {
-      try {
-        const payload = {
-          id: newStructure.id,
-          school_id: activeSchoolId,
-          class_id: newStructure.class_id,
-          class_name: newStructure.class_name,
-          term: newStructure.term,
-          session: newStructure.session,
-          line_items: newStructure.line_items,
-          total_amount: newStructure.total_amount,
-          published: newStructure.published,
-          published_at: newStructure.published_at,
-        };
+    // Persist fee structure via secure tenant data gateway
+    const payload = {
+      id: newStructure.id,
+      school_id: activeSchoolId,
+      class_id: newStructure.class_id,
+      class_name: newStructure.class_name,
+      term: newStructure.term,
+      session: newStructure.session,
+      line_items: newStructure.line_items,
+      total_amount: newStructure.total_amount,
+      published: newStructure.published,
+      published_at: newStructure.published_at,
+    };
 
-        const { error } = await supabase.from('fee_structures').upsert(payload, {
-          onConflict: 'class_id, term, session',
-        });
+    const res = await mutateTenantData({
+      action: 'upsert',
+      table: 'fee_structures',
+      payload,
+    });
 
-        if (error) {
-          console.error('CRITICAL: Supabase fee structure publish error:', error);
-          return { success: false, structure: newStructure, error: error.message };
-        } else {
-          console.log('✓ Successfully published fee structure to Supabase:', newStructure.class_name, newStructure.term);
-          return { success: true, structure: newStructure };
-        }
-      } catch (err: any) {
-        console.error('CRITICAL: Supabase fee structure publish exception:', err);
-        return { success: false, structure: newStructure, error: err?.message || 'Network error' };
-      }
+    if (!res.success) {
+      console.warn('Tenant data gateway fee structure publish notice:', res.message);
     }
 
     return { success: true, structure: newStructure };
@@ -2854,21 +2309,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteFeeStructure = async (id: string): Promise<{ success: boolean; error?: string }> => {
     setFeeStructures((prev) => prev.filter((f) => f.id !== id));
-    if (isSupabaseConfigured()) {
-      try {
-        const { error } = await supabase.from('fee_structures').delete().eq('id', id);
-        if (error) {
-          console.error('CRITICAL: Supabase fee structure delete error:', error);
-          return { success: false, error: error.message };
-        } else {
-          console.log('✓ Successfully deleted fee structure from Supabase:', id);
-          return { success: true };
-        }
-      } catch (err: any) {
-        console.error('CRITICAL: Supabase fee structure delete exception:', err);
-        return { success: false, error: err?.message || 'Network error' };
-      }
-    }
+    await mutateTenantData({
+      action: 'delete',
+      table: 'fee_structures',
+      filter: { id },
+    });
     return { success: true };
   };
 
@@ -3034,12 +2479,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           payload,
         });
 
-        const { error } = await supabase.from('receipts').insert(payload);
-        if (error) {
-          console.warn('Supabase direct receipt insert note:', error.message);
-        } else {
-          console.log('✓ Successfully saved receipt to Supabase receipts table:', newReceipt.id);
-        }
         return { success: true, receipt: newReceipt };
       } catch (err: any) {
         console.warn('Receipt insert exception:', err);
@@ -3129,31 +2568,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
-    if (isSupabaseConfigured()) {
-      try {
-        await Promise.all([
-          supabase
-            .from('receipts')
-            .update({
-              status: 'approved',
-              amount_approved: creditAmount,
-              reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
-              reviewed_at: new Date().toISOString(),
-            })
-            .eq('id', receiptId),
-          supabase
-            .from('students')
-            .update({
-              fee_paid: true,
-              payment_status: 'paid',
-              tuition_status: 'paid',
-            })
-            .eq('id', receipt.student_id),
-        ]);
-      } catch (err) {
-        console.error('Error approving receipt in Supabase:', err);
-      }
-    }
+    // Persist approval via secure tenant data gateway
+    void mutateTenantData({
+      action: 'update',
+      table: 'receipts',
+      payload: {
+        status: 'approved',
+        amount_approved: creditAmount,
+        reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
+        reviewed_at: new Date().toISOString(),
+      },
+      filter: { id: receiptId },
+    });
+
+    void mutateTenantData({
+      action: 'update',
+      table: 'students',
+      payload: {
+        fee_paid: true,
+        payment_status: 'paid',
+        tuition_status: 'paid',
+      },
+      filter: { id: receipt.student_id },
+    });
   };
 
   const confirmPartialPayment = async (receiptId: string, approvedAmount?: number, bursarNote?: string) => {
@@ -3240,32 +2677,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
-    if (isSupabaseConfigured()) {
-      try {
-        await Promise.all([
-          supabase
-            .from('receipts')
-            .update({
-              status: isFullyPaidNow ? 'approved' : 'partially_approved',
-              amount_approved: creditAmount,
-              reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
-              reviewed_at: new Date().toISOString(),
-              admin_note: bursarNote,
-            })
-            .eq('id', receiptId),
-          supabase
-            .from('students')
-            .update({
-              fee_paid: isFullyPaidNow,
-              payment_status: isFullyPaidNow ? 'paid' : 'partially_paid',
-              tuition_status: isFullyPaidNow ? 'paid' : 'partial',
-            })
-            .eq('id', receipt.student_id),
-        ]);
-      } catch (err) {
-        console.error('Error confirming partial payment in Supabase:', err);
-      }
-    }
+    // Persist partial payment via secure tenant data gateway
+    void mutateTenantData({
+      action: 'update',
+      table: 'receipts',
+      payload: {
+        status: isFullyPaidNow ? 'approved' : 'partially_approved',
+        amount_approved: creditAmount,
+        reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
+        reviewed_at: new Date().toISOString(),
+        admin_note: bursarNote,
+      },
+      filter: { id: receiptId },
+    });
+
+    void mutateTenantData({
+      action: 'update',
+      table: 'students',
+      payload: {
+        fee_paid: isFullyPaidNow,
+        payment_status: isFullyPaidNow ? 'paid' : 'partially_paid',
+        tuition_status: isFullyPaidNow ? 'paid' : 'partial',
+      },
+      filter: { id: receipt.student_id },
+    });
   };
 
   const rejectReceipt = async (receiptId: string, note?: string) => {
@@ -3315,21 +2750,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
     );
 
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase
-          .from('receipts')
-          .update({
-            status: 'rejected',
-            reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
-            reviewed_at: new Date().toISOString(),
-            admin_note: note,
-          })
-          .eq('id', receiptId);
-      } catch (err) {
-        console.error('Error rejecting receipt in Supabase:', err);
-      }
-    }
+    // Persist rejection via secure tenant data gateway
+    void mutateTenantData({
+      action: 'update',
+      table: 'receipts',
+      payload: {
+        status: 'rejected',
+        reviewed_by: currentUser?.id && currentUser.id.length === 36 ? currentUser.id : null,
+        reviewed_at: new Date().toISOString(),
+        admin_note: note,
+      },
+      filter: { id: receiptId },
+    });
   };
 
   // Teacher Registry & Security Controls (Admin)
@@ -3391,37 +2823,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    // Persist to Supabase staff table immediately with exact column mappings matching PostgreSQL schema
-    if (isSupabaseConfigured()) {
-      hashPassword(generatedPassword)
-        .then((hashedPass) => {
-          const staffPayload = {
-            id: newTeacher.id,
-            school_id: activeSchoolId,
-            staff_id_code: newTeacher.teacher_id_code,
-            full_name: newTeacher.full_name,
-            phone: newTeacher.phone,
-            email: newTeacher.email,
-            username: newTeacher.username,
-            password_hash: hashedPass,
-            role: newTeacher.role || 'teacher',
-            status: newTeacher.status,
-            assigned_subject_ids: newTeacher.assigned_subject_ids,
-            form_class_id: newTeacher.form_class_id || null,
-            session_token: newTeacher.session_token,
-          };
+    // Persist staff creation via secure tenant data gateway
+    hashPassword(generatedPassword)
+      .then((hashedPass) => {
+        const staffPayload = {
+          id: newTeacher.id,
+          school_id: activeSchoolId,
+          staff_id_code: newTeacher.teacher_id_code,
+          full_name: newTeacher.full_name,
+          phone: newTeacher.phone,
+          email: newTeacher.email,
+          username: newTeacher.username,
+          password_hash: hashedPass,
+          role: newTeacher.role || 'teacher',
+          status: newTeacher.status,
+          assigned_subject_ids: newTeacher.assigned_subject_ids,
+          form_class_id: newTeacher.form_class_id || null,
+          session_token: newTeacher.session_token,
+        };
 
-          return supabase.from('staff').insert(staffPayload);
-        })
-        .then((res: any) => {
-          if (res?.error) {
-            console.error('CRITICAL: Supabase staff insert failed:', res.error);
-          } else {
-            console.log('✓ Successfully saved new staff member to Supabase staff table:', newTeacher.teacher_id_code);
-          }
-        })
-        .catch((e: unknown) => console.error('CRITICAL: Supabase staff insert exception:', e));
-    }
+        return mutateTenantData({
+          action: 'insert',
+          table: 'staff',
+          payload: staffPayload,
+        });
+      })
+      .then((res: any) => {
+        if (!res?.success) {
+          console.warn('Tenant data gateway staff insert notice:', res?.message);
+        } else {
+          console.log('✓ Successfully saved new staff member via tenant gateway:', newTeacher.teacher_id_code);
+        }
+      })
+      .catch((e: unknown) => console.error('Staff insert exception:', e));
 
     return { teacher: newTeacher, initialPassword: generatedPassword };
   };
@@ -3488,42 +2922,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       })
     );
 
-    if (isSupabaseConfigured()) {
-      const dbUpdates: any = {};
-      if (updates.fullName) dbUpdates.full_name = updates.fullName;
-      if (updates.phone) dbUpdates.phone = updates.phone;
-      if (updates.email) dbUpdates.email = updates.email;
-      if (updates.role) dbUpdates.role = updates.role;
-      if (updates.assignedSubjects !== undefined || updates.assignedSubjectIds !== undefined) {
-        dbUpdates.assigned_subject_ids = updates.role === 'gate_security' ? [] : (updates.assignedSubjects || updates.assignedSubjectIds);
-      }
-      if (updates.role === 'gate_security' || updates.isPartTime) {
-        dbUpdates.form_class_id = null;
-      } else if (updates.formClassId !== undefined || updates.assignedClassId !== undefined) {
-        dbUpdates.form_class_id = updates.assignedClassId || updates.formClassId || null;
-      }
-
-      const syncStaffUpdate = async () => {
-        if (newPassword) {
-          const hashed = await hashPassword(newPassword);
-          dbUpdates.password_hash = hashed;
-          dbUpdates.session_token = newToken;
-        }
-        const res = await supabase.from('staff').update(dbUpdates).eq('id', teacherId);
-        if (res?.error) console.error('Supabase staff update error:', res.error);
-      };
-
-      syncStaffUpdate().catch((e: unknown) => console.error('Supabase staff update exception:', e));
+    const dbUpdates: any = {};
+    if (updates.fullName) dbUpdates.full_name = updates.fullName;
+    if (updates.phone) dbUpdates.phone = updates.phone;
+    if (updates.email) dbUpdates.email = updates.email;
+    if (updates.role) dbUpdates.role = updates.role;
+    if (updates.assignedSubjects !== undefined || updates.assignedSubjectIds !== undefined) {
+      dbUpdates.assigned_subject_ids = updates.role === 'gate_security' ? [] : (updates.assignedSubjects || updates.assignedSubjectIds);
     }
+    if (updates.role === 'gate_security' || updates.isPartTime) {
+      dbUpdates.form_class_id = null;
+    } else if (updates.formClassId !== undefined || updates.assignedClassId !== undefined) {
+      dbUpdates.form_class_id = updates.assignedClassId || updates.formClassId || null;
+    }
+
+    const syncStaffUpdate = async () => {
+      if (newPassword) {
+        const hashed = await hashPassword(newPassword);
+        dbUpdates.password_hash = hashed;
+        dbUpdates.session_token = newToken;
+      }
+      const res = await mutateTenantData({
+        action: 'update',
+        table: 'staff',
+        payload: dbUpdates,
+        filter: { id: teacherId },
+      });
+      if (!res.success) console.warn('Tenant data gateway staff update notice:', res.message);
+    };
+
+    syncStaffUpdate().catch((e: unknown) => console.error('Staff update exception:', e));
 
     return { success: true, newPassword };
   };
 
   const deleteTeacher = (teacherId: string) => {
     setTeachers((prev) => prev.filter((t) => t.id !== teacherId));
-    if (isSupabaseConfigured()) {
-      Promise.resolve(supabase.from('staff').delete().eq('id', teacherId)).catch(() => {});
-    }
+    void mutateTenantData({
+      action: 'delete',
+      table: 'staff',
+      filter: { id: teacherId },
+    });
     if (currentUser?.teacher_id === teacherId) {
       logout();
     }
@@ -3551,24 +2990,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentSchool(updatedSchool);
     setSchools((prev) => prev.map((s) => (s.id === updatedSchool.id ? updatedSchool : s)));
 
-    if (isSupabaseConfigured()) {
-      try {
-        const { error } = await supabase
-          .from('schools')
-          .update({
-            latitude: updatedSchool.latitude,
-            longitude: updatedSchool.longitude,
-            geofence_radius_meters: updatedSchool.geofence_radius_meters,
-          })
-          .eq('id', updatedSchool.id);
-
-        if (error) {
-          console.warn('Supabase geofence update warning:', error.message);
-        }
-      } catch (err: any) {
-        console.warn('Supabase geofence update caught note:', err);
-      }
-    }
+    void mutateTenantData({
+      action: 'update',
+      table: 'schools',
+      payload: {
+        latitude: updatedSchool.latitude,
+        longitude: updatedSchool.longitude,
+        geofence_radius_meters: updatedSchool.geofence_radius_meters,
+      },
+      filter: { id: updatedSchool.id },
+    });
 
     return { success: true };
   };
@@ -3589,26 +3020,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSchools((prev) => prev.map((s) => (s.id === updatedSchool.id ? updatedSchool : s)));
     setSessionCookie(currentUser, updatedSchool);
 
-    if (isSupabaseConfigured()) {
-      try {
-        // 1. Attempt updating logo_url column on public.schools table
-        const { error: schoolErr } = await supabase
-          .from('schools')
-          .update({ logo_url: logoUrl })
-          .eq('id', updatedSchool.id);
-
-        if (schoolErr) {
-          console.warn('Note: schools table logo_url column update note:', schoolErr.message);
-        }
-
-        // 2. Persist in high-availability access registry so logo always persists
-        await saveSchoolAccessMeta(supabase, updatedSchool.id, {
-          logo_url: logoUrl,
-        });
-      } catch (err: any) {
-        console.warn('Error updating school logo:', err);
-      }
-    }
+    void mutateTenantData({
+      action: 'update',
+      table: 'schools',
+      payload: { logo_url: logoUrl },
+      filter: { id: updatedSchool.id },
+    });
 
     return { success: true };
   };
@@ -3645,32 +3062,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSchools((prev) => prev.map((s) => (s.id === updatedSchool.id ? updatedSchool : s)));
     setSessionCookie(currentUser, updatedSchool);
 
-    if (isSupabaseConfigured()) {
-      try {
-        // 1. Attempt updating bank columns on public.schools table
-        const { error: schoolErr } = await supabase
-          .from('schools')
-          .update({
-            bank_name: cleanBank || null,
-            account_number: cleanNum || null,
-            account_name: cleanName || null,
-          })
-          .eq('id', updatedSchool.id);
-
-        if (schoolErr) {
-          console.warn('Note: schools table bank columns update note:', schoolErr.message);
-        }
-
-        // 2. Persist in high-availability access registry so bank details always persist
-        await saveSchoolAccessMeta(supabase, updatedSchool.id, {
-          bank_name: cleanBank || null,
-          account_number: cleanNum || null,
-          account_name: cleanName || null,
-        });
-      } catch (err: any) {
-        console.warn('Error updating school bank details:', err);
-      }
-    }
+    void mutateTenantData({
+      action: 'update',
+      table: 'schools',
+      payload: {
+        bank_name: cleanBank || null,
+        account_number: cleanNum || null,
+        account_name: cleanName || null,
+      },
+      filter: { id: updatedSchool.id },
+    });
 
     return { success: true };
   };
@@ -3800,18 +3201,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       payload: attPayload,
     });
 
-    // Persist to Supabase staff_attendance (fallback)
-    if (isSupabaseConfigured()) {
-      try {
-        const { error } = await supabase.from('staff_attendance').insert(attPayload);
 
-        if (error) {
-          console.warn('Supabase staff attendance insert note:', error.message);
-        }
-      } catch (err: any) {
-        console.warn('Supabase staff attendance caught note:', err);
-      }
-    }
 
     return {
       success: true,
@@ -3930,16 +3320,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         payload: passPayload,
       });
 
-      if (isSupabaseConfigured()) {
-        try {
-          const { error } = await supabase.from('pickup_passes').insert(passPayload);
-          if (error) {
-            console.warn('Supabase pickup_passes insert note:', error.message);
-          }
-        } catch (err: any) {
-          console.warn('Supabase pickup_passes insert caught exception:', err);
-        }
-      }
+
 
       return { success: true, pass: newPass };
     } catch (e: any) {
@@ -3999,16 +3380,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         payload: delegatePayload,
       });
 
-      if (isSupabaseConfigured()) {
-        try {
-          const { error } = await supabase.from('pickup_passes').insert(delegatePayload);
-          if (error) {
-            console.warn('Supabase delegate pass insert note:', error.message);
-          }
-        } catch (err: any) {
-          console.warn('Supabase delegate pass insert caught exception:', err);
-        }
-      }
+
 
       return { success: true, pass: newPass };
     } catch (e: any) {
@@ -4103,21 +3475,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return false;
       }) || null;
 
-      // If not in local memory, query Supabase directly
-      if (!matchedPass && isSupabaseConfigured()) {
+      // If not in local memory, query dedicated pickup-pass server API
+      if (!matchedPass && targetToken) {
         try {
-          let query = supabase.from('pickup_passes').select('*').eq('school_id', activeSchoolId);
-          if (targetOtp) {
-            query = query.eq('otp_code', targetOtp);
-          } else if (targetToken) {
-            query = query.eq('qr_token', targetToken);
+          const res = await fetch(`/api/pickup-pass?token=${encodeURIComponent(targetToken)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.pass && data.pass.school_id === activeSchoolId) {
+              matchedPass = normalizePickupPass(data.pass);
+            }
           }
-          const { data, error } = await query.maybeSingle();
-          if (!error && data) {
-            matchedPass = normalizePickupPass(data);
-          }
-        } catch (dbErr) {
-          console.warn('Supabase verify pass query note:', dbErr);
+        } catch (apiErr) {
+          console.warn('Pickup pass API lookup note:', apiErr);
         }
       }
 

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ShieldCheck, Clock, AlertTriangle, CheckCircle2, User, Building2, Calendar, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SchoolLogo } from '@/components/SchoolLogo';
@@ -40,51 +39,17 @@ function PublicPickupPassContent() {
       setLoading(true);
       setErrorMsg(null);
 
-      if (!isSupabaseConfigured()) {
-        // Fallback mock pass for offline/dev demo
-        setPassData({
-          pass_type: 'DELEGATE_5H',
-          delegate_name: 'Authorized Collector',
-          otp_code: '482910',
-          qr_token: token,
-          status: 'ACTIVE',
-          expires_at: new Date(Date.now() + 3.5 * 3600 * 1000).toISOString(),
-          student_name: 'Student Scholar',
-          student_class: 'SS1 Arm A',
-          school_name: 'Aegis Academy Nigeria',
-        });
-        setLoading(false);
-        return;
-      }
-
       try {
-        // 1. Fetch pass strictly by qr_token
-        const { data: pass, error: passErr } = await supabase
-          .from('pickup_passes')
-          .select('id, school_id, student_id, pass_type, delegate_name, otp_code, qr_token, status, expires_at, picked_up_at')
-          .eq('qr_token', token)
-          .maybeSingle();
+        const res = await fetch(`/api/pickup-pass?token=${encodeURIComponent(token)}`);
+        const data = await res.json().catch(() => null);
 
-        if (passErr || !pass) {
-          setErrorMsg('Invalid or non-existent pick-up pass.');
+        if (!res.ok || !data?.success || !data.pass) {
+          setErrorMsg(data?.message || 'Invalid or non-existent pick-up pass.');
           setLoading(false);
           return;
         }
 
-        // 2. Fetch student minimal display fields only (NO grades, NO fees, NO pins)
-        const { data: student } = await supabase
-          .from('students')
-          .select('full_name, class_grade')
-          .eq('id', pass.student_id)
-          .maybeSingle();
-
-        // 3. Fetch school name
-        const { data: school } = await supabase
-          .from('schools')
-          .select('name')
-          .eq('id', pass.school_id)
-          .maybeSingle();
-
+        const pass = data.pass;
         setPassData({
           pass_type: pass.pass_type,
           delegate_name: pass.delegate_name,
@@ -93,12 +58,13 @@ function PublicPickupPassContent() {
           status: pass.status,
           expires_at: pass.expires_at,
           picked_up_at: pass.picked_up_at,
-          student_name: student?.full_name || 'Enrolled Student',
-          student_class: student?.class_grade || 'Primary / Secondary',
-          school_name: school?.name || 'Aegis Academy',
+          student_name: pass.student_name,
+          student_class: pass.student_class,
+          school_name: pass.school_name,
         });
       } catch (err: any) {
-        setErrorMsg('Failed loading gate pass details.');
+        console.warn('Error fetching public pass:', err);
+        setErrorMsg('Failed loading gate pass details. Please check network connection.');
       } finally {
         setLoading(false);
       }

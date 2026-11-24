@@ -870,43 +870,46 @@ export default function AcademicHubPage() {
 
   // Initialize and read existing early years commentary from results
   useEffect(() => {
-    const map: Record<string, EarlyYearsCommentary> = {};
-    classStudents.forEach((std) => {
-      const match = results.find(
-        (r) =>
-          r.student_id === std.id &&
-          r.term === selectedTerm &&
-          (r.session === session || !r.session) &&
-          (Boolean(r.early_years_data) ||
-            (typeof r.remarks === 'string' && r.remarks.startsWith('EY_DATA:')) ||
-            r.subject_id === 'subj-ec-lang' ||
-            r.subject_id === 'sub-eng' ||
-            r.subject_id === 'subj-j-eng')
-      );
+    setEyPupilComments((prevMap) => {
+      const nextMap = { ...prevMap };
+      classStudents.forEach((std) => {
+        // Find result matching student and term/session
+        const match = results.find(
+          (r) =>
+            r.student_id === std.id &&
+            r.term === selectedTerm &&
+            (r.session === session || !r.session) &&
+            (Boolean(r.early_years_data) ||
+              (typeof r.remarks === 'string' && r.remarks.startsWith('EY_DATA:')) ||
+              r.subject_id === 'subj-ec-lang' ||
+              r.subject_id === 'sub-eng' ||
+              r.subject_id === 'subj-j-eng')
+        );
 
-      let commentary: EarlyYearsCommentary | null = match?.early_years_data || null;
-      if (!commentary && match?.remarks && typeof match.remarks === 'string' && match.remarks.startsWith('EY_DATA:')) {
-        try {
-          commentary = JSON.parse(match.remarks.replace('EY_DATA:', ''));
-        } catch {}
-      }
+        let commentary: EarlyYearsCommentary | null = match?.early_years_data || null;
+        if (!commentary && match?.remarks && typeof match.remarks === 'string' && match.remarks.startsWith('EY_DATA:')) {
+          try {
+            commentary = JSON.parse(match.remarks.replace('EY_DATA:', ''));
+          } catch {}
+        }
 
-      if (commentary && commentary.ratings) {
-        map[std.id] = commentary;
-      } else {
-        map[std.id] = {
-          ratings: {
-            language_phonics: 'Developing',
-            early_numeracy: 'Developing',
-            motor_skills: 'Proficient',
-            social_emotional: 'Proficient',
-            hygiene_health: 'Proficient',
-          },
-          narrative_observation: '',
-        };
-      }
+        if (commentary && commentary.ratings) {
+          nextMap[std.id] = commentary;
+        } else if (!nextMap[std.id]) {
+          nextMap[std.id] = {
+            ratings: {
+              language_phonics: 'Developing',
+              early_numeracy: 'Developing',
+              motor_skills: 'Proficient',
+              social_emotional: 'Proficient',
+              hygiene_health: 'Proficient',
+            },
+            narrative_observation: '',
+          };
+        }
+      });
+      return nextMap;
     });
-    setEyPupilComments(map);
   }, [classStudents, results, selectedTerm, session]);
 
   const handleEyRatingChange = (

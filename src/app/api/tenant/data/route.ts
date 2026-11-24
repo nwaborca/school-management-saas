@@ -253,6 +253,22 @@ export async function POST(req: NextRequest) {
           if (updateRes.error) {
             return NextResponse.json({ success: false, message: updateRes.error.message }, { status: 400 });
           }
+
+          // If this is commentary, ensure remarks and grade weren't reset by trigger
+          const remarksStr = typeof sanitizedPayload.remarks === 'string' ? sanitizedPayload.remarks : '';
+          const isCommentary = remarksStr.startsWith('EY_DATA:') || sanitizedPayload.grade === 'A';
+          if (isCommentary) {
+            try {
+              await supabase
+                .from('term_results')
+                .update({
+                  remarks: sanitizedPayload.remarks,
+                  grade: sanitizedPayload.grade || 'A',
+                })
+                .eq('id', updateId);
+            } catch {}
+          }
+
           return NextResponse.json({ success: true, count: 1 });
         }
       }
@@ -270,6 +286,30 @@ export async function POST(req: NextRequest) {
 
       if (res.error) {
         return NextResponse.json({ success: false, message: res.error.message }, { status: 400 });
+      }
+
+      // If this is an early years or commentary term_results record, the database calculation trigger
+      // (handle_result_grade_calculation) calculates 0 + 0 + 0 = 0 and forcibly overwrites remarks with 'Fail (F9)'.
+      // We immediately patch remarks and grade without touching ca1/ca2/exam, bypassing the calculation trigger.
+      if (table === 'term_results' && sanitizedPayload) {
+        const remarksStr = typeof sanitizedPayload.remarks === 'string' ? sanitizedPayload.remarks : '';
+        const isCommentary = remarksStr.startsWith('EY_DATA:') || sanitizedPayload.grade === 'A';
+        if (isCommentary && sanitizedPayload.student_id && sanitizedPayload.subject_id) {
+          try {
+            await supabase
+              .from('term_results')
+              .update({
+                remarks: sanitizedPayload.remarks,
+                grade: sanitizedPayload.grade || 'A',
+              })
+              .eq('student_id', sanitizedPayload.student_id)
+              .eq('subject_id', sanitizedPayload.subject_id)
+              .eq('term', sanitizedPayload.term)
+              .eq('session', sanitizedPayload.session || sanitizedPayload.academic_session);
+          } catch (patchErr) {
+            console.warn('Non-fatal term_results commentary patch warning:', patchErr);
+          }
+        }
       }
 
       return NextResponse.json({ success: true, count: Array.isArray(payload) ? payload.length : 1 });

@@ -122,9 +122,10 @@ export default function AcademicHubPage() {
 
   // Mobile Drawer Tab Switch Listener
   useEffect(() => {
-    const handleSwitch = (e: CustomEvent<{ tab: 'entry' | 'form_roster' | 'pickup_gate' | 'dismissal' | 'enroll_student' }>) => {
+    const handleSwitch = (e: CustomEvent<{ tab: 'entry' | 'form_roster' | 'broadsheet' | 'pickup_gate' | 'dismissal' | 'enroll_student' }>) => {
       if (e.detail?.tab) {
-        setActiveTab(e.detail.tab);
+        const targetTab = e.detail.tab === 'broadsheet' ? 'form_roster' : e.detail.tab;
+        setActiveTab(targetTab);
         const el = document.getElementById('academic-content-panel');
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1144,7 +1145,7 @@ export default function AcademicHubPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-200 gap-4 overflow-x-auto">
+        <div className="hidden md:flex border-b border-slate-200 gap-4 overflow-x-auto">
           <button
             onClick={() => setActiveTab('entry')}
             className={`pb-3 text-sm font-bold transition border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
@@ -1917,20 +1918,20 @@ export default function AcademicHubPage() {
                 Enter Collector 6-Digit Gate Pass OTP
               </h3>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <input
                   type="text"
                   maxLength={6}
                   placeholder="e.g. 482910"
                   value={pickupInputCode}
                   onChange={(e) => setPickupInputCode(e.target.value.replace(/\D/g, ''))}
-                  className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-2xl font-mono font-black text-center tracking-widest text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full sm:flex-1 min-w-0 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-2xl font-mono font-black text-center tracking-widest text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
                 />
                 <button
                   type="button"
                   onClick={() => handleVerifyPassCode()}
                   disabled={isVerifyingPass || pickupInputCode.length < 6}
-                  className="px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-40"
+                  className="w-full sm:w-auto shrink-0 px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-40"
                 >
                   {isVerifyingPass ? 'Verifying...' : 'Verify OTP'}
                 </button>

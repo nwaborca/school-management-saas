@@ -478,6 +478,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     payload?: any;
     filter?: Record<string, any>;
     targetSchoolId?: string;
+    onConflict?: string;
   }): Promise<{ success: boolean; message?: string }> => {
     try {
       const activeSchoolId = params.targetSchoolId || currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
@@ -550,13 +551,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const exam = Number(r.exam) || 0;
     const total_score = Number(r.total_score) || (ca1 + ca2 + exam);
 
-    // Extract Early Years commentary data if packed in r.early_years_data or parsed from r.remarks JSON
+    // Extract Early Years commentary data if packed in r.early_years_data, domain_ratings, or parsed from r.remarks JSON
     let earlyYearsData = r.early_years_data || null;
+    if (!earlyYearsData && r.domain_ratings) {
+      earlyYearsData = {
+        ratings: typeof r.domain_ratings === 'string' ? JSON.parse(r.domain_ratings) : r.domain_ratings,
+        narrative_observation: r.teacher_comment || r.narrative_observation || '',
+        updated_at: r.updated_at || r.audit_timestamp,
+        teacher_name: r.teacher_name || r.audited_by,
+      };
+    }
     if (!earlyYearsData && typeof r.remarks === 'string' && r.remarks.startsWith('EY_DATA:')) {
       try {
         earlyYearsData = JSON.parse(r.remarks.replace('EY_DATA:', ''));
       } catch {}
     }
+
+    // Preserve commentary grades and flags
+    const isCommentary = Boolean(
+      r.is_commentary ||
+      earlyYearsData ||
+      (typeof r.remarks === 'string' && r.remarks.startsWith('EY_DATA:'))
+    );
+    const resolvedGrade = r.commentary_grade || r.grade || (isCommentary ? 'A' : 'F');
+    const resolvedTotal = isCommentary && (r.total_score === undefined || r.total_score === null || Number(r.total_score) === 0)
+      ? 100
+      : total_score;
 
     return {
       id: r.id,
@@ -568,12 +588,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       subject_id: resolvedSubjectId,
       subject_name: r.subject_name || subject?.name || 'Subject',
       term: r.term,
-      session: r.session,
+      session: r.session || r.academic_session,
       ca1,
       ca2,
       exam,
-      total_score,
-      grade: r.grade,
+      total_score: resolvedTotal,
+      grade: resolvedGrade,
       remarks: r.remarks,
       early_years_data: earlyYearsData,
       audited_by: r.audited_by,
@@ -1908,6 +1928,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       action: 'upsert',
       table: 'term_results',
       payload: scorePayload,
+      onConflict: 'student_id,subject_id,term,session',
     });
 
     if (!mutateRes.success) {
@@ -1986,6 +2007,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const dbSubjectId = toDbSubjectId(updatedResult.subject_id);
       const activeSchoolId = currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
       const payload = {
+        id: updatedResult.id?.startsWith('res-ey-') ? undefined : updatedResult.id,
         student_id: updatedResult.student_id,
         class_id: updatedResult.class_id,
         subject_id: dbSubjectId,
@@ -2002,11 +2024,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         audit_timestamp: updatedResult.audit_timestamp,
       };
 
-      await mutateTenantData({
+      const mutateRes = await mutateTenantData({
         action: 'upsert',
         table: 'term_results',
         payload,
+        onConflict: 'student_id,subject_id,term,session',
       });
+
+      if (!mutateRes.success) {
+        return { success: false, error: mutateRes.message || 'Database rejected commentary update' };
+      }
 
       return { success: true };
     } catch (e: any) {

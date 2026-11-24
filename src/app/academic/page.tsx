@@ -97,7 +97,7 @@ export default function AcademicHubPage() {
 
   // Early Years Grading State (Creche, KG, Nursery)
   const [eyPupilComments, setEyPupilComments] = useState<Record<string, EarlyYearsCommentary>>({});
-  const [eySavingNotice, setEySavingNotice] = useState<string | null>(null);
+  const [eySavingNotice, setEySavingNotice] = useState<{ type: 'success' | 'error' | 'saving'; message: string } | null>(null);
 
   // Route Guard: Strictly require teacher role (Admins have Admin & Bursar Hubs)
   useEffect(() => {
@@ -958,7 +958,8 @@ export default function AcademicHubPage() {
     const commentData = eyPupilComments[studentId];
     if (!commentData) return;
 
-    setEySavingNotice('Saving developmental observation...');
+    const pupilName = students.find((s) => s.id === studentId)?.full_name || 'pupil';
+    setEySavingNotice({ type: 'saving', message: `Saving developmental observation for ${pupilName}...` });
     try {
       const res = await updateEarlyYearsCommentary(
         studentId,
@@ -969,15 +970,15 @@ export default function AcademicHubPage() {
       );
 
       if (res.success) {
-        setEySavingNotice(`Saved observation for ${students.find((s) => s.id === studentId)?.full_name || 'pupil'}!`);
-        setTimeout(() => setEySavingNotice(null), 3000);
+        setEySavingNotice({ type: 'success', message: `Saved observation for ${pupilName}!` });
+        setTimeout(() => setEySavingNotice(null), 3500);
       } else {
-        setEySavingNotice(`Save error: ${res.error || 'Failed'}`);
-        setTimeout(() => setEySavingNotice(null), 3000);
+        setEySavingNotice({ type: 'error', message: `Save error for ${pupilName}: ${res.error || 'Failed'}` });
+        setTimeout(() => setEySavingNotice(null), 5000);
       }
     } catch {
-      setEySavingNotice('Error saving developmental report.');
-      setTimeout(() => setEySavingNotice(null), 3000);
+      setEySavingNotice({ type: 'error', message: `Error saving developmental report for ${pupilName}.` });
+      setTimeout(() => setEySavingNotice(null), 5000);
     }
   };
 
@@ -1292,9 +1293,23 @@ export default function AcademicHubPage() {
                     </p>
                   </div>
                   {eySavingNotice && (
-                    <span className="text-xs font-semibold text-emerald-700 bg-white px-3 py-1.5 rounded-lg border border-emerald-300 shadow-xs flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 animate-pulse" />
-                      {eySavingNotice}
+                    <span
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg border shadow-xs flex items-center gap-1.5 ${
+                        eySavingNotice.type === 'error'
+                          ? 'text-rose-700 bg-rose-50 border-rose-300'
+                          : eySavingNotice.type === 'saving'
+                          ? 'text-amber-700 bg-amber-50 border-amber-300'
+                          : 'text-emerald-700 bg-emerald-50 border-emerald-300'
+                      }`}
+                    >
+                      {eySavingNotice.type === 'error' ? (
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      ) : eySavingNotice.type === 'saving' ? (
+                        <RefreshCw className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 animate-pulse shrink-0" />
+                      )}
+                      <span>{eySavingNotice.message}</span>
                     </span>
                   )}
                 </div>

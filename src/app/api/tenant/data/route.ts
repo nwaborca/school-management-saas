@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
     const session = sessionJwt ? await verifySessionToken(sessionJwt) : null;
 
     const body = await req.json();
-    const { action, table, payload, filter, targetSchoolId } = body;
+    const { action, table, payload, filter, targetSchoolId, onConflict } = body;
 
     const resolvedSchoolId = session?.schoolId || targetSchoolId;
 
@@ -226,10 +226,47 @@ export async function POST(req: NextRequest) {
         ? payload.map((item) => ({ ...item, school_id: resolvedSchoolId }))
         : { ...payload, school_id: resolvedSchoolId };
 
+      // Safe UPSERT for term_results and tables with composite unique constraints
+      if (action === 'upsert' && table === 'term_results' && !Array.isArray(sanitizedPayload)) {
+        // First check if an existing row matches the unique constraint or provided id
+        let existingRowQuery = supabase.from('term_results').select('id');
+        if (sanitizedPayload.id) {
+          existingRowQuery = existingRowQuery.eq('id', sanitizedPayload.id);
+        } else if (
+          sanitizedPayload.student_id &&
+          sanitizedPayload.subject_id &&
+          sanitizedPayload.term &&
+          (sanitizedPayload.session || sanitizedPayload.academic_session)
+        ) {
+          existingRowQuery = existingRowQuery
+            .eq('student_id', sanitizedPayload.student_id)
+            .eq('subject_id', sanitizedPayload.subject_id)
+            .eq('term', sanitizedPayload.term)
+            .eq('session', sanitizedPayload.session || sanitizedPayload.academic_session);
+        }
+
+        const { data: existingRows } = await existingRowQuery.limit(1);
+        if (existingRows && existingRows.length > 0) {
+          const updateId = existingRows[0].id;
+          const { id: _ignoredId, ...updateFields } = sanitizedPayload;
+          const updateRes = await supabase.from('term_results').update(updateFields).eq('id', updateId);
+          if (updateRes.error) {
+            return NextResponse.json({ success: false, message: updateRes.error.message }, { status: 400 });
+          }
+          return NextResponse.json({ success: true, count: 1 });
+        }
+      }
+
       let query = supabase.from(table);
-      const res = action === 'upsert'
-        ? await query.upsert(sanitizedPayload)
-        : await query.insert(sanitizedPayload);
+      let res;
+      if (action === 'upsert') {
+        const resolvedConflict = onConflict || (table === 'term_results' ? 'student_id,subject_id,term,session' : undefined);
+        res = resolvedConflict
+          ? await query.upsert(sanitizedPayload, { onConflict: resolvedConflict })
+          : await query.upsert(sanitizedPayload);
+      } else {
+        res = await query.insert(sanitizedPayload);
+      }
 
       if (res.error) {
         return NextResponse.json({ success: false, message: res.error.message }, { status: 400 });

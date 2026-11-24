@@ -890,6 +890,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             const rawSchool = gData.school;
             const enrichedSchool: School = {
               ...rawSchool,
+              latitude: rawSchool.latitude !== null && rawSchool.latitude !== undefined ? Number(rawSchool.latitude) : rawSchool.latitude,
+              longitude: rawSchool.longitude !== null && rawSchool.longitude !== undefined ? Number(rawSchool.longitude) : rawSchool.longitude,
+              geofence_radius_meters: rawSchool.geofence_radius_meters !== null && rawSchool.geofence_radius_meters !== undefined ? Number(rawSchool.geofence_radius_meters) : 150,
+              resumption_cutoff_time: rawSchool.resumption_cutoff_time || '08:00',
               logo_url: rawSchool.logo_url || null,
               logoUrl: rawSchool.logo_url || null,
               bank_name: rawSchool.bank_name || null,
@@ -2997,6 +3001,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         latitude: updatedSchool.latitude,
         longitude: updatedSchool.longitude,
         geofence_radius_meters: updatedSchool.geofence_radius_meters,
+        resumption_cutoff_time: updatedSchool.resumption_cutoff_time,
       },
       filter: { id: updatedSchool.id },
     });

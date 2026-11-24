@@ -247,6 +247,21 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Special handling for the 'schools' table which uses 'id' instead of 'school_id'
+      if (table === 'schools') {
+        let query = supabase.from('schools').update(payload).eq('id', resolvedSchoolId);
+        for (const [key, val] of Object.entries(filter)) {
+          if (key !== 'id' && key !== 'school_id' && val !== undefined) {
+            query = query.eq(key, val);
+          }
+        }
+        const res = await query;
+        if (res.error) {
+          return NextResponse.json({ success: false, message: res.error.message }, { status: 400 });
+        }
+        return NextResponse.json({ success: true });
+      }
+
       // Never update or overwrite another tenant's rows
       let query = supabase.from(table).update(payload).eq('school_id', resolvedSchoolId);
 

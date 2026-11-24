@@ -254,7 +254,26 @@ export default function AdminHubPage() {
   const [geofenceRadius, setGeofenceRadius] = useState<number>(currentSchool?.geofence_radius_meters || 150);
   const [resumptionCutoff, setResumptionCutoff] = useState<string>(currentSchool?.resumption_cutoff_time || '08:00');
   const [isCapturingGps, setIsCapturingGps] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [geofenceSaveNotice, setGeofenceSaveNotice] = useState<string | null>(null);
+
+  // Sync local geofence inputs whenever currentSchool updates or loads
+  useEffect(() => {
+    if (currentSchool) {
+      if (currentSchool.latitude !== undefined && currentSchool.latitude !== null) {
+        setGeofenceLat(currentSchool.latitude.toString());
+      }
+      if (currentSchool.longitude !== undefined && currentSchool.longitude !== null) {
+        setGeofenceLon(currentSchool.longitude.toString());
+      }
+      if (currentSchool.geofence_radius_meters) {
+        setGeofenceRadius(currentSchool.geofence_radius_meters);
+      }
+      if (currentSchool.resumption_cutoff_time) {
+        setResumptionCutoff(currentSchool.resumption_cutoff_time);
+      }
+    }
+  }, [currentSchool?.id, currentSchool?.latitude, currentSchool?.longitude, currentSchool?.geofence_radius_meters, currentSchool?.resumption_cutoff_time]);
 
   // Attendance Log Filters
   const [attendancePeriodFilter, setAttendancePeriodFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
@@ -1917,25 +1936,33 @@ export default function AdminHubPage() {
                           (pos) => {
                             setGeofenceLat(pos.coords.latitude.toFixed(6));
                             setGeofenceLon(pos.coords.longitude.toFixed(6));
+                            setGpsAccuracy(Math.round(pos.coords.accuracy));
                             setIsCapturingGps(false);
-                            setGeofenceSaveNotice('Current GPS coordinates captured! Click "Save Campus Geofence" to apply.');
-                            setTimeout(() => setGeofenceSaveNotice(null), 4000);
+                            setGeofenceSaveNotice(`Current satellite GPS locked (±${Math.round(pos.coords.accuracy)}m accuracy)! Click "Save Campus Geofence" to apply.`);
+                            setTimeout(() => setGeofenceSaveNotice(null), 5000);
                           },
                           (err) => {
                             setIsCapturingGps(false);
                             alert(`GPS capture failed: ${err.message}`);
                           },
-                          { enableHighAccuracy: true, timeout: 15000 }
+                          { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
                         );
                       }}
                       className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition cursor-pointer border border-slate-300 flex items-center gap-1.5"
                     >
                       <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                      <span>{isCapturingGps ? 'Capturing GPS...' : 'Capture Current School GPS Location'}</span>
+                      <span>{isCapturingGps ? 'Locking Satellite GPS...' : 'Use Current Device Location'}</span>
                     </button>
-                    <p className="text-[11px] text-slate-500">
-                      Tip: For best accuracy, capture your school&apos;s GPS coordinates using a mobile phone at the school gate/staffroom rather than a desktop/laptop.
-                    </p>
+                    <div className="flex items-center gap-2">
+                      {gpsAccuracy !== null && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span>Live GPS Accuracy: ±{gpsAccuracy}m</span>
+                        </span>
+                      )}
+                      <p className="text-[11px] text-slate-500">
+                        Tip: For best accuracy, capture your school&apos;s GPS coordinates using a mobile phone at the school gate/staffroom rather than a desktop/laptop.
+                      </p>
+                    </div>
                   </div>
 
                   <button

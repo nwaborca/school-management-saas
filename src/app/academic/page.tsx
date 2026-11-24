@@ -555,7 +555,7 @@ export default function AcademicHubPage() {
     setAttendanceNotice(null);
 
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-      // Step 1: High-accuracy GPS request
+      // Step 1: Force high-accuracy satellite GPS request
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           setCachedCoords({
@@ -565,7 +565,7 @@ export default function AcademicHubPage() {
           setIsScannerOpen(true);
         },
         (err) => {
-          console.warn('High-accuracy GPS attempt failed/timed out, retrying with fallback:', err);
+          console.warn('High-accuracy satellite GPS attempt failed/timed out, retrying with fallback:', err);
           // Step 2: Fallback request (cell tower / Wi-Fi) with relaxed timeout & maximumAge
           navigator.geolocation.getCurrentPosition(
             (fallbackPos) => {
@@ -584,7 +584,7 @@ export default function AcademicHubPage() {
             { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
           );
         },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
       );
     } else {
       setCachedCoords(null);
@@ -655,7 +655,7 @@ export default function AcademicHubPage() {
             { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
           );
         },
-        { enableHighAccuracy: true, timeout: 6000, maximumAge: 15000 }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
       );
     } else {
       executeClockIn(null);

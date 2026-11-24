@@ -21,6 +21,7 @@ import {
   GraduationCap,
   Eye,
   EyeOff,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function TeacherRegistry() {
@@ -57,6 +58,32 @@ export default function TeacherRegistry() {
   const [viewingCredentialsTeacher, setViewingCredentialsTeacher] = useState<TeacherProfile | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<{ [teacherId: string]: boolean }>({});
   const [registerStatus, setRegisterStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [freshPasswords, setFreshPasswords] = useState<{ [teacherId: string]: string }>({});
+
+  const handleQuickResetPassword = (t: TeacherProfile) => {
+    const res = updateTeacher(t.id, {
+      fullName: t.full_name,
+      phone: t.phone,
+      email: t.email,
+      role: t.role,
+      resetCredentials: true,
+    });
+
+    const newPass = res.newPassword;
+    if (newPass) {
+      setFreshPasswords((prev) => ({
+        ...prev,
+        [t.id]: newPass,
+      }));
+      setNewCredentialsModal({
+        teacherName: t.full_name,
+        teacherIdCode: t.teacher_id_code,
+        username: t.username,
+        password: newPass,
+        isReset: true,
+      });
+    }
+  };
 
   const togglePasswordVisibility = (teacherId: string) => {
     setVisiblePasswords((prev) => ({
@@ -136,6 +163,10 @@ export default function TeacherRegistry() {
       });
 
       setIsRegisterOpen(false);
+      setFreshPasswords((prev) => ({
+        ...prev,
+        [res.teacher.id]: res.initialPassword,
+      }));
       setNewCredentialsModal({
         teacherName: res.teacher.full_name,
         teacherIdCode: res.teacher.teacher_id_code,
@@ -201,6 +232,10 @@ export default function TeacherRegistry() {
     setEditingTeacher(null);
 
     if (resetCredentials && newPass) {
+      setFreshPasswords((prev) => ({
+        ...prev,
+        [editingTeacher.id]: newPass,
+      }));
       setNewCredentialsModal({
         teacherName,
         teacherIdCode,
@@ -221,7 +256,8 @@ export default function TeacherRegistry() {
 
   const copyCredentials = () => {
     if (!newCredentialsModal) return;
-    const text = `APEX ACADEMY FACULTY CREDENTIALS\nName: ${newCredentialsModal.teacherName}\nTeacher ID: ${newCredentialsModal.teacherIdCode}\nLogin Username: ${newCredentialsModal.username}\nPassword: ${newCredentialsModal.password}\nPortal Link: http://localhost:3000/login`;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://aegis-school.vercel.app';
+    const text = `AEGIS FACULTY / STAFF CREDENTIALS\nName: ${newCredentialsModal.teacherName}\nStaff ID: ${newCredentialsModal.teacherIdCode}\nLogin Username: ${newCredentialsModal.username}\nPassword: ${newCredentialsModal.password}\nPortal Link: ${origin}/login`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -311,44 +347,63 @@ export default function TeacherRegistry() {
                         <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200">
                           <span className="text-slate-500 text-[10px] uppercase font-semibold">Pass:</span>
                           <div className="flex items-center gap-1 font-mono">
-                            <span className="text-rose-300 font-bold tracking-wider">
-                              {isPwVisible ? t.password_hash : '••••••••'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => togglePasswordVisibility(t.id)}
-                              className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
-                              title={isPwVisible ? 'Hide password' : 'Show password'}
-                            >
-                              {isPwVisible ? (
-                                <EyeOff className="w-3 h-3 text-blue-600" />
-                              ) : (
-                                <Eye className="w-3 h-3" />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => copyTextToClipboard(t.password_hash, `p-${t.id}`)}
-                              className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
-                              title="Copy password"
-                            >
-                              {copiedField === `p-${t.id}` ? (
-                                <Check className="w-3 h-3 text-emerald-400" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
+                            {freshPasswords[t.id] ? (
+                              <>
+                                <span className="text-emerald-600 font-bold tracking-wider">
+                                  {isPwVisible ? freshPasswords[t.id] : '••••••••'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePasswordVisibility(t.id)}
+                                  className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
+                                  title={isPwVisible ? 'Hide password' : 'Show password'}
+                                >
+                                  {isPwVisible ? (
+                                    <EyeOff className="w-3 h-3 text-blue-600" />
+                                  ) : (
+                                    <Eye className="w-3 h-3" />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => copyTextToClipboard(freshPasswords[t.id], `p-${t.id}`)}
+                                  className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
+                                  title="Copy password"
+                                >
+                                  {copiedField === `p-${t.id}` ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-slate-400 font-medium text-[10px] italic">
+                                •••••••• (Encrypted)
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => setViewingCredentialsTeacher(t)}
-                          className="w-full mt-1 py-1 rounded-lg bg-white hover:bg-slate-100 text-amber-300 font-bold text-[10px] flex items-center justify-center gap-1 border border-slate-200 transition cursor-pointer"
-                        >
-                          <KeyRound className="w-3 h-3 text-blue-600" />
-                          <span>View Full Credential Slip</span>
-                        </button>
+                        <div className="flex items-center gap-1 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => setViewingCredentialsTeacher(t)}
+                            className="flex-1 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 font-bold text-[10px] flex items-center justify-center gap-1 border border-slate-200 transition cursor-pointer"
+                          >
+                            <KeyRound className="w-3 h-3 text-blue-600" />
+                            <span>Slip</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickResetPassword(t)}
+                            className="py-1 px-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[10px] flex items-center justify-center gap-1 border border-amber-200 transition cursor-pointer"
+                            title="Reset & generate fresh credentials"
+                          >
+                            <RotateCcw className="w-3 h-3 text-amber-600" />
+                            <span>Reset</span>
+                          </button>
+                        </div>
                       </div>
                     </td>
 
@@ -493,42 +548,60 @@ export default function TeacherRegistry() {
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
                     <span className="text-[10px] text-slate-500 uppercase font-semibold">Password:</span>
                     <div className="flex items-center gap-1 font-mono">
-                      <span className="text-rose-300 font-bold">
-                        {Boolean(visiblePasswords[t.id]) ? t.password_hash : '••••••••'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => togglePasswordVisibility(t.id)}
-                        className="p-1 hover:text-blue-600 text-slate-500 transition"
-                      >
-                        {Boolean(visiblePasswords[t.id]) ? (
-                          <EyeOff className="w-3 h-3 text-blue-600" />
-                        ) : (
-                          <Eye className="w-3 h-3" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => copyTextToClipboard(t.password_hash, `mob-p-${t.id}`)}
-                        className="p-1 hover:text-blue-600 text-slate-500 transition"
-                      >
-                        {copiedField === `mob-p-${t.id}` ? (
-                          <Check className="w-3 h-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
+                      {freshPasswords[t.id] ? (
+                        <>
+                          <span className="text-emerald-600 font-bold text-xs tracking-wider">
+                            {Boolean(visiblePasswords[t.id]) ? freshPasswords[t.id] : '••••••••'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility(t.id)}
+                            className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
+                          >
+                            {Boolean(visiblePasswords[t.id]) ? (
+                              <EyeOff className="w-3 h-3 text-blue-600" />
+                            ) : (
+                              <Eye className="w-3 h-3" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => copyTextToClipboard(freshPasswords[t.id], `mob-p-${t.id}`)}
+                            className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
+                          >
+                            {copiedField === `mob-p-${t.id}` ? (
+                              <Check className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-slate-400 font-medium text-[10px] italic">
+                          •••••••• (Encrypted)
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setViewingCredentialsTeacher(t)}
-                    className="w-full py-1 rounded-lg bg-white hover:bg-slate-100 text-amber-300 font-bold text-[10px] flex items-center justify-center gap-1 border border-slate-200 transition"
-                  >
-                    <KeyRound className="w-3 h-3 text-blue-600" />
-                    <span>View Full Credential Slip</span>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setViewingCredentialsTeacher(t)}
+                      className="flex-1 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 font-bold text-[10px] flex items-center justify-center gap-1 border border-slate-200 transition"
+                    >
+                      <KeyRound className="w-3 h-3 text-blue-600" />
+                      <span>View Full Credential Slip</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickResetPassword(t)}
+                      className="py-1 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[10px] flex items-center justify-center gap-1 border border-amber-200 transition cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3 text-amber-600" />
+                      <span>Reset</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs text-slate-700 pt-1 border-t border-slate-200/60">
@@ -1224,33 +1297,68 @@ export default function TeacherRegistry() {
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 font-sans text-[11px]">Access Password:</span>
                 <div className="flex items-center gap-1.5">
-                  <strong className="text-rose-300 text-sm font-bold tracking-wider">
-                    {Boolean(visiblePasswords[viewingCredentialsTeacher.id])
-                      ? viewingCredentialsTeacher.password_hash
-                      : '••••••••'}
-                  </strong>
-                  <button
-                    type="button"
-                    onClick={() => togglePasswordVisibility(viewingCredentialsTeacher.id)}
-                    className="p-1 hover:text-blue-600 text-slate-500 transition"
-                    title={Boolean(visiblePasswords[viewingCredentialsTeacher.id]) ? 'Hide password' : 'Show password'}
-                  >
-                    {Boolean(visiblePasswords[viewingCredentialsTeacher.id]) ? (
-                      <EyeOff className="w-3.5 h-3.5 text-blue-600" />
-                    ) : (
-                      <Eye className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => copyTextToClipboard(viewingCredentialsTeacher.password_hash, 'dossier-pass')}
-                    className="p-1 hover:text-blue-600 text-slate-500 transition"
-                  >
-                    {copiedField === 'dossier-pass' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
+                  {freshPasswords[viewingCredentialsTeacher.id] ? (
+                    <>
+                      <strong className="text-emerald-600 text-sm font-bold tracking-wider">
+                        {Boolean(visiblePasswords[viewingCredentialsTeacher.id])
+                          ? freshPasswords[viewingCredentialsTeacher.id]
+                          : '••••••••'}
+                      </strong>
+                      <button
+                        type="button"
+                        onClick={() => togglePasswordVisibility(viewingCredentialsTeacher.id)}
+                        className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
+                        title={Boolean(visiblePasswords[viewingCredentialsTeacher.id]) ? 'Hide password' : 'Show password'}
+                      >
+                        {Boolean(visiblePasswords[viewingCredentialsTeacher.id]) ? (
+                          <EyeOff className="w-3.5 h-3.5 text-blue-600" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyTextToClipboard(freshPasswords[viewingCredentialsTeacher.id], 'dossier-pass')}
+                        className="p-1 hover:text-blue-600 text-slate-500 transition cursor-pointer"
+                      >
+                        {copiedField === 'dossier-pass' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-slate-500 font-mono text-xs italic">
+                      •••••••• (Encrypted)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
+
+            {!freshPasswords[viewingCredentialsTeacher.id] ? (
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="font-semibold text-slate-800">Password is encrypted</div>
+                  <div className="text-[11px] text-slate-500">Generate a fresh temporary password for this staff member.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const teacher = viewingCredentialsTeacher;
+                    handleQuickResetPassword(teacher);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0 shadow-sm"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset & Show New Password</span>
+                </button>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
+                <KeyRound className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span>
+                  New credentials generated. Provide this password to <strong>{viewingCredentialsTeacher.full_name}</strong> to access the Academic Hub.
+                </span>
+              </div>
+            )}
 
             <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-300 flex items-start gap-2">
               <KeyRound className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
@@ -1263,7 +1371,9 @@ export default function TeacherRegistry() {
               <button
                 type="button"
                 onClick={() => {
-                  const summary = `Staff Credentials:\nName: ${viewingCredentialsTeacher.full_name}\nTeacher ID: ${viewingCredentialsTeacher.teacher_id_code}\nUsername: ${viewingCredentialsTeacher.username}\nPassword: ${viewingCredentialsTeacher.password_hash}\nLogin URL: ${window?.location?.origin || ''}/login`;
+                  const passDisplay = freshPasswords[viewingCredentialsTeacher.id] || '[Protected by Encryption — Reset to generate new password]';
+                  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                  const summary = `Staff Credentials Slip:\nName: ${viewingCredentialsTeacher.full_name}\nStaff ID: ${viewingCredentialsTeacher.teacher_id_code}\nUsername: ${viewingCredentialsTeacher.username}\nPassword: ${passDisplay}\nLogin URL: ${origin}/login`;
                   copyTextToClipboard(summary, 'dossier-all');
                 }}
                 className="py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-blue-600 border border-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"

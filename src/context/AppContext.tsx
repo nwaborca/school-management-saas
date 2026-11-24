@@ -525,7 +525,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       phone: t.phone || '+2348000000000',
       email: t.email || `${t.username || t.id}@school.edu.ng`,
       username: t.username || `tch_${t.id}`,
-      password_hash: t.password_hash || 'Tch2026!',
+      password_hash: t.password_hash || '',
       role: t.role === 'gate_security' || t.role === 'GATE_SECURITY' ? 'gate_security' : (t.role === 'admin' ? 'admin' : 'teacher'),
       assigned_subject_ids: Array.isArray(assignedIds) ? assignedIds : [],
       assigned_subjects: Array.isArray(assignedIds) ? assignedIds : [],

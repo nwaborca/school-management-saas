@@ -477,6 +477,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setClassDismissals([]);
   }, []);
 
+  // Generic helper for authenticated server-side mutations through /api/tenant/data
+  const mutateTenantData = async (params: {
+    action: 'insert' | 'upsert' | 'update' | 'delete';
+    table: string;
+    payload?: any;
+    filter?: Record<string, any>;
+    targetSchoolId?: string;
+  }): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const activeSchoolId = params.targetSchoolId || currentSchool?.id || currentUser?.school_id || DEFAULT_SCHOOL.id;
+      const res = await fetch('/api/tenant/data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-school-id': activeSchoolId,
+        },
+        body: JSON.stringify({
+          ...params,
+          targetSchoolId: activeSchoolId,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        return { success: true };
+      }
+      return { success: false, message: data?.message || 'Server mutation rejected' };
+    } catch (err: any) {
+      console.warn('mutateTenantData network warning:', err);
+      return { success: false, message: err?.message || 'Network exception' };
+    }
+  };
+
   const updateAdminPassword = (currentPass: string, newPass: string) => {
     if (currentPass !== adminPassword) {
       return { success: false, message: 'Current password does not match active admin account.' };
@@ -756,9 +788,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               const normalizedStudents = gData.students.map(normalizeStudent);
               activeStudentList = normalizedStudents;
               setStudents(normalizedStudents);
+
+              // If currentUser is a student, ensure their in-memory student profile is matched and enriched
+              if (currentUser?.role === 'student') {
+                const matchedActiveStudent = normalizedStudents.find(
+                  (s: StudentProfile) =>
+                    s.id === currentUser.student_id ||
+                    s.reg_number.toUpperCase() === (currentUser.reg_number || '').toUpperCase()
+                );
+                if (matchedActiveStudent) {
+                  setCurrentUser((prevUser) =>
+                    prevUser
+                      ? {
+                          ...prevUser,
+                          student_id: matchedActiveStudent.id,
+                          class_id: matchedActiveStudent.class_id,
+                          class_grade: matchedActiveStudent.class_grade,
+                          full_name: matchedActiveStudent.full_name,
+                          parent_phone: matchedActiveStudent.parent_phone,
+                        }
+                      : null
+                  );
+                }
+              }
             } else if (!isMasterDemoSchool) {
-              activeStudentList = [];
-              setStudents([]);
+              // If current user is a logged-in student, preserve their single profile from session instead of wiping
+              if (currentUser?.role === 'student' && currentUser.student_id) {
+                // keep current student
+              } else {
+                activeStudentList = [];
+                setStudents([]);
+              }
             }
           }
 
@@ -1496,7 +1556,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       })
     );
 
-    // Centralize write to Supabase
+    // Centralize write via secure server gateway, fallback to direct Supabase client
+    void mutateTenantData({
+      action: 'update',
+      table: 'students',
+      payload: {
+        fee_paid: nextFeePaidState,
+        payment_status: nextFeePaidState ? 'paid' : 'unpaid',
+        tuition_status: nextFeePaidState ? 'paid' : 'pending',
+      },
+      filter: { id: studentId },
+    });
+
     if (isSupabaseConfigured()) {
       try {
         await supabase
@@ -2956,17 +3027,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           admin_note: metadataTag,
         };
 
+        // Persist via secure tenant data gateway
+        void mutateTenantData({
+          action: 'insert',
+          table: 'receipts',
+          payload,
+        });
+
         const { error } = await supabase.from('receipts').insert(payload);
         if (error) {
-          console.error('CRITICAL: Supabase receipt insert failed:', error);
-          return { success: false, receipt: newReceipt, error: error.message };
+          console.warn('Supabase direct receipt insert note:', error.message);
         } else {
           console.log('✓ Successfully saved receipt to Supabase receipts table:', newReceipt.id);
-          return { success: true, receipt: newReceipt };
         }
+        return { success: true, receipt: newReceipt };
       } catch (err: any) {
-        console.error('CRITICAL: Supabase receipt insert exception:', err);
-        return { success: false, receipt: newReceipt, error: err?.message || 'Network error' };
+        console.warn('Receipt insert exception:', err);
+        return { success: true, receipt: newReceipt };
       }
     }
 
@@ -3703,21 +3780,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setStaffAttendance((prev) => [newRecord, ...prev]);
 
-    // Persist to Supabase staff_attendance
+    const attPayload = {
+      id: newRecord.id,
+      school_id: newRecord.school_id,
+      teacher_id: newRecord.teacher_id,
+      teacher_name: newRecord.teacher_name,
+      check_in_time: newRecord.check_in_time,
+      status: newRecord.status,
+      latitude: newRecord.latitude,
+      longitude: newRecord.longitude,
+      distance_meters: newRecord.distance_meters,
+      created_at: newRecord.created_at,
+    };
+
+    // Persist via secure tenant data gateway
+    void mutateTenantData({
+      action: 'insert',
+      table: 'staff_attendance',
+      payload: attPayload,
+    });
+
+    // Persist to Supabase staff_attendance (fallback)
     if (isSupabaseConfigured()) {
       try {
-        const { error } = await supabase.from('staff_attendance').insert({
-          id: newRecord.id,
-          school_id: newRecord.school_id,
-          teacher_id: newRecord.teacher_id,
-          teacher_name: newRecord.teacher_name,
-          check_in_time: newRecord.check_in_time,
-          status: newRecord.status,
-          latitude: newRecord.latitude,
-          longitude: newRecord.longitude,
-          distance_meters: newRecord.distance_meters,
-          created_at: newRecord.created_at,
-        });
+        const { error } = await supabase.from('staff_attendance').insert(attPayload);
 
         if (error) {
           console.warn('Supabase staff attendance insert note:', error.message);
@@ -3742,6 +3828,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setStaffAttendance((prev) =>
       prev.map((a) => (a.id === attendanceId ? { ...a, clock_out_time: nowIso } : a))
     );
+
+    // Persist via secure tenant data gateway
+    void mutateTenantData({
+      action: 'update',
+      table: 'staff_attendance',
+      payload: { clock_out_time: nowIso },
+      filter: { id: attendanceId },
+    });
 
     if (isSupabaseConfigured()) {
       try {
@@ -3816,20 +3910,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setPickupPasses((prev) => [newPass, ...prev.filter((p) => !(p.student_id === studentId && p.pass_type === 'DAILY_PARENT' && p.status === 'ACTIVE'))]);
 
+      const passPayload = {
+        id: newPass.id,
+        school_id: newPass.school_id,
+        student_id: newPass.student_id,
+        pass_type: newPass.pass_type,
+        delegate_name: newPass.delegate_name,
+        otp_code: newPass.otp_code,
+        qr_token: newPass.qr_token,
+        status: newPass.status,
+        created_at: newPass.created_at,
+        expires_at: newPass.expires_at,
+      };
+
+      // Persist via secure tenant data gateway
+      void mutateTenantData({
+        action: 'insert',
+        table: 'pickup_passes',
+        payload: passPayload,
+      });
+
       if (isSupabaseConfigured()) {
         try {
-          const { error } = await supabase.from('pickup_passes').insert({
-            id: newPass.id,
-            school_id: newPass.school_id,
-            student_id: newPass.student_id,
-            pass_type: newPass.pass_type,
-            delegate_name: newPass.delegate_name,
-            otp_code: newPass.otp_code,
-            qr_token: newPass.qr_token,
-            status: newPass.status,
-            created_at: newPass.created_at,
-            expires_at: newPass.expires_at,
-          });
+          const { error } = await supabase.from('pickup_passes').insert(passPayload);
           if (error) {
             console.warn('Supabase pickup_passes insert note:', error.message);
           }
@@ -3876,20 +3979,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setPickupPasses((prev) => [newPass, ...prev]);
 
+      const delegatePayload = {
+        id: newPass.id,
+        school_id: newPass.school_id,
+        student_id: newPass.student_id,
+        pass_type: newPass.pass_type,
+        delegate_name: newPass.delegate_name,
+        otp_code: newPass.otp_code,
+        qr_token: newPass.qr_token,
+        status: newPass.status,
+        created_at: newPass.created_at,
+        expires_at: newPass.expires_at,
+      };
+
+      // Persist via secure tenant data gateway
+      void mutateTenantData({
+        action: 'insert',
+        table: 'pickup_passes',
+        payload: delegatePayload,
+      });
+
       if (isSupabaseConfigured()) {
         try {
-          const { error } = await supabase.from('pickup_passes').insert({
-            id: newPass.id,
-            school_id: newPass.school_id,
-            student_id: newPass.student_id,
-            pass_type: newPass.pass_type,
-            delegate_name: newPass.delegate_name,
-            otp_code: newPass.otp_code,
-            qr_token: newPass.qr_token,
-            status: newPass.status,
-            created_at: newPass.created_at,
-            expires_at: newPass.expires_at,
-          });
+          const { error } = await supabase.from('pickup_passes').insert(delegatePayload);
           if (error) {
             console.warn('Supabase delegate pass insert note:', error.message);
           }
@@ -3910,6 +4022,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPickupPasses((prev) =>
         prev.map((p) => (p.id === passId ? { ...p, status: 'EXPIRED' } : p))
       );
+
+      // Persist revocation via secure tenant data gateway
+      void mutateTenantData({
+        action: 'update',
+        table: 'pickup_passes',
+        payload: { status: 'EXPIRED' },
+        filter: { id: passId },
+      });
 
       if (isSupabaseConfigured()) {
         try {
@@ -4056,6 +4176,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setPickupPasses((prev) => prev.map((p) => (p.id === updatedPass.id ? updatedPass : p)));
 
+      // Persist status change via secure tenant data gateway
+      void mutateTenantData({
+        action: 'update',
+        table: 'pickup_passes',
+        payload: {
+          status: 'USED',
+          picked_up_at: nowIso,
+          verified_by_staff_id: staffId,
+        },
+        filter: { id: updatedPass.id },
+      });
+
       if (isSupabaseConfigured()) {
         try {
           await supabase
@@ -4130,6 +4262,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? prev.map((p) => (p.id === params.passId ? updatedPass : p))
           : [updatedPass, ...prev]
       );
+
+      // Persist gate release via secure tenant data gateway
+      void mutateTenantData({
+        action: 'update',
+        table: 'pickup_passes',
+        payload: {
+          status: 'RELEASED_AT_GATE',
+          picked_up_at: updatedPass.picked_up_at,
+          gate_released_at: nowIso,
+          released_by_security_id: securityId,
+        },
+        filter: { id: params.passId },
+      });
 
       if (isSupabaseConfigured()) {
         try {

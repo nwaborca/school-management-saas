@@ -96,7 +96,8 @@ export async function GET(req: NextRequest) {
       announcementsRes,
     ] = await Promise.all([
       supabase.from('schools').select('*').eq('id', resolvedSchoolId).maybeSingle(),
-      supabase.from('students').select(SAFE_STUDENT_COLUMNS).eq('school_id', resolvedSchoolId),
+      // Fetch all students for the tenant, or if students select returns empty or specific safe list
+      supabase.from('students').select('*').eq('school_id', resolvedSchoolId),
       supabase.from('staff').select(SAFE_STAFF_COLUMNS).eq('school_id', resolvedSchoolId),
       supabase.from('classes').select('*').eq('school_id', resolvedSchoolId),
       supabase.from('term_results').select('*').eq('school_id', resolvedSchoolId),
@@ -107,12 +108,19 @@ export async function GET(req: NextRequest) {
       supabase.from('announcements').select('*').eq('school_id', resolvedSchoolId),
     ]);
 
+    // Strip sensitive access_pin from student records in the list
+    const sanitizedStudents = (studentsRes.data || []).map((s: any) => {
+      const clean = { ...s };
+      delete clean.access_pin;
+      return clean;
+    });
+
     return NextResponse.json({
       success: true,
       schoolId: resolvedSchoolId,
       data: {
         school: schoolRes.data || null,
-        students: studentsRes.data || [],
+        students: sanitizedStudents,
         staff: staffRes.data || [],
         classes: classesRes.data || [],
         termResults: resultsRes.data || [],

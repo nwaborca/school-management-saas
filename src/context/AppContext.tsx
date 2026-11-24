@@ -1954,9 +1954,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const existingIndex = results.findIndex(
         (r) =>
           r.student_id === studentId &&
-          r.subject_id === eySubjectId &&
+          (r.subject_id === eySubjectId ||
+            r.subject_id === 'sub-eng' ||
+            r.subject_id === 'subj-j-eng' ||
+            Boolean(r.early_years_data) ||
+            (typeof r.remarks === 'string' && r.remarks.startsWith('EY_DATA:'))) &&
           r.term === term &&
-          r.session === session
+          (r.session === session || !r.session)
       );
 
       let updatedResult: StudentResult;

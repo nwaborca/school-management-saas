@@ -876,11 +876,23 @@ export default function AcademicHubPage() {
         (r) =>
           r.student_id === std.id &&
           r.term === selectedTerm &&
-          r.session === session &&
-          r.early_years_data
+          (r.session === session || !r.session) &&
+          (Boolean(r.early_years_data) ||
+            (typeof r.remarks === 'string' && r.remarks.startsWith('EY_DATA:')) ||
+            r.subject_id === 'subj-ec-lang' ||
+            r.subject_id === 'sub-eng' ||
+            r.subject_id === 'subj-j-eng')
       );
-      if (match?.early_years_data) {
-        map[std.id] = match.early_years_data;
+
+      let commentary: EarlyYearsCommentary | null = match?.early_years_data || null;
+      if (!commentary && match?.remarks && typeof match.remarks === 'string' && match.remarks.startsWith('EY_DATA:')) {
+        try {
+          commentary = JSON.parse(match.remarks.replace('EY_DATA:', ''));
+        } catch {}
+      }
+
+      if (commentary && commentary.ratings) {
+        map[std.id] = commentary;
       } else {
         map[std.id] = {
           ratings: {

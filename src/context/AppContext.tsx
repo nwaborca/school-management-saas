@@ -527,7 +527,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       email: t.email || `${t.username || t.id}@school.edu.ng`,
       username: t.username || `tch_${t.id}`,
       password_hash: t.password_hash || '',
-      role: t.role === 'gate_security' || t.role === 'GATE_SECURITY' ? 'gate_security' : (t.role === 'admin' ? 'admin' : 'teacher'),
+      role: t.role === 'gate_security' || t.role === 'GATE_SECURITY' || String(t.staff_id_code || t.teacher_id_code || '').toUpperCase().startsWith('SEC-') ? 'gate_security' : (t.role === 'admin' ? 'admin' : 'teacher'),
       assigned_subject_ids: Array.isArray(assignedIds) ? assignedIds : [],
       assigned_subjects: Array.isArray(assignedIds) ? assignedIds : [],
       form_class_id: t.is_part_time ? undefined : (t.form_class_id || (t.assigned_class_id ?? undefined)),
@@ -1764,8 +1764,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       // Determine role: staff row may have role 'admin', 'gate_security', or 'teacher'
       const rawRole = (matchedTeacher as any).role;
+      const staffCode = String((matchedTeacher as any).staff_id_code || (matchedTeacher as any).teacher_id_code || '').toUpperCase();
       const assignedRole: UserRole =
-        rawRole === 'gate_security' || rawRole === 'GATE_SECURITY'
+        rawRole === 'gate_security' || rawRole === 'GATE_SECURITY' || staffCode.startsWith('SEC-')
           ? 'gate_security'
           : rawRole === 'admin'
           ? 'admin'
@@ -3536,7 +3537,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return false;
       }) || null;
 
-      // If not in local memory, query dedicated pickup-pass server API
+      // If not in local memory, query dedicated pickup-pass server API or Supabase directly
       if (!matchedPass && targetToken) {
         try {
           const res = await fetch(`/api/pickup-pass?token=${encodeURIComponent(targetToken)}`);
@@ -3548,6 +3549,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (apiErr) {
           console.warn('Pickup pass API lookup note:', apiErr);
+        }
+      }
+
+      if (!matchedPass && targetOtp) {
+        try {
+          const res = await fetch(`/api/pickup-pass?otp=${encodeURIComponent(targetOtp)}&schoolId=${encodeURIComponent(activeSchoolId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.pass && data.pass.school_id === activeSchoolId) {
+              matchedPass = normalizePickupPass(data.pass);
+            }
+          }
+        } catch (apiErr) {
+          console.warn('Pickup pass OTP API lookup note:', apiErr);
         }
       }
 

@@ -230,8 +230,9 @@ export async function POST(req: NextRequest) {
         clearRateLimit(rateLimitKey);
 
         const rawRole = matchedStaff.role;
+        const staffCode = (matchedStaff.staff_id_code || '').toUpperCase();
         const assignedRole =
-          rawRole === 'gate_security' || rawRole === 'GATE_SECURITY'
+          rawRole === 'gate_security' || rawRole === 'GATE_SECURITY' || staffCode.startsWith('SEC-')
             ? 'gate_security'
             : rawRole === 'admin'
             ? 'admin'

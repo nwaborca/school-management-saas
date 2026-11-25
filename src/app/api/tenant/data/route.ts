@@ -158,7 +158,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, table, payload, filter, targetSchoolId, onConflict } = body;
 
-    const resolvedSchoolId = session?.schoolId || targetSchoolId;
+    const requestedSchoolId = targetSchoolId || req.headers.get('x-school-id') || null;
+    const resolvedSchoolId = session?.schoolId || requestedSchoolId;
 
     if (!resolvedSchoolId) {
       return NextResponse.json(
@@ -223,9 +224,19 @@ export async function POST(req: NextRequest) {
       }
 
       // Enforce school_id on single object or array
-      const sanitizedPayload = Array.isArray(payload)
+      let sanitizedPayload = Array.isArray(payload)
         ? payload.map((item) => ({ ...item, school_id: resolvedSchoolId }))
         : { ...payload, school_id: resolvedSchoolId };
+
+      // Omit generated column 'total_score' from term_results write payloads to prevent Postgres errors
+      if (table === 'term_results') {
+        if (Array.isArray(sanitizedPayload)) {
+          sanitizedPayload = sanitizedPayload.map(({ total_score, ...rest }) => rest);
+        } else if (sanitizedPayload && typeof sanitizedPayload === 'object') {
+          const { total_score, ...rest } = sanitizedPayload;
+          sanitizedPayload = rest;
+        }
+      }
 
       // Server-Side Geofence Enforcement for staff_attendance clock-in
       if (table === 'staff_attendance' && (action === 'insert' || action === 'upsert')) {

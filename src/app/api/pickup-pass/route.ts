@@ -4,19 +4,27 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 export async function GET(req: NextRequest) {
   try {
     const token = req.nextUrl.searchParams.get('token')?.trim();
+    const otp = req.nextUrl.searchParams.get('otp')?.trim();
+    const schoolId = req.nextUrl.searchParams.get('schoolId')?.trim();
 
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No pass token provided' }, { status: 400 });
+    if (!token && !(otp && schoolId)) {
+      return NextResponse.json({ success: false, message: 'No pass token or OTP provided' }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
 
-    // 1. Fetch pass strictly by qr_token
-    const { data: pass, error: passErr } = await supabase
+    // 1. Fetch pass strictly by qr_token or (school_id + otp_code)
+    let query = supabase
       .from('pickup_passes')
-      .select('id, school_id, student_id, pass_type, delegate_name, otp_code, qr_token, status, expires_at, picked_up_at, gate_released_at')
-      .eq('qr_token', token)
-      .maybeSingle();
+      .select('id, school_id, student_id, pass_type, delegate_name, otp_code, qr_token, status, expires_at, picked_up_at, gate_released_at');
+
+    if (token) {
+      query = query.eq('qr_token', token);
+    } else if (otp && schoolId) {
+      query = query.eq('school_id', schoolId).eq('otp_code', otp);
+    }
+
+    const { data: pass, error: passErr } = await query.maybeSingle();
 
     if (passErr || !pass) {
       return NextResponse.json({ success: false, message: 'Invalid or non-existent pick-up pass' }, { status: 404 });
@@ -41,6 +49,7 @@ export async function GET(req: NextRequest) {
       pass: {
         id: pass.id,
         school_id: pass.school_id,
+        student_id: pass.student_id,
         pass_type: pass.pass_type,
         delegate_name: pass.delegate_name,
         otp_code: pass.otp_code,

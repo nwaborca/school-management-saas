@@ -477,13 +477,13 @@ test.describe('Aegis Platform E2E & Stress Test Suite', () => {
 
     // 7d. Verify /student Safe Pick-Up tab shows upgrade lock banner
     await page.goto('/login');
-    await page.getByRole('button', { name: 'Parent / Student', exact: true }).click();
+    await page.getByRole('button', { name: 'Student / Parent', exact: true }).click();
     await page.locator('input[placeholder="e.g. AEGIS-XXXX"]').fill(TEST_INVITE_CODE);
-    await page.locator('input[placeholder*="AEGIS-2026-001"]').fill('AEGIS-999-001');
-    await page.locator('input[placeholder*="PIN"]').fill('1234');
-    await page.getByRole('button', { name: 'Sign In as Parent / Student' }).click();
-    await page.waitForURL(/\/student/, { timeout: 15000 });
-    await page.getByRole('button', { name: /Safe Pick-Up/i }).click();
+    await page.locator('input[placeholder="e.g. STU-2026-841"]').fill('TEST-EY-001');
+    await page.locator('input[placeholder="••••"]').fill('1234');
+    await page.getByRole('button', { name: 'Sign In as Student / Parent' }).click();
+    await page.waitForURL(/(\/student|\/student-hub)/, { timeout: 15000 });
+    await page.locator('button:has-text("Safe Pick-Up")').first().click();
     await expect(page.getByTestId('module-locked-banner')).toBeVisible({ timeout: 10000 });
 
     // 7e. Restore safe_pickup_gate ON

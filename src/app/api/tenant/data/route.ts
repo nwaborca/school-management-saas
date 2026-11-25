@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin';
 import { verifySessionToken } from '@/lib/security';
+import { calculateHaversineDistance } from '@/lib/geofence';
 
 const ALLOWED_TABLES = [
   'students',
@@ -225,6 +226,79 @@ export async function POST(req: NextRequest) {
       const sanitizedPayload = Array.isArray(payload)
         ? payload.map((item) => ({ ...item, school_id: resolvedSchoolId }))
         : { ...payload, school_id: resolvedSchoolId };
+
+      // Server-Side Geofence Enforcement for staff_attendance clock-in
+      if (table === 'staff_attendance' && (action === 'insert' || action === 'upsert')) {
+        const attRecords = Array.isArray(sanitizedPayload) ? sanitizedPayload : [sanitizedPayload];
+        for (const record of attRecords) {
+          // Read school's configured campus geofence coordinates
+          const { data: schoolData, error: schoolErr } = await supabase
+            .from('schools')
+            .select('latitude, longitude, geofence_radius_meters')
+            .eq('id', resolvedSchoolId)
+            .maybeSingle();
+
+          if (schoolErr || !schoolData) {
+            return NextResponse.json(
+              { success: false, message: 'Could not verify school geofence configuration.' },
+              { status: 403 }
+            );
+          }
+
+          const sLat = schoolData.latitude;
+          const sLon = schoolData.longitude;
+          const sRadius = schoolData.geofence_radius_meters || 150;
+
+          if (
+            sLat === null ||
+            sLat === undefined ||
+            sLon === null ||
+            sLon === undefined ||
+            (Number(sLat) === 0 && Number(sLon) === 0)
+          ) {
+            return NextResponse.json(
+              { success: false, message: 'School campus GPS coordinates have not been configured by Admin yet.' },
+              { status: 403 }
+            );
+          }
+
+          const teacherLat = record.latitude ?? record.clock_in_lat;
+          const teacherLon = record.longitude ?? record.clock_in_lng;
+
+          if (
+            teacherLat === undefined ||
+            teacherLon === undefined ||
+            teacherLat === null ||
+            teacherLon === null ||
+            (Number(teacherLat) === 0 && Number(teacherLon) === 0)
+          ) {
+            return NextResponse.json(
+              { success: false, message: 'GPS coordinates are required to verify physical presence on campus.' },
+              { status: 403 }
+            );
+          }
+
+          const dist = calculateHaversineDistance(
+            Number(sLat),
+            Number(sLon),
+            Number(teacherLat),
+            Number(teacherLon)
+          );
+
+          if (dist > sRadius) {
+            return NextResponse.json(
+              {
+                success: false,
+                message: `Outside Campus Geofence: You are ${dist}m away from school (allowed: ${sRadius}m). Off-campus clock-in is rejected.`,
+              },
+              { status: 403 }
+            );
+          }
+
+          // Enforce distance_meters on the stored record
+          record.distance_meters = dist;
+        }
+      }
 
       // Safe UPSERT for term_results and tables with composite unique constraints
       if (action === 'upsert' && table === 'term_results' && !Array.isArray(sanitizedPayload)) {

@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { formatNaira, calculateGradeAndRemark, isEarlyYearsClass, EarlyYearsMastery, EarlyYearsDomainRatings, EarlyYearsCommentary } from '@/types';
+import { calculateHaversineDistance } from '@/lib/geofence';
 import { filterSubjectsForClassAndStream, getSeniorStreamForClass } from '@/lib/streamSpecialization';
 import EnrollStudentForm from '@/components/EnrollStudentForm';
 import {
@@ -73,6 +74,7 @@ export default function AcademicHubPage() {
 
   // Phase 3: Teacher Geofenced QR Attendance State
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isLocatingGps, setIsLocatingGps] = useState(false);
   const [isClockingIn, setIsClockingIn] = useState(false);
   const [isClockingOut, setIsClockingOut] = useState(false);
   const [cachedCoords, setCachedCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -551,46 +553,97 @@ export default function AcademicHubPage() {
   }, [staffAttendance, teacherId, teacherName, clientTodayStr]);
 
   // Handle direct tap on "Clock In via Gate QR":
-  // Immediately request browser GPS permission before opening camera scanner
+  // Immediately request browser GPS permission and verify campus geofence before opening camera scanner
   const handleStartClockInFlow = () => {
     setAttendanceNotice(null);
 
-    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-      // Step 1: Force high-accuracy satellite GPS request
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setCachedCoords({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
-          setIsScannerOpen(true);
-        },
-        (err) => {
-          console.warn('High-accuracy satellite GPS attempt failed/timed out, retrying with fallback:', err);
-          // Step 2: Fallback request (cell tower / Wi-Fi) with relaxed timeout & maximumAge
-          navigator.geolocation.getCurrentPosition(
-            (fallbackPos) => {
-              setCachedCoords({
-                latitude: fallbackPos.coords.latitude,
-                longitude: fallbackPos.coords.longitude,
-              });
-              setIsScannerOpen(true);
-            },
-            (fallbackErr) => {
-              console.warn('Fallback geolocation failed/denied:', fallbackErr);
-              // Do not block the teacher: open camera anyway to scan printed gate poster
-              setCachedCoords(null);
-              setIsScannerOpen(true);
-            },
-            { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-          );
-        },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-      );
-    } else {
-      setCachedCoords(null);
-      setIsScannerOpen(true);
+    // 1. Check if school campus GPS coordinates have been configured by Admin
+    const schoolLat = currentSchool?.latitude;
+    const schoolLon = currentSchool?.longitude;
+    const radiusMeters = currentSchool?.geofence_radius_meters || 150;
+
+    if (
+      schoolLat === null ||
+      schoolLat === undefined ||
+      schoolLon === null ||
+      schoolLon === undefined ||
+      (Number(schoolLat) === 0 && Number(schoolLon) === 0)
+    ) {
+      setAttendanceNotice({
+        type: 'error',
+        message: 'School campus GPS coordinates have not been configured by Admin yet.',
+      });
+      return;
     }
+
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      setAttendanceNotice({
+        type: 'error',
+        message: 'GPS geolocation is not supported by your browser/device. Cannot verify campus arrival.',
+      });
+      return;
+    }
+
+    // Set immediate tactile feedback on Tap 1
+    setIsLocatingGps(true);
+
+    const onGpsResolved = (coords: { latitude: number; longitude: number }) => {
+      setIsLocatingGps(false);
+      setCachedCoords(coords);
+
+      // Verify geofence distance immediately
+      const dist = calculateHaversineDistance(
+        Number(schoolLat),
+        Number(schoolLon),
+        coords.latitude,
+        coords.longitude
+      );
+
+      if (dist > radiusMeters) {
+        setAttendanceNotice({
+          type: 'error',
+          message: `Outside Campus Geofence: You are ${dist}m away from school (allowed: ${radiusMeters}m).`,
+        });
+        return;
+      }
+
+      // Inside geofence - proceed to open QR camera scanner
+      setIsScannerOpen(true);
+    };
+
+    // Stage 1: Fast GPS check with maximumAge=10000 and timeout=6000
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onGpsResolved({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        console.warn('Fast GPS lock failed/timed out, trying fresh hardware GPS lock:', err);
+        // Stage 2: Fallback retry with maximumAge=0 and timeout=6000
+        navigator.geolocation.getCurrentPosition(
+          (freshPos) => {
+            onGpsResolved({
+              latitude: freshPos.coords.latitude,
+              longitude: freshPos.coords.longitude,
+            });
+          },
+          (freshErr) => {
+            setIsLocatingGps(false);
+            console.warn('Fresh GPS lock failed:', freshErr);
+            setAttendanceNotice({
+              type: 'error',
+              message: freshErr.code === 1
+                ? 'GPS permission denied. Please allow location access to clock in on campus.'
+                : 'Unable to acquire accurate GPS position. Please ensure your device location is turned on and try again.',
+            });
+          },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 6000 }
+        );
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 6000 }
+    );
   };
 
   const handleScanSuccess = async (scannedPayload: string) => {
@@ -642,24 +695,20 @@ export default function AcademicHubPage() {
           executeClockIn(coords);
         },
         () => {
-          // Fallback attempt
-          navigator.geolocation.getCurrentPosition(
-            (fallbackPos) => {
-              const coords = { latitude: fallbackPos.coords.latitude, longitude: fallbackPos.coords.longitude };
-              setCachedCoords(coords);
-              executeClockIn(coords);
-            },
-            () => {
-              // Proceed with scan verification even if GPS unavailable
-              executeClockIn(null);
-            },
-            { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
-          );
+          setIsClockingIn(false);
+          setAttendanceNotice({
+            type: 'error',
+            message: 'Campus GPS coordinates required to verify arrival. Please enable location services.',
+          });
         },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 6000 }
       );
     } else {
-      executeClockIn(null);
+      setIsClockingIn(false);
+      setAttendanceNotice({
+        type: 'error',
+        message: 'Campus GPS coordinates required to verify arrival. Geolocation not supported.',
+      });
     }
   };
 
@@ -1093,11 +1142,21 @@ export default function AcademicHubPage() {
                 <button
                   type="button"
                   onClick={handleStartClockInFlow}
-                  disabled={isClockingIn}
+                  disabled={isClockingIn || isLocatingGps}
                   className="px-4 py-2 rounded-lg bg-[#1D4ED8] hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <Camera className="w-4 h-4" />
-                  <span>{isClockingIn ? 'Verifying Attendance...' : 'Clock In via Gate QR'}</span>
+                  {isLocatingGps ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
+                  <span>
+                    {isLocatingGps
+                      ? 'Verifying Campus GPS...'
+                      : isClockingIn
+                      ? 'Verifying Attendance...'
+                      : 'Clock In via Gate QR'}
+                  </span>
                 </button>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">

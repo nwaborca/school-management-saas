@@ -3167,32 +3167,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // 3. Geofence Verification using Haversine formula
+    // 3. Strict Geofence Verification using Haversine formula
     let distanceMeters: number | null = null;
     const schoolLat = currentSchool?.latitude;
     const schoolLon = currentSchool?.longitude;
     const radiusMeters = currentSchool?.geofence_radius_meters || 150;
 
-    if (schoolLat !== null && schoolLat !== undefined && schoolLon !== null && schoolLon !== undefined) {
-      if (params.latitude !== undefined && params.longitude !== undefined) {
-        distanceMeters = calculateHaversineDistance(
-          schoolLat,
-          schoolLon,
-          params.latitude,
-          params.longitude
-        );
+    // Reject immediately if school campus GPS coordinates have not been configured
+    if (
+      schoolLat === null ||
+      schoolLat === undefined ||
+      schoolLon === null ||
+      schoolLon === undefined ||
+      (Number(schoolLat) === 0 && Number(schoolLon) === 0)
+    ) {
+      return {
+        success: false,
+        message: 'School campus GPS coordinates have not been configured by Admin yet.',
+      };
+    }
 
-        if (distanceMeters > radiusMeters) {
-          return {
-            success: false,
-            message: `You are ${distanceMeters}m away from school. Move within ${radiusMeters}m of the school gate/staffroom to clock in.`,
-            distanceMeters,
-          };
-        }
-      } else {
-        // Teacher physically scanned the authentic gate QR poster, but browser/device GPS is restricted or unavailable
-        distanceMeters = null;
-      }
+    if (params.latitude === undefined || params.longitude === undefined || params.latitude === null || params.longitude === null) {
+      return {
+        success: false,
+        message: 'GPS coordinates are required to verify physical arrival on campus. Please allow location access.',
+      };
+    }
+
+    distanceMeters = calculateHaversineDistance(
+      Number(schoolLat),
+      Number(schoolLon),
+      params.latitude,
+      params.longitude
+    );
+
+    if (distanceMeters > radiusMeters) {
+      return {
+        success: false,
+        message: `Outside Campus Geofence: You are ${distanceMeters}m away from school (allowed: ${radiusMeters}m).`,
+        distanceMeters,
+      };
     }
 
     // 4. Punctuality Evaluation
@@ -3226,16 +3240,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: newRecord.status,
       latitude: newRecord.latitude,
       longitude: newRecord.longitude,
+      clock_in_lat: newRecord.latitude,
+      clock_in_lng: newRecord.longitude,
       distance_meters: newRecord.distance_meters,
       created_at: newRecord.created_at,
     };
 
     // Persist via secure tenant data gateway
-    void mutateTenantData({
+    const mutateRes = await mutateTenantData({
       action: 'insert',
       table: 'staff_attendance',
       payload: attPayload,
     });
+
+    if (!mutateRes.success) {
+      // Revert optimistic insert on server rejection
+      setStaffAttendance((prev) => prev.filter((r) => r.id !== newRecord.id));
+      return {
+        success: false,
+        message: mutateRes.message || 'Server rejected attendance clock-in.',
+      };
+    }
 
 
 

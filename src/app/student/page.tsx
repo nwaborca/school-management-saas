@@ -11,6 +11,8 @@ import { filterSubjectsForClassAndStream } from '@/lib/streamSpecialization';
 import { uploadReceiptToStorage } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 import { SchoolLogo } from '@/components/SchoolLogo';
+import { ModuleLockedBanner } from '@/components/ModuleLockedBanner';
+import { isModuleEnabled } from '@/lib/modules';
 import {
   GraduationCap,
   Award,
@@ -1344,7 +1346,10 @@ export default function StudentDashboardPage() {
         )}
 
         {/* TAB 3: SAFE PICK-UP & DISMISSAL PASS (PHASE 4) */}
-        {activeTab === 'pickup' && (
+        {activeTab === 'pickup' && !isModuleEnabled(currentSchool, 'safe_pickup_gate') && (
+          <ModuleLockedBanner moduleName="Safe Pick-Up & Gate" className="my-6" />
+        )}
+        {activeTab === 'pickup' && isModuleEnabled(currentSchool, 'safe_pickup_gate') && (
           <div className="space-y-6">
             {/* Header info */}
             <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">

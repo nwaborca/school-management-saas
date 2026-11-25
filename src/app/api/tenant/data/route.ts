@@ -217,6 +217,40 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
+    // Modular Feature Flag Guard for writes/mutations
+    const guardedTables = ['staff_attendance', 'pickup_passes', 'fee_structures', 'receipts', 'term_results'];
+    if (guardedTables.includes(table)) {
+      const { data: schoolFlags } = await supabase
+        .from('schools')
+        .select('enabled_modules')
+        .eq('id', resolvedSchoolId)
+        .maybeSingle();
+
+      const mods = schoolFlags?.enabled_modules;
+      if (mods) {
+        if (table === 'staff_attendance' && mods.staff_qr_attendance === false) {
+          return NextResponse.json({ success: false, message: 'Module not enabled for this school plan' }, { status: 403 });
+        }
+        if (table === 'pickup_passes' && mods.safe_pickup_gate === false) {
+          return NextResponse.json({ success: false, message: 'Module not enabled for this school plan' }, { status: 403 });
+        }
+        if ((table === 'fee_structures' || table === 'receipts') && mods.fee_tracking === false) {
+          return NextResponse.json({ success: false, message: 'Module not enabled for this school plan' }, { status: 403 });
+        }
+        if (table === 'term_results' && payload) {
+          const items = Array.isArray(payload) ? payload : [payload];
+          const hasEyData = items.some((item: any) => typeof item?.remarks === 'string' && item.remarks.startsWith('EY_DATA:'));
+          const hasNumeric = items.some((item: any) => !(typeof item?.remarks === 'string' && item.remarks.startsWith('EY_DATA:')));
+          if (hasEyData && mods.nursery_commentary === false) {
+            return NextResponse.json({ success: false, message: 'Module not enabled for this school plan' }, { status: 403 });
+          }
+          if (hasNumeric && mods.auto_grading_results === false) {
+            return NextResponse.json({ success: false, message: 'Module not enabled for this school plan' }, { status: 403 });
+          }
+        }
+      }
+    }
+
     // 1. INSERT / UPSERT
     if (action === 'insert' || action === 'upsert') {
       if (!payload) {

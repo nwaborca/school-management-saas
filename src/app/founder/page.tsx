@@ -19,7 +19,15 @@ import {
   ExternalLink,
   MessageCircle,
 } from 'lucide-react';
-import { SchoolAccessStatus, SchoolPlanLabel } from '@/types';
+import {
+  SchoolAccessStatus,
+  SchoolPlanLabel,
+  EnabledModules,
+  ModuleKey,
+  PlanTier,
+  SubscriptionStatus,
+} from '@/types';
+import { MODULE_METADATA, TIER_PRESETS, normalizeEnabledModules } from '@/lib/modules';
 
 interface ManagedSchool {
   id: string;
@@ -31,6 +39,10 @@ interface ManagedSchool {
   access_expires_at: string | null;
   is_expired: boolean;
   is_master_demo: boolean;
+  enabled_modules?: EnabledModules;
+  plan_tier?: PlanTier;
+  termly_fee_ngn?: number;
+  subscription_status?: SubscriptionStatus;
   student_count: number;
   teacher_count: number;
 }
@@ -456,6 +468,17 @@ export default function FounderConsolePage() {
                     Master demo school is permanently active and exempt from term expiry checks.
                   </div>
                 )}
+
+                {/* Modules & Subscription Panel */}
+                <SchoolModulesPanel
+                  school={school}
+                  founderPassword={founderPassword}
+                  onUpdated={(updated) => {
+                    setSchools((prev) =>
+                      prev.map((s) => (s.id === school.id ? { ...s, ...updated } : s))
+                    );
+                  }}
+                />
               </div>
             );
           })}
@@ -466,6 +489,182 @@ export default function FounderConsolePage() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SchoolModulesPanel({
+  school,
+  founderPassword,
+  onUpdated,
+}: {
+  school: ManagedSchool;
+  founderPassword: string;
+  onUpdated: (updated: Partial<ManagedSchool>) => void;
+}) {
+  const [modules, setModules] = useState<EnabledModules>(() =>
+    normalizeEnabledModules(school.enabled_modules)
+  );
+  const [planTier, setPlanTier] = useState<PlanTier>(school.plan_tier || 'SHIELD');
+  const [termlyFee, setTermlyFee] = useState<string>(
+    String(typeof school.termly_fee_ngn === 'number' ? school.termly_fee_ngn : 75000)
+  );
+  const [subStatus, setSubStatus] = useState<SubscriptionStatus>(
+    school.subscription_status || 'ACTIVE'
+  );
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const persistUpdate = async (
+    nextModules: EnabledModules,
+    nextTier: PlanTier,
+    nextFee: number,
+    nextStatus: SubscriptionStatus
+  ) => {
+    setSaving(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/founder/schools/${school.id}/modules`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          founderPassword,
+          enabled_modules: nextModules,
+          plan_tier: nextTier,
+          termly_fee_ngn: nextFee,
+          subscription_status: nextStatus,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setFeedback(data.message || 'Failed to save modules');
+        return;
+      }
+      onUpdated({
+        enabled_modules: data.school.enabled_modules,
+        plan_tier: data.school.plan_tier,
+        termly_fee_ngn: data.school.termly_fee_ngn,
+        subscription_status: data.school.subscription_status,
+      });
+      setFeedback('Saved');
+      setTimeout(() => setFeedback(null), 2000);
+    } catch {
+      setFeedback('Network error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const applyPreset = (tierKey: Exclude<PlanTier, 'CUSTOM'>) => {
+    const preset = TIER_PRESETS[tierKey];
+    setModules(preset.modules);
+    setPlanTier(preset.tier);
+    setTermlyFee(String(preset.priceNgn));
+    void persistUpdate(preset.modules, preset.tier, preset.priceNgn, subStatus);
+  };
+
+  const toggleModule = (key: ModuleKey) => {
+    const nextModules: EnabledModules = {
+      ...modules,
+      [key]: !modules[key],
+    };
+    setModules(nextModules);
+    setPlanTier('CUSTOM');
+    const numericFee = Number(termlyFee) || 0;
+    void persistUpdate(nextModules, 'CUSTOM', numericFee, subStatus);
+  };
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-800 space-y-3" data-testid={`modules-panel-${school.invite_code}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          Modules &amp; Subscription ({planTier})
+        </div>
+        {feedback && (
+          <span className="text-xs font-semibold text-emerald-400">{feedback}</span>
+        )}
+      </div>
+
+      {/* 3 One-Click Tier Preset Buttons */}
+      <div className="flex flex-wrap gap-2">
+        {(['CORE', 'OPERATIONS', 'SHIELD'] as const).map((tierKey) => {
+          const preset = TIER_PRESETS[tierKey];
+          const isActive = planTier === tierKey;
+          return (
+            <button
+              key={tierKey}
+              type="button"
+              disabled={saving}
+              onClick={() => applyPreset(tierKey)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer disabled:opacity-50 ${
+                isActive
+                  ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300'
+                  : 'bg-slate-800/70 border-slate-700 text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              {preset.name} (₦{preset.priceNgn.toLocaleString()}/term)
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 5 Individual Module Toggle Switches */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {MODULE_METADATA.map((mod) => {
+          const enabled = modules[mod.key];
+          return (
+            <label
+              key={mod.key}
+              className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 cursor-pointer hover:border-slate-700"
+            >
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-200 truncate">{mod.label}</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={enabled}
+                disabled={saving}
+                onChange={() => toggleModule(mod.key)}
+                data-testid={`toggle-${school.invite_code}-${mod.key}`}
+                className="w-4 h-4 accent-emerald-500 cursor-pointer shrink-0"
+              />
+            </label>
+          );
+        })}
+      </div>
+
+      {/* Billing Metadata */}
+      <div className="flex flex-wrap items-center gap-3 pt-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400">Termly Price (₦):</span>
+          <input
+            type="number"
+            value={termlyFee}
+            onChange={(e) => setTermlyFee(e.target.value)}
+            className="w-28 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400">Status:</span>
+          <select
+            value={subStatus}
+            onChange={(e) => setSubStatus(e.target.value as SubscriptionStatus)}
+            className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white"
+          >
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="TRIAL">TRIAL</option>
+            <option value="SUSPENDED">SUSPENDED</option>
+          </select>
+        </div>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => persistUpdate(modules, planTier, Number(termlyFee) || 0, subStatus)}
+          className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 cursor-pointer disabled:opacity-50"
+        >
+          Save Billing
+        </button>
       </div>
     </div>
   );

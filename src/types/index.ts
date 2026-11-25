@@ -12,6 +12,18 @@ export type StaffRole = 'teacher' | 'admin' | 'gate_security';
 export type SchoolAccessStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'TERM_EXPIRED';
 export type SchoolPlanLabel = 'FREE_PILOT_TERM' | 'ACTIVE_TERM';
 
+export type ModuleKey =
+  | 'auto_grading_results'
+  | 'nursery_commentary'
+  | 'fee_tracking'
+  | 'staff_qr_attendance'
+  | 'safe_pickup_gate';
+
+export type EnabledModules = Record<ModuleKey, boolean>;
+
+export type PlanTier = 'CORE' | 'OPERATIONS' | 'SHIELD' | 'CUSTOM';
+export type SubscriptionStatus = 'ACTIVE' | 'TRIAL' | 'SUSPENDED';
+
 // Multi-Tenant School Record
 export interface School {
   id: string;
@@ -32,6 +44,10 @@ export interface School {
   access_status?: SchoolAccessStatus;
   plan_label?: SchoolPlanLabel;
   access_expires_at?: string | null; // ISO timestamp
+  enabled_modules?: EnabledModules;
+  plan_tier?: PlanTier;
+  termly_fee_ngn?: number;
+  subscription_status?: SubscriptionStatus;
   created_at: string;
 }
 

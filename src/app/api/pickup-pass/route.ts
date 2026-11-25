@@ -37,12 +37,19 @@ export async function GET(req: NextRequest) {
       .eq('id', pass.student_id)
       .maybeSingle();
 
-    // 3. Fetch school name
+    // 3. Fetch school name & check module flag
     const { data: school } = await supabase
       .from('schools')
-      .select('name, logo_url')
+      .select('name, logo_url, enabled_modules')
       .eq('id', pass.school_id)
       .maybeSingle();
+
+    if (school?.enabled_modules && school.enabled_modules.safe_pickup_gate === false) {
+      return NextResponse.json(
+        { success: false, message: 'Module not enabled for this school plan' },
+        { status: 403 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

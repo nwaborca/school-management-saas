@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase';
 import TeacherRegistry from '@/components/TeacherRegistry';
 import EnrollStudentForm from '@/components/EnrollStudentForm';
 import StaffAttendanceQROverlay from '@/components/StaffAttendanceQROverlay';
+import { ModuleLockedBanner } from '@/components/ModuleLockedBanner';
+import { isModuleEnabled } from '@/lib/modules';
 import {
   Shield,
   TrendingUp,
@@ -1041,7 +1043,10 @@ export default function AdminHubPage() {
         )}
 
         {/* TAB 2: RECEIPT VERIFICATION QUEUE */}
-        {activeTab === 'receipts' && (
+        {activeTab === 'receipts' && !isModuleEnabled(currentSchool, 'fee_tracking') && (
+          <ModuleLockedBanner moduleName="Fee Tracking & Ledger" className="my-6" />
+        )}
+        {activeTab === 'receipts' && isModuleEnabled(currentSchool, 'fee_tracking') && (
           <div className="space-y-4">
             <div className="p-6 rounded-xl bg-white border border-slate-200 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200">
@@ -1212,7 +1217,10 @@ export default function AdminHubPage() {
         )}
 
         {/* TAB 3: HISTORICAL DEBT LEDGER & TRANSACTIONS BREAKDOWN */}
-        {activeTab === 'ledger' && (
+        {activeTab === 'ledger' && !isModuleEnabled(currentSchool, 'fee_tracking') && (
+          <ModuleLockedBanner moduleName="Fee Tracking & Ledger" className="my-6" />
+        )}
+        {activeTab === 'ledger' && isModuleEnabled(currentSchool, 'fee_tracking') && (
           <div className="space-y-4">
             <div className="p-6 rounded-xl bg-white border border-slate-200 space-y-4">
               <div className="flex items-center gap-3 pb-3 border-b border-slate-200">
@@ -1832,7 +1840,10 @@ export default function AdminHubPage() {
         )}
 
         {/* TAB 7: Staff Attendance & Geofence Audit */}
-        {activeTab === 'attendance' && (
+        {activeTab === 'attendance' && !isModuleEnabled(currentSchool, 'staff_qr_attendance') && (
+          <ModuleLockedBanner moduleName="Staff QR Attendance" className="my-6" />
+        )}
+        {activeTab === 'attendance' && isModuleEnabled(currentSchool, 'staff_qr_attendance') && (
           <div className="space-y-6">
             {/* Header + Actions */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
@@ -2192,7 +2203,10 @@ export default function AdminHubPage() {
         )}
 
         {/* TAB 8: SAFE PICK-UP & DISMISSAL AUDIT LOG (PHASE 4 & 5) */}
-        {activeTab === 'pickup-log' && (
+        {activeTab === 'pickup-log' && !isModuleEnabled(currentSchool, 'safe_pickup_gate') && (
+          <ModuleLockedBanner moduleName="Safe Pick-Up & Gate" className="my-6" />
+        )}
+        {activeTab === 'pickup-log' && isModuleEnabled(currentSchool, 'safe_pickup_gate') && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200">
               <div>

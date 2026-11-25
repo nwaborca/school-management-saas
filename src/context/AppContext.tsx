@@ -351,6 +351,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     access_status: 'ACTIVE',
     plan_label: 'ACTIVE_TERM',
     access_expires_at: null,
+    enabled_modules: {
+      auto_grading_results: true,
+      nursery_commentary: true,
+      fee_tracking: true,
+      staff_qr_attendance: true,
+      safe_pickup_gate: true,
+    },
+    plan_tier: 'SHIELD',
+    termly_fee_ngn: 75000,
+    subscription_status: 'ACTIVE',
     created_at: '2026-01-01T00:00:00.000Z',
   };
 

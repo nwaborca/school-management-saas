@@ -420,4 +420,87 @@ test.describe('Aegis Platform E2E & Stress Test Suite', () => {
       expect(hasHorizontalScroll, `Route ${route} has horizontal overflow on 375px mobile!`).toBe(false);
     }
   });
+
+  // --------------------------------------------------------------------------
+  // TEST 7 — Modular Feature Flags & Safe Pick-Up Gate Lock
+  // --------------------------------------------------------------------------
+  test('Test 7: Modular Feature Flags & Safe Pick-Up Gate Lock', async ({ page }) => {
+    const founderPassword = process.env.FOUNDER_PASSWORD || 'jesusislord';
+
+    // 7a. Toggle safe_pickup_gate OFF via Founder Modules API
+    const disableRes = await page.request.patch(`/api/founder/schools/${TEST_SCHOOL_ID}/modules`, {
+      data: {
+        founderPassword,
+        enabled_modules: {
+          auto_grading_results: true,
+          nursery_commentary: true,
+          fee_tracking: true,
+          staff_qr_attendance: true,
+          safe_pickup_gate: false,
+        },
+        plan_tier: 'OPERATIONS',
+        termly_fee_ngn: 55000,
+      },
+    });
+    expect(disableRes.status()).toBe(200);
+
+    // 7b. Verify /api/tenant/data blocks pickup_passes writes with 403
+    const blockedPassRes = await page.request.post('/api/tenant/data', {
+      headers: { 'x-school-id': TEST_SCHOOL_ID },
+      data: {
+        action: 'insert',
+        table: 'pickup_passes',
+        targetSchoolId: TEST_SCHOOL_ID,
+        payload: {
+          student_id: '99999999-3333-0000-0000-000000000001',
+          pass_type: 'DAILY_PARENT',
+          otp_code: '123456',
+          qr_token: 'test-blocked-token',
+          status: 'ACTIVE',
+          expires_at: new Date(Date.now() + 3600000).toISOString(),
+        },
+      },
+    });
+    expect(blockedPassRes.status()).toBe(403);
+    const blockedJson = await blockedPassRes.json();
+    expect(blockedJson.message).toContain('Module not enabled');
+
+    // 7c. Verify /gate shows upgrade lock banner
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Staff / Admin', exact: true }).click();
+    await page.locator('input[placeholder="e.g. AEGIS-XXXX"]').fill(TEST_INVITE_CODE);
+    await page.locator('input[placeholder*="admin@school.ng"]').fill('test_gate_999');
+    await page.locator('input[placeholder="Enter account password"]').fill(TEST_PASSWORD);
+    await page.getByRole('button', { name: 'Sign In as Staff / Admin' }).click();
+    await page.waitForURL(/\/gate/, { timeout: 15000 });
+    await expect(page.getByTestId('module-locked-banner')).toBeVisible({ timeout: 10000 });
+
+    // 7d. Verify /student Safe Pick-Up tab shows upgrade lock banner
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Parent / Student', exact: true }).click();
+    await page.locator('input[placeholder="e.g. AEGIS-XXXX"]').fill(TEST_INVITE_CODE);
+    await page.locator('input[placeholder*="AEGIS-2026-001"]').fill('AEGIS-999-001');
+    await page.locator('input[placeholder*="PIN"]').fill('1234');
+    await page.getByRole('button', { name: 'Sign In as Parent / Student' }).click();
+    await page.waitForURL(/\/student/, { timeout: 15000 });
+    await page.getByRole('button', { name: /Safe Pick-Up/i }).click();
+    await expect(page.getByTestId('module-locked-banner')).toBeVisible({ timeout: 10000 });
+
+    // 7e. Restore safe_pickup_gate ON
+    const restoreRes = await page.request.patch(`/api/founder/schools/${TEST_SCHOOL_ID}/modules`, {
+      data: {
+        founderPassword,
+        enabled_modules: {
+          auto_grading_results: true,
+          nursery_commentary: true,
+          fee_tracking: true,
+          staff_qr_attendance: true,
+          safe_pickup_gate: true,
+        },
+        plan_tier: 'SHIELD',
+        termly_fee_ngn: 75000,
+      },
+    });
+    expect(restoreRes.status()).toBe(200);
+  });
 });

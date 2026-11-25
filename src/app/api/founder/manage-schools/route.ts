@@ -9,6 +9,7 @@ import {
 } from '@/lib/founderAccess';
 import { School, SchoolAccessStatus, SchoolPlanLabel } from '@/types';
 import { checkRateLimit, recordRateLimitAttempt, clearRateLimit } from '@/lib/security';
+import { normalizeEnabledModules } from '@/lib/modules';
 
 function verifyFounderPassword(password: string): boolean {
   const masterPassword = (process.env.FOUNDER_PASSWORD || 'jesusislord').trim();
@@ -101,6 +102,10 @@ export async function POST(req: NextRequest) {
           access_expires_at: access.expiresAt,
           is_expired: access.isExpired,
           is_master_demo: access.isMasterDemo,
+          enabled_modules: normalizeEnabledModules(s.enabled_modules),
+          plan_tier: s.plan_tier || 'SHIELD',
+          termly_fee_ngn: typeof s.termly_fee_ngn === 'number' ? s.termly_fee_ngn : 75000,
+          subscription_status: s.subscription_status || 'ACTIVE',
           student_count: studentCountMap[s.id] || 0,
           teacher_count: staffCountMap[s.id] || 0,
         };

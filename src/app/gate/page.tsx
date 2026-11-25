@@ -4,6 +4,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { SchoolLogo } from '@/components/SchoolLogo';
+import { ModuleLockedBanner } from '@/components/ModuleLockedBanner';
+import { isModuleEnabled } from '@/lib/modules';
 import {
   Shield,
   ShieldCheck,
@@ -355,6 +357,10 @@ export default function GateSecurityPage() {
 
       {/* Main Gate Control Container */}
       <main className="flex-1 max-w-md w-full mx-auto p-4 space-y-4">
+        {!isModuleEnabled(currentSchool, 'safe_pickup_gate') ? (
+          <ModuleLockedBanner moduleName="Safe Pick-Up & Gate" className="my-6" />
+        ) : (
+        <>
         {/* Status Toast Notice */}
         {clockNotice && (
           <div className="p-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xs flex items-center gap-2 animate-in fade-in">
@@ -617,6 +623,8 @@ export default function GateSecurityPage() {
             </div>
           )}
         </div>
+        </>
+        )}
       </main>
     </div>
   );

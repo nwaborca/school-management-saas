@@ -10,6 +10,8 @@ import { formatNaira, calculateGradeAndRemark, isEarlyYearsClass, EarlyYearsMast
 import { calculateHaversineDistance } from '@/lib/geofence';
 import { filterSubjectsForClassAndStream, getSeniorStreamForClass } from '@/lib/streamSpecialization';
 import EnrollStudentForm from '@/components/EnrollStudentForm';
+import { ModuleLockedBanner } from '@/components/ModuleLockedBanner';
+import { isModuleEnabled } from '@/lib/modules';
 import {
   BookOpen,
   GraduationCap,
@@ -1354,7 +1356,11 @@ export default function AcademicHubPage() {
             </div>
 
             {/* Early Years Developmental Rubric (Creche, Playgroup, KG, Nursery) vs Numeric Grid */}
-            {isTargetEarlyYears ? (
+            {isTargetEarlyYears && !isModuleEnabled(currentSchool, 'nursery_commentary') ? (
+              <ModuleLockedBanner moduleName="Nursery Commentary" className="my-6" />
+            ) : !isTargetEarlyYears && !isModuleEnabled(currentSchool, 'auto_grading_results') ? (
+              <ModuleLockedBanner moduleName="Auto-Grading & Results" className="my-6" />
+            ) : isTargetEarlyYears ? (
               <div className="space-y-6">
                 <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
                   <div>

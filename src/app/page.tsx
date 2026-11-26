@@ -340,6 +340,133 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 2B. 3-PILLAR PLATFORM TIER SHOWCASE (READ-ONLY) */}
+      <section className="py-20 border-b border-[#E2E8F0] bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mb-12 space-y-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold uppercase tracking-wider">
+              <Layers className="w-3.5 h-3.5" />
+              <span>Modular Platform Architecture</span>
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0F172A] tracking-tight">
+              Three Pillars Built for Modern Schools
+            </h2>
+            <p className="text-slate-600 text-base">
+              Every school starts with a rock-solid academic and financial foundation, and scales into campus-wide staff accountability and child gate security.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Card 1 — Aegis Core */}
+            <div className="cursor-default rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-7 flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="w-11 h-11 rounded-xl bg-[#0F172A] text-white flex items-center justify-center">
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-extrabold text-[#0F172A]">Aegis Core</h3>
+                  <p className="text-sm font-medium text-emerald-700 mt-0.5">
+                    Essential Academic &amp; Fee Foundation
+                  </p>
+                </div>
+                <ul className="space-y-2.5 pt-2 text-sm text-slate-700">
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Automatic WAEC &amp; Numeric Grading Engine</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Early Years &amp; Montessori Commentary Grading</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Instant Digital Report Cards &amp; Parent Result Checker</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Termly Fee Ledger, Payment Receipts &amp; Bank Account Display</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Student, Class &amp; Staff Registry</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Card 2 — Aegis Operations */}
+            <div className="cursor-default rounded-2xl border border-[#E2E8F0] bg-white p-7 flex flex-col justify-between space-y-6 shadow-xs">
+              <div className="space-y-4">
+                <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-extrabold text-[#0F172A]">Aegis Operations</h3>
+                  <p className="text-sm font-medium text-emerald-700 mt-0.5">
+                    Core + Campus Staff Accountability
+                  </p>
+                </div>
+                <ul className="space-y-2.5 pt-2 text-sm text-slate-700">
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>
+                      Everything in <strong className="font-bold text-[#0F172A]">Aegis Core</strong>
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Campus GPS Geofencing &amp; Anti-Spoof Verification</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Teacher Gate QR Code Clock-In &amp; Lateness Logs</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Printable High-Resolution Campus QR Attendance Posters</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Card 3 — Aegis Shield */}
+            <div className="cursor-default rounded-2xl border border-[#0F172A] bg-[#0F172A] text-white p-7 flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-extrabold text-white">Aegis Shield</h3>
+                  <p className="text-sm font-medium text-emerald-400 mt-0.5">
+                    Complete Academic, Operations &amp; Child Security
+                  </p>
+                </div>
+                <ul className="space-y-2.5 pt-2 text-sm text-slate-200">
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>
+                      Everything in <strong className="font-bold text-white">Aegis Operations</strong>
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>Anti-Kidnapping Safe Pick-Up 6-Digit OTP Passes</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>5-Hour Expiring Authorized Delegate Verification</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>Dedicated Gate Security Dismissal Checkpoint &amp; Exit Logs</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* 3. CALL TO ACTION BANNER */}
       <section className="pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

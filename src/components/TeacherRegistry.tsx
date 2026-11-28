@@ -150,7 +150,7 @@ export default function TeacherRegistry() {
 
     try {
       setRegisterStatus(null);
-      const res = registerTeacher({
+      const res = await registerTeacher({
         fullName: fullName.trim(),
         phone: phone.trim().startsWith('+234') ? phone.trim() : `+234${phone.trim()}`,
         email: email.trim(),

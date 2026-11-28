@@ -503,4 +503,48 @@ test.describe('Aegis Platform E2E & Stress Test Suite', () => {
     });
     expect(restoreRes.status()).toBe(200);
   });
+
+  // --------------------------------------------------------------------------
+  // TEST 8 — Admin Gate Security Officer Creation & /gate Login Flow
+  // --------------------------------------------------------------------------
+  test('Test 8: Admin Gate Security Officer Creation & Login Flow', async ({ page }) => {
+    // 8a. Log in as Admin
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Staff / Admin', exact: true }).click();
+    await page.locator('input[placeholder="e.g. AEGIS-XXXX"]').fill(TEST_INVITE_CODE);
+    await page.locator('input[placeholder*="admin@school.ng"]').fill('test_admin_999');
+    await page.locator('input[placeholder="Enter account password"]').fill(TEST_PASSWORD);
+    await page.getByRole('button', { name: 'Sign In as Staff / Admin' }).click();
+    await page.waitForURL(/(\/admin|\/admin-hub)/, { timeout: 15000 });
+
+    // 8b. Open Teacher Registry tab and create a Gate Security officer
+    await page.locator('button:has-text("Teacher Registry")').first().click();
+    await page.getByRole('button', { name: /Register New Teacher/i }).first().click();
+
+    await page.getByRole('button', { name: /Gate Security/i }).first().click();
+    await page.locator('input[placeholder*="Ngozi Okafor"]').fill('Officer Musa Guard');
+    await page.locator('input[type="email"]').fill(`musa.guard.${Date.now()}@test.ng`);
+    await page.getByRole('button', { name: /Save Security Guard & Generate Gate Pass Key/i }).click();
+
+    // 8c. Read generated SEC- code and password from credentials modal
+    await expect(page.locator('text=/Gate\\d+!/').first()).toBeVisible({ timeout: 10000 });
+    const bodyText = await page.locator('body').innerText();
+    const codeMatch = bodyText.match(/SEC-[A-Z0-9-]+-\d+/);
+    const passMatch = bodyText.match(/Gate\d+!/);
+    expect(codeMatch).not.toBeNull();
+    expect(passMatch).not.toBeNull();
+
+    const secCode = codeMatch![0];
+    const secPass = passMatch![0];
+
+    // 8d. Log in as the newly created Gate Security officer and verify /gate access
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Staff / Admin', exact: true }).click();
+    await page.locator('input[placeholder="e.g. AEGIS-XXXX"]').fill(TEST_INVITE_CODE);
+    await page.locator('input[placeholder*="admin@school.ng"]').fill(secCode);
+    await page.locator('input[placeholder="Enter account password"]').fill(secPass);
+    await page.getByRole('button', { name: 'Sign In as Staff / Admin' }).click();
+    await page.waitForURL(/\/gate/, { timeout: 15000 });
+    await expect(page.locator('text=Officer Musa Guard')).toBeVisible({ timeout: 10000 });
+  });
 });

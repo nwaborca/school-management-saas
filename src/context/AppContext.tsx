@@ -174,7 +174,7 @@ interface AppContextType {
     formClassId?: string;
     assignedClassId?: string | null;
     isPartTime?: boolean;
-  }) => { teacher: TeacherProfile; initialPassword: string };
+  }) => Promise<{ teacher: TeacherProfile; initialPassword: string }>;
   updateTeacher: (
     teacherId: string,
     updates: {
@@ -2811,7 +2811,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Teacher Registry & Security Controls (Admin)
-  const registerTeacher = (data: {
+  const registerTeacher = async (data: {
     fullName: string;
     phone: string;
     email: string;
@@ -2827,7 +2827,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const activeInvite = (currentSchool?.invite_code || currentUser?.invite_code || 'AEGIS-2026').toUpperCase();
     const inviteSuffix = activeInvite.includes('-') ? activeInvite.split('-')[1] : activeInvite.slice(-4);
 
-    const nextSeq = String(teachers.length + 1).padStart(3, '0');
+    let seqNum = teachers.length + 1;
+    const existingCodes = new Set(teachers.map((t) => (t.teacher_id_code || '').toUpperCase()));
+    while (
+      existingCodes.has(
+        isSecurity
+          ? `SEC-${inviteSuffix}-${String(seqNum).padStart(3, '0')}`
+          : `TCH/2026/${String(seqNum).padStart(3, '0')}`
+      )
+    ) {
+      seqNum++;
+    }
+    const nextSeq = String(seqNum).padStart(3, '0');
     const teacherIdCode = isSecurity
       ? `SEC-${inviteSuffix}-${nextSeq}`
       : `TCH/2026/${nextSeq}`;
@@ -2870,38 +2881,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Persist staff creation via secure tenant data gateway
-    hashPassword(generatedPassword)
-      .then((hashedPass) => {
-        const staffPayload = {
-          id: newTeacher.id,
-          school_id: activeSchoolId,
-          staff_id_code: newTeacher.teacher_id_code,
-          full_name: newTeacher.full_name,
-          phone: newTeacher.phone,
-          email: newTeacher.email,
-          username: newTeacher.username,
-          password_hash: hashedPass,
-          role: newTeacher.role || 'teacher',
-          status: newTeacher.status,
-          assigned_subject_ids: newTeacher.assigned_subject_ids,
-          form_class_id: newTeacher.form_class_id || null,
-          session_token: newTeacher.session_token,
-        };
+    const hashedPass = await hashPassword(generatedPassword);
+    const staffPayload = {
+      id: newTeacher.id,
+      school_id: activeSchoolId,
+      staff_id_code: newTeacher.teacher_id_code,
+      full_name: newTeacher.full_name,
+      phone: newTeacher.phone?.trim() || '+2340000000000',
+      email: newTeacher.email,
+      username: newTeacher.username,
+      password_hash: hashedPass,
+      role: newTeacher.role || 'teacher',
+      status: newTeacher.status,
+      assigned_subject_ids: newTeacher.assigned_subject_ids,
+      form_class_id: newTeacher.form_class_id || null,
+      session_token: newTeacher.session_token,
+    };
 
-        return mutateTenantData({
-          action: 'insert',
-          table: 'staff',
-          payload: staffPayload,
-        });
-      })
-      .then((res: any) => {
-        if (!res?.success) {
-          console.warn('Tenant data gateway staff insert notice:', res?.message);
-        } else {
-          console.log('✓ Successfully saved new staff member via tenant gateway:', newTeacher.teacher_id_code);
-        }
-      })
-      .catch((e: unknown) => console.error('Staff insert exception:', e));
+    const res: any = await mutateTenantData({
+      action: 'insert',
+      table: 'staff',
+      payload: staffPayload,
+    });
+
+    if (!res?.success) {
+      setTeachers((prev) => prev.filter((t) => t.id !== newTeacher.id));
+      throw new Error(res?.message || 'Failed to save staff member to database.');
+    }
 
     return { teacher: newTeacher, initialPassword: generatedPassword };
   };
